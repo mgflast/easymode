@@ -1,0 +1,5 @@
+{
+  "MODEL_DIRECTORY": "~/easymode/",
+  "ARETOMO3_ENV": "module load aretomo3",
+  "ARETOMO3_PATH": "/public/EM/AreTomo/AreTomo3-2.1.10-cuda12.4/AreTomo3"
+}
