@@ -12,8 +12,7 @@ All networks were trained on a dataset of ~850 tilt series from 27 different sou
 
 ### functionality
 
-Pretrained 3D UNets for segmentation of common eukaryotic features are hosted via [🤗 huggingface](https://huggingface.co/mgflast/easymode/tree/main) and are automatically downloaded when you call *easymode*, so you don't need to worry about where to get the network weights from. To see which models are available, use:
-
+Pretrained 3D UNets for segmentation of common eukaryotic features are hosted via [🤗 huggingface](https://huggingface.co/mgflast/easymode/tree/main) and are automatically downloaded when you call *easymode*, so you don't need to worry about where to get the network weights from. To see which models are available, use this command. Note that we're still working to include more features & to validate the accuracy.
 ```
 easymode list
 ```
@@ -27,11 +26,11 @@ Easymode can currently segment the following features:
    > tric - [weights available for download]
 ```
 
-To segment data:
+To segment data, use 'easymode segment'. If the required network weights are not found in your local cache, they are automatically downloaded.
 ```
 easymode segment <feature> --data <directory containing tomograms>
 easymode segment ribosome --data warp_tiltseries/reconstruction
-easymode segment tric --data warp_tiltseries/reconstruction --tta 4                 # 4-fold test-time augmentation
+easymode segment tric --data warp_tiltseries/reconstruction --tta 4 --batch 1 --format int8        # 4-fold test-time augmentation, mimimal memory requirement
 ```
 To facilitate data pre-processing you can use the 'reconstruct' command. Using this requires an environment with [WarpTools](https://warpem.github.io/warp/user_guide/warptools/installation/) installedand configuring access to AreTomo3. In our case we set it up as follows:
 ```
@@ -48,10 +47,16 @@ We also distribute pretrained instances of cryoCARE and DeepDeWedge. To use thes
 easymode denoise cryocare
 easymode denoise deepdewedge
 ```
-Finally, to turn segmentations into coordinates and export these for ingestion in tools such as [Relion](https://github.com/3dem/relion) or [Warp](https://github.com/warpem/warp), use the following commands. Behind the scence we simply call _ais pick <arguments>_ from [Ais](github.com/bionanopatterning/Ais).
+To turn segmentations into coordinates and export these for ingestion in tools such as [Relion](https://github.com/3dem/relion) or [Warp](https://github.com/warpem/warp), use the following commands. Behind the scence we simply call _ais pick <arguments>_ from [Ais](github.com/bionanopatterning/Ais).
 ```
 easymode pick <feature> --data <directory containing segmentations corresponding to the feature> --output <output_directory> --size <minimum particle volume in cubic Å> --spacing <minimum inter-particle distance in Å>
 easymode pick ribosome --data segmented/ --output coordinates/ribosome --size 2000000 --spacing 300
+```
+Finally, to clear up valuable disk space (run with care!)
+```
+easymode clean --frame_halfmaps --volume_halfmaps --frame_averages --thumbnails --aretomo --tiltstacks         # use these flags to specify what to delete
+easymode clean <> --confirm                                                                                    # to actually delete files
+easymode clean <> --list                                                                                       # to list the files that would be deleted
 ```
 
 ### data sources
