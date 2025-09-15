@@ -147,9 +147,12 @@ def segment_tomogram(model, tomogram_path, tta=1, batch_size=2):
     volume /= np.std(volume) + 1e-8
 
     segmented_volume = np.zeros_like(volume)
-    k_xy = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3]
-    k_fx = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1]
-    k_yz = [0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1]
+
+    # Below: all 16 combinations of 90-degree rotations and flips that respect the anisotropy of the data.
+    k_xy = [0, 2, 2, 0, 1, 3, 0, 1, 2, 3, 0, 1, 2, 3, 1, 3]
+    k_fx = [0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1]
+    k_yz = [0, 1, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1]
+
     for j in range(tta):
         tta_vol = volume.copy()
         tta_vol = np.rot90(tta_vol, k=k_xy[j], axes=(1, 2))

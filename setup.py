@@ -30,8 +30,8 @@ setup(
         "requests",
         "tifffile",
         "psutil",
-        "Ais-cryoET"
-
+        "starfile"
+        #"Ais-cryoET"
     ]
 )
 

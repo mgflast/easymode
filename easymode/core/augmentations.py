@@ -1,6 +1,6 @@
 import numpy as np
 import random
-from scipy.ndimage import rotate, gaussian_filter, median_filter
+from scipy.ndimage import rotate, gaussian_filter, median_filter, zoom
 
 from easymode.membrain_fourier_augmentations.fourier_augmentations import MissingWedgeMaskAndFourierAmplitudeMatchingCombined
 
@@ -50,4 +50,29 @@ def remove_wedge(img, label):
 
 def filter_gaussian(img, label):
     img = gaussian_filter(img, sigma=random.uniform(0.3, 1.5))
+    return img, label
+
+
+def scale(img, label):
+    factor = np.random.uniform(0.9, 1.1)
+    box_size = img.shape[0]
+    if factor < 1:
+        zoomed_img = zoom(img, factor, order=1)
+        zoomed_label = zoom(label, factor, order=0)
+
+        pad_width = (box_size - zoomed_img.shape[0]) // 2
+        remainder = box_size - zoomed_img.shape[0] - 2 * pad_width
+
+        img = np.pad(zoomed_img, [(pad_width, pad_width + remainder)] * 3, mode='reflect')
+        label = np.pad(zoomed_label, [(pad_width, pad_width + remainder)] * 3, mode='reflect')
+    else:
+        zoomed_img = zoom(img, factor, order=1)
+        zoomed_label = zoom(label, factor, order=0)
+
+        center = zoomed_img.shape[0] // 2
+        start = center - 80
+        end = center + 80
+
+        img = zoomed_img[start:end, start:end, start:end]
+        label = zoomed_label[start:end, start:end, start:end]
     return img, label

@@ -5,7 +5,7 @@ import os
 # TODO: clear cache command
 
 def main():
-    parser = argparse.ArgumentParser(description="Ais headless CLI parser")
+    parser = argparse.ArgumentParser(description="easymode: pretrained general networks for cryoET.")
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
 
     train_parser = subparsers.add_parser('train', help='Train an easymode network.')
@@ -36,9 +36,19 @@ def main():
     segment.add_argument('--tta', required=False, type=int, default=4, help="Integer between 1 and 16 (or max 8 for 2d). For values > 1, test-time augmentation is performed by averaging the predictions of several transformed versions of the input. Higher values can yield better results but increase computation time. (default: 4)")
     segment.add_argument('--output', required=False, type=str, help="Directory to save the output")
     segment.add_argument('--overwrite', action='store_true', help='If set, overwrite existing segmentations in the output directory.')
-    segment.add_argument('--2d', dest='in_2d', action='store_true', help='Use Ais 2D networks rather than easymode 3D.')
-    segment.add_argument('--batch', type=int, default=1, help='Batch size for segmentation (default 4). Volumes are processed in batches of 160x160x160 shaped tiles. In/decrease batch size depending on available GPU memory.')
-    segment.add_argument('--format', type=str, choices=['float32', 'uint16', 'int8'], default='int8', help='Output format for the segmented volumes (default: float32). Choose uint16 or int8 to save disk space, but note that this may reduces the precision of the output (although that should hardly matter).')
+    segment.add_argument('--batch', type=int, default=1, help='Batch size for segmentation (default 1). Volumes are processed in batches of 160x160x160 shaped tiles. In/decrease batch size depending on available GPU memory.')
+    segment.add_argument('--format', type=str, choices=['float32', 'uint16', 'int8'], default='int8', help='Output format for the segmented volumes (default: float32). Choose uint16 or int8 to save disk space, but note that this may reduces the precision of the output (which should hardly matter).')
+
+    pick = subparsers.add_parser('pick', help='Pick particles in segmented volumes.')
+    pick.add_argument("feature", metavar='FEATURE', type=str, help="Feature to pick, based on segmentations.")
+    pick.add_argument('--data', required=True, type=str, help="Path to directory containing input .mrc's.")
+    pick.add_argument('--output', required=False, type=str, default=None, help="Directory to save output coordinate files to. If left empty, will save to the input data directory.")
+    pick.add_argument('--threshold', required=False, type=float, default=128, help="Threshold to apply to volumes prior to finding local maxima (default 128). Regardless of the segmentation .mrc dtype, the value range is assumed to be 0-255.")
+    pick.add_argument('--binning', required=False, type=int, default=2, help="Binning factor to apply before processing (faster, possibly less accurate). Default is 2.")
+    pick.add_argument('--spacing', required=False, type=float, default=10.0, help="Minimum distance between particles in Angstrom.")
+    pick.add_argument('--size', required=False, type=float, default=10.0, help="Minimum particle size in cubic Angstrom.")
+    pick.add_argument('--no_tomostar', dest='tomostar', action='store_false', help='Include this flag in order NOT to rename tomograms in the .star files from etc_10.00Apx.mrc to etc.tomostar.')
+
 
     reconstruct = subparsers.add_parser('reconstruct', help='Reconstruct tomograms using WarpTools and AreTomo3.')
     reconstruct.add_argument('--frames', type=str, required=True, help="Directory containing raw frames.")
@@ -69,11 +79,20 @@ def main():
         dispatch_segment(feature=args.feature.lower(),
                 data_directory=args.data,
                 output_directory=args.output,
-                 tta=args.tta if not args.in_2d else min(args.tta, 8),
+                tta=args.tta,
                 gpus=args.gpu,
                 batch_size=args.batch,
                 overwrite=args.overwrite,
                 data_format=args.format)
+    elif args.command == 'pick':
+        from easymode.core.pick import pick
+        pick(target=args.feature.lower(),
+             data_directory=args.data,
+             output_directory=args.output if args.output is not None else args.data,
+             spacing=args.spacing,
+             size=args.size,
+             binning=args.binning,
+             tomostar=args.tomostar)
     elif args.command == 'reconstruct':
         from easymode.core.warp import reconstruct
         reconstruct(frames=args.frames,

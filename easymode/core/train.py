@@ -6,6 +6,7 @@ AUGMENTATIONS_ROT_XZ_YZ = 0.33 #0.333
 AUGMENTATIONS_ROT_XY = 0.33 #0.333
 AUGMENATIONS_MISSING_WEDGE = 0.0 # 0.0
 AUGMENTATIONS_GAUSSIAN = 0.33 #0.2
+AUGMENTATIONS_SCALE = 0.33
 
 
 class DataLoader:
@@ -93,6 +94,16 @@ class DataLoader:
         # AUGMENTATION 7 - missing wedge simulation - exclusive
         if random.uniform(0.0, 1.0) < AUGMENATIONS_MISSING_WEDGE:
             img, label = remove_wedge(img, label)
+
+        if random.uniform(0.0, 1.0) < AUGMENTATIONS_SCALE:
+            img, label = scale(img, label)
+
+        label[:32, :, :] = 2
+        label[-32:, :, :] = 2
+        label[:, :32, :] = 2
+        label[:, -32:, :] = 2
+        label[:, :, :32] = 2
+        label[:, :, -32:] = 2
 
         return img, label
 
