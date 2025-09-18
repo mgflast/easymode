@@ -3,7 +3,8 @@ import requests
 import json
 from pathlib import Path
 from huggingface_hub import hf_hub_download, HfApi
-from easymode.core.model import create
+from easymode.core.model import create as create_segmenter
+from easymode.n2n.model import create as create_denoiser
 import tensorflow as tf
 import easymode.core.config as cfg
 
@@ -15,13 +16,13 @@ VERSION_FILE = "model_info.json"
 
 def get_model_info(model_title):
     """Get model repository and filename info."""
-    filename = f"{model_title}_3d.h5"
+    filename = f"{model_title}.h5"
 
     return {
         'repo_id': HF_REPO_ID,
         'filename': filename,
         'local_path': os.path.join(MODEL_CACHE_DIR, filename),
-        'version_path': os.path.join(MODEL_CACHE_DIR, f"{model_title}_3d_info.json")
+        'version_path': os.path.join(MODEL_CACHE_DIR, f"{model_title}_info.json")
     }
 
 
@@ -79,7 +80,7 @@ def download_model(repo_id, filename, local_path, version_path):
         os.makedirs(os.path.dirname(local_path), exist_ok=True)
 
         # Download file
-        downloaded_path = hf_hub_download(
+        hf_hub_download(
             repo_id=repo_id,
             filename=filename,
             cache_dir=MODEL_CACHE_DIR,
@@ -99,8 +100,12 @@ def download_model(repo_id, filename, local_path, version_path):
 
 
 def load_model_weights(weights_path):
-    model = create()
-    dummy_input = tf.zeros((1, 160, 160, 160, 1))
+    if 'denoise' in os.path.basename(weights_path):
+        model = create_denoiser()
+        dummy_input = tf.zeros((1, 128, 128, 128, 1))
+    else:
+        model = create_segmenter()
+        dummy_input = tf.zeros((1, 160, 160, 160, 1))
     _ = model(dummy_input)
     model.load_weights(weights_path)
     return model

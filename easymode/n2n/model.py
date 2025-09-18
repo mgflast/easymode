@@ -2,9 +2,61 @@ import tensorflow as tf
 from tensorflow.keras import layers, Model
 
 
-def l1_loss(y_true, y_pred):
-    return tf.reduce_mean(tf.abs(y_true - y_pred))
+def gaussian_kernel_3d(size=11, sigma=1.5):
+    ax = tf.range(-size // 2 + 1., size // 2 + 1., dtype=tf.float32)
+    zz, yy, xx = tf.meshgrid(ax, ax, ax, indexing='ij')
+    kernel = tf.exp(-(xx ** 2 + yy ** 2 + zz ** 2) / (2 * sigma ** 2))
+    kernel = kernel / tf.reduce_sum(kernel)
+    return kernel[:, :, :, None, None]
 
+
+def ssim_3d(img1, img2, max_val=1.0, filter_size=11, filter_sigma=1.5, k1=0.01, k2=0.03):
+    kernel = gaussian_kernel_3d(filter_size, filter_sigma)
+
+    def conv3d(img, kernel):
+        return tf.nn.conv3d(img, kernel, strides=[1, 1, 1, 1, 1], padding='SAME')
+
+    mu1 = conv3d(img1, kernel)
+    mu2 = conv3d(img2, kernel)
+    mu1_sq = mu1 * mu1
+    mu2_sq = mu2 * mu2
+    mu1_mu2 = mu1 * mu2
+
+    sigma1_sq = conv3d(img1 * img1, kernel) - mu1_sq
+    sigma2_sq = conv3d(img2 * img2, kernel) - mu2_sq
+    sigma12 = conv3d(img1 * img2, kernel) - mu1_mu2
+
+    c1 = (k1 * max_val) ** 2
+    c2 = (k2 * max_val) ** 2
+
+    ssim_map = ((2 * mu1_mu2 + c1) * (2 * sigma12 + c2)) / ((mu1_sq + mu2_sq + c1) * (sigma1_sq + sigma2_sq + c2))
+    return tf.reduce_mean(ssim_map)
+
+
+def masked_l1_ssim_loss(y_true, y_pred, alpha=0.8, edge=16, max_val=1.0):
+    shape = tf.shape(y_true)
+    d, h, w = shape[1], shape[2], shape[3]
+
+    mask_d = tf.logical_and(tf.range(d) >= edge, tf.range(d) < d - edge)
+    mask_h = tf.logical_and(tf.range(h) >= edge, tf.range(h) < h - edge)
+    mask_w = tf.logical_and(tf.range(w) >= edge, tf.range(w) < w - edge)
+
+    mask = tf.logical_and(tf.logical_and(
+        mask_d[None, :, None, None, None],
+        mask_h[None, None, :, None, None]),
+        mask_w[None, None, None, :, None])
+
+    mask_float = tf.cast(mask, y_pred.dtype)
+
+    per_voxel = tf.abs(y_true - y_pred)
+    masked_per_voxel = per_voxel * mask_float
+    denom = tf.reduce_sum(mask_float)
+    l1_loss = tf.reduce_sum(masked_per_voxel) / tf.maximum(denom, 1.0)
+
+    ssim_val = ssim_3d(y_true, y_pred, max_val=max_val)
+    ssim_loss = 1.0 - ssim_val
+
+    return alpha * l1_loss + (1.0 - alpha) * ssim_loss
 
 class ResBlock3D(layers.Layer):
     """3D Residual block with batch normalization and ReLU activation."""
@@ -121,13 +173,13 @@ class DecoderBlock(layers.Layer):
         return x
 
 
-class VolumeDenoiserUNet(Model):
+class UNet(Model):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        filters = [32, 64, 128, 256, 512]
-        strides = [1, 2, 2, 2, 2]
-        upsample_kernel_sizes = [1, 2, 2, 2, 2]
+        filters = [32, 64, 128, 256]
+        strides = [1, 2, 2, 2]
+        upsample_kernel_sizes = [1, 2, 2, 2]
 
         self.encoders = []
         for i, (f, s) in enumerate(zip(filters, strides)):
@@ -140,20 +192,15 @@ class VolumeDenoiserUNet(Model):
         for i, (f, us) in enumerate(zip(decoder_filters, decoder_upsample)):
             self.decoders.append(DecoderBlock(f, upsample_kernel_size=us, name=f'decoder_{i}'))
 
-        self.final_conv = layers.Conv3D(1, 1, activation='linear', name='output')
+        self.final_conv = layers.Conv3D(1, 1, activation='linear', name='output', use_bias=False)
 
         self.compile(
-            optimizer=tf.keras.optimizers.Adam(
-                learning_rate=0.0001,
-                beta_1=0.9,
-                beta_2=0.999,
-                epsilon=1e-7
-            ),
-            loss=l1_loss,
+            optimizer=tf.keras.optimizers.Adam(learning_rate=0.0004),
+            loss=masked_l1_ssim_loss,
             metrics=['mae', 'mse'],
             run_eagerly=False,
-            steps_per_execution=16,
         )
+
 
     def call(self, inputs, training=None):
         # Encoder path
@@ -173,55 +220,11 @@ class VolumeDenoiserUNet(Model):
             x = decoder(x, skip_connection=skip, training=training)
 
         # Final output
-        output = self.final_conv(x)
-        return output
-
-    def train_model(self, train_data, val_data, epochs=100, batch_size=1):
-        callbacks = [
-            tf.keras.callbacks.EarlyStopping(
-                patience=15,
-                restore_best_weights=True,
-                monitor='val_loss',
-                min_delta=1e-6
-            ),
-            tf.keras.callbacks.ReduceLROnPlateau(
-                factor=0.5,
-                patience=7,
-                min_lr=1e-7,
-                monitor='val_loss',
-                verbose=1
-            ),
-            tf.keras.callbacks.ModelCheckpoint(
-                'best_denoiser_model.h5',
-                save_best_only=True,
-                monitor='val_loss'
-            )
-        ]
-
-        return self.fit(
-            train_data.batch(batch_size),
-            validation_data=val_data.batch(batch_size),
-            epochs=epochs,
-            callbacks=callbacks,
-            verbose=1
-        )
-
-    def predict_volume(self, noisy_volume):
-        return self.predict(noisy_volume)
+        residual = self.final_conv(x)
+        return inputs - residual
 
 
-def create_denoiser():
-    model = VolumeDenoiserUNet()
+def create():
+    model = UNet()
     return model
 
-
-def prepare_denoising_dataset(full_volumes, denoised_volumes, validation_split=0.2):
-    """Prepare dataset for denoising training"""
-    dataset = tf.data.Dataset.from_tensor_slices((full_volumes, denoised_volumes))
-    dataset = dataset.shuffle(len(full_volumes))
-
-    val_size = int(len(full_volumes) * validation_split)
-    train_data = dataset.skip(val_size)
-    val_data = dataset.take(val_size)
-
-    return train_data, val_data

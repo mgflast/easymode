@@ -165,12 +165,7 @@ class UNet(Model):
         self.final_conv = layers.Conv3D(1, 1, activation='sigmoid', name='output')
 
         self.compile(
-            optimizer=tf.keras.optimizers.SGD(
-                learning_rate=0.001,
-                momentum=0.99,
-                decay=3e-5,
-                nesterov=True
-            ),
+            optimizer=tf.keras.optimizers.Adam(learning_rate=0.0004),
             loss=combined_masked_bce_dice_loss,
             metrics=[masked_dice, 'binary_accuracy'],
             run_eagerly=False,

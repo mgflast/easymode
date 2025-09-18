@@ -99,7 +99,9 @@ Not all training data sources are currently listed, as a number of contributors 
 | 028_ROOF    | DS-10434              | cellular periphery H. sapiens (HEK293)     | 20 | 1.51           |
 | 029_TKIV    | EMPIAR-11058          | milled T. kivui                            | 17 | 1.51           |
 | 030_LDN     | Mart Last             | cellular periphery H. sapiens (U2OS)       | 26 | 2.74           |
+
 *DS: datasets on the [CZI CryoET Data Portal](https://cryoetdataportal.czscience.com/)
+
 ### references
 
 (work in progress)
