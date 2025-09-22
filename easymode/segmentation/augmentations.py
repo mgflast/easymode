@@ -1,8 +1,8 @@
 import numpy as np
 import random
-from scipy.ndimage import rotate, gaussian_filter, median_filter, zoom
+from scipy.ndimage import rotate, gaussian_filter, zoom
 
-from easymode.membrain_fourier_augmentations.fourier_augmentations import MissingWedgeMaskAndFourierAmplitudeMatchingCombined
+from easymode.segmentation.membrain_fourier_augmentations.fourier_augmentations import MissingWedgeMaskAndFourierAmplitudeMatchingCombined
 
 ROT_XZ_YZ_MAX_ANGLE = 10.0
 ROT_XY_MAX_ANGLE = 10.0

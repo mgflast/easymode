@@ -1,5 +1,5 @@
-import glob, os, mrcfile, numpy as np, random
-from easymode.core.augmentations import *
+import glob, os, mrcfile
+from easymode.segmentation.augmentations import *
 import tensorflow as tf
 
 AUGMENTATIONS_ROT_XZ_YZ = 0.33 #0.333
@@ -141,7 +141,7 @@ class DataLoader:
 
 
 def train_model(title='', features='', batch_size=8, epochs=2000, lr_start=1e-3, lr_end=1e-5):
-    from easymode.core.model import create
+    from easymode.segmentation.model import create
 
     tf.config.run_functions_eagerly(False)
 

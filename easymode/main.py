@@ -32,12 +32,11 @@ def main():
     segment = subparsers.add_parser('segment', help='Segment data using pretrained easymode networks.')
     segment.add_argument("feature", metavar='FEATURE', type=str, help="Feature to segment. Use 'easymode list' to see available features.")
     segment.add_argument("--data", type=str, required=True, help="Directory containing .mrc files to segment.")
-    segment.add_argument('--gpu', required=True, type=str, help="Comma-separated list of GPU IDs to use (e.g., 0,1,3,4)")  #
     segment.add_argument('--tta', required=False, type=int, default=4, help="Integer between 1 and 16 (or max 8 for 2d). For values > 1, test-time augmentation is performed by averaging the predictions of several transformed versions of the input. Higher values can yield better results but increase computation time. (default: 4)")
     segment.add_argument('--output', required=True, type=str, help="Directory to save the output")
     segment.add_argument('--overwrite', action='store_true', help='If set, overwrite existing segmentations in the output directory.')
     segment.add_argument('--batch', type=int, default=1, help='Batch size for segmentation (default 1). Volumes are processed in batches of 160x160x160 shaped tiles. In/decrease batch size depending on available GPU memory.')
-    segment.add_argument('--format', type=str, choices=['float32', 'uint16', 'int8'], default='int8', help='Output format for the segmented volumes (default: float32). Choose uint16 or int8 to save disk space, but note that this may reduces the precision of the output (which should hardly matter).')
+    segment.add_argument('--format', type=str, choices=['float32', 'uint16', 'int8'], default='int8', help='Output format for the segmented volumes (default: int8).')
 
     pick = subparsers.add_parser('pick', help='Pick particles in segmented volumes.')
     pick.add_argument("feature", metavar='FEATURE', type=str, help="Feature to pick, based on segmentations.")
@@ -64,9 +63,9 @@ def main():
     denoise = subparsers.add_parser('denoise', help='Denoise or enhance contrast of tomograms.')
     denoise.add_argument('--data', type=str, required=True, help="Directory containing tomograms to denoise. In mode 'splits', this directory is expected to contain two subdirectories 'even' and 'odd' with the respective tomogram splits.")
     denoise.add_argument('--output', type=str, required=True, help="Directory to save denoised tomograms to.")
-    denoise.add_argument('--mode', type=str, choices=['splits', 'direct'], help="Denoising mode. splits: statistically sound denoising of independent even/odd splits. direct: denoise the complete tomogram using a network that was trained on even/odd split denoised data. This last option helps avoid having to generate even/odd frame and volume splits.")
+    denoise.add_argument('--mode', type=str, choices=['splits', 'direct'], help="Denoising mode. splits: statistically sound denoising of independent even/odd splits. direct: denoise the complete tomogram using a network that was trained on even/odd split denoised data. This last option helps avoid having to generate even/odd frame and volume splits.", default='direct')
+    denoise.add_argument('--method', type=str, choices=['n2n', 'ddw'], help="Choose between denoising methods: 'n2n' for Noise2Noise (e.g. cryoCARE), or 'ddw' for DeepDeWedge. See github.com/juglab/cryocare_pip and github.com/mli-lab/deepdewedge and corresponding publications. In easymode we use custom tensorflow implementations.", default='n2n')
     denoise.add_argument('--tta', type=int, default=1, help="Test-time augmentation factor (default 1). Input volumes can be processed multiple times in different orientations and the results averaged to yield a (potentially) better result. Higher values increase computation time. Maximum is 16, default is 1.")
-    denoise.add_argument('--gpu', required=True, type=str, help="Comma-separated list of GPU IDs to use (e.g., 0,1,3,4)")  #
     denoise.add_argument('--overwrite', action='store_true', help='If set, overwrite existing segmentations in the output directory.')
     denoise.add_argument('--batch', type=int, default=1,help='Batch size for segmentation (default 1). Volumes are processed in batches of 128x128x128 shaped tiles. In/decrease batch size depending on available GPU memory.')
     denoise.add_argument('--iter', type=int, default=1, help="Only valid in direct mode: number of denoising iterations to perform (default 1). If you are really starved for contrast, try increasing this - but beware of artifacts.")
@@ -74,6 +73,7 @@ def main():
 
     denoise_train = subparsers.add_parser('denoise_train', help='Train a denoising network.')
     denoise_train.add_argument('--mode', type=str, choices=['splits', 'direct'], required=True, help="Denoising type. splits: statistically sound denoising of independent even/odd splits. direct: denoise the complete tomogram using a network that was trained on even/odd split denoised data. This last option helps avoid having to generate even/odd frame and volume splits.")
+    denoise_train.add_argument('--method', type=str, choices=['n2n', 'ddw'], help="Choose between denoising methods: 'n2n' for Noise2Noise (e.g. cryoCARE), or 'ddw' for DeepDeWedge. See github.com/juglab/cryocare_pip and github.com/mli-lab/deepdewedge and corresponding publications. In easymode we use custom tensorflow implementations.", default='n2n')
     denoise_train.add_argument('--extract', action='store_true', help="If set, perform step 1 of the training: extraction of subvolumes.")
     denoise_train.add_argument('--train', action='store_true', help="If set, perform step 2 of the training: the actual training run.")
     denoise_train.add_argument('--n', type=int, default=10, help="Number of samples to use per tomogram (default 10).")
@@ -82,11 +82,12 @@ def main():
     denoise_train.add_argument('--box',  type=int, help="Box size for training (default 96).", default=96)
     denoise_train.add_argument('--ls', type=float, help="Initial learning rate for the optimizer (default 1e-3).", default=1e-4)
     denoise_train.add_argument('--le', type=float, help="Final learning rate for the optimizer (default 1e-5).", default=1e-5)
+    denoise_train.add_argument('--wedge', type=float, help="Size of the missing wedge in degrees, e.g. '90' (default). Only used with method 'ddw'", default=90.0)
 
     args, unknown = parser.parse_known_args()
 
     if args.command == 'train':
-        from easymode.core.train import train_model
+        from easymode.segmentation.train import train_model
         train_model(title=args.title,
                     features=args.features,
                     batch_size=args.batch_size,
@@ -94,43 +95,70 @@ def main():
                     lr_start=args.lr_start,
                     lr_end=args.lr_end
                     )
+
     elif args.command == 'denoise':
-        from easymode.n2n.inference import dispatch_segment
-        dispatch_segment(mode=args.mode,
-                         input_directory=args.data,
-                         output_directory=args.output,
-                         tta=args.tta,
-                         gpus=args.gpu,
-                         batch_size=args.batch,
-                         overwrite=args.overwrite,
-                         iter=args.iter)
+        if args.method == 'n2n':
+            from easymode.n2n.inference import dispatch
+            dispatch(mode=args.mode,
+                     input_directory=args.data,
+                     output_directory=args.output,
+                     tta=args.tta,
+                     batch_size=args.batch,
+                     overwrite=args.overwrite,
+                     iter=args.iter)
+        elif args.method == 'ddw':
+            from easymode.ddw.inference import dispatch
+            dispatch(mode=args.mode,
+                     input_directory=args.data,
+                     output_directory=args.output,
+                     tta=args.tta,
+                     batch_size=args.batch,
+                     overwrite=args.overwrite,
+                     iter=args.iter)
+
     elif args.command == 'denoise_train':
-        if args.extract:
-            from easymode.n2n.train import N2NDatasetGenerator
-            dataset = N2NDatasetGenerator(mode=args.mode, samples_per_tomogram=args.n)
-            dataset.generate()
-        if args.train:
-            from easymode.n2n.train import train_denoiser
-            train_denoiser(mode=args.mode,
-                           batch_size=args.batch,
-                           box_size=args.box,
-                           epochs=args.epochs,
-                           lr_start=args.ls,
-                           lr_end=args.le)
         if not args.extract and not args.train:
-            print("Neither --extract or --train flag set!.")
+            print("Neither --extract or --train flag set.")
+            exit()
+        if args.method == 'n2n':
+            if args.extract:
+                from easymode.n2n.train import N2NDatasetGenerator
+                N2NDatasetGenerator(mode=args.mode, samples_per_tomogram=args.n, box_size=args.box).generate()
+            if args.train:
+                from easymode.n2n.train import train_n2n
+                train_n2n(mode=args.mode,
+                          batch_size=args.batch,
+                          box_size=args.box,
+                          epochs=args.epochs,
+                          lr_start=args.ls,
+                          lr_end=args.le)
+        elif args.method == 'ddw':
+            if args.extract:
+                from easymode.ddw.train import DDWDatasetGenerator
+                DDWDatasetGenerator(mode=args.mode, samples_per_tomogram=args.n, box_size=args.box).generate()
+            if args.train:
+                from easymode.ddw.train import train_ddw
+                train_ddw(mode=args.mode,
+                          batch_size=args.batch,
+                          box_size=args.box,
+                          epochs=args.epochs,
+                          lr_start=args.ls,
+                          lr_end=args.le,
+                          wedge_angle=args.wedge
+                )
+
     elif args.command == 'segment':
-        from easymode.core.inference import dispatch_segment
+        from easymode.segmentation.inference import dispatch_segment
         dispatch_segment(feature=args.feature.lower(),
                 data_directory=args.data,
                 output_directory=args.output,
                 tta=args.tta,
-                gpus=args.gpu,
                 batch_size=args.batch,
                 overwrite=args.overwrite,
                 data_format=args.format)
+
     elif args.command == 'pick':
-        from easymode.core.pick import pick
+        from easymode.core.ais_wrapper import pick
         pick(target=args.feature.lower(),
              data_directory=args.data,
              output_directory=args.output if args.output is not None else args.data,
@@ -138,8 +166,9 @@ def main():
              size=args.size,
              binning=args.binning,
              tomostar=args.tomostar)
+
     elif args.command == 'reconstruct':
-        from easymode.core.warp import reconstruct
+        from easymode.core.warp_wrapper import reconstruct
         reconstruct(frames=args.frames,
                     mdocs=args.mdocs,
                     apix=args.apix,
@@ -150,6 +179,7 @@ def main():
                     shape=args.shape,
                     steps=args.steps,
                     halfmaps=args.halfmaps)
+
     elif args.command == 'set':
         if args.cache_directory:
             if os.path.exists(args.cache_directory):
@@ -166,9 +196,11 @@ def main():
         if args.aretomo3_env:
             cfg.edit_setting("ARETOMO3_ENV", args.aretomo3_env)
             print(f'Set AreTomo3 environment command to {args.aretomo3_env}.')
+
     elif args.command == 'package':
         from easymode.core.packaging import package_checkpoint
         package_checkpoint(title=args.title, checkpoint_directory=args.checkpoint_directory, output_directory=args.output_directory)
+
     elif args.command == 'list':
         from easymode.core.distribution import list_remote_models
         list_remote_models()

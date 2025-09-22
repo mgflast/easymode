@@ -1,6 +1,8 @@
-import glob, os, mrcfile, numpy as np, random, shutil
-from easymode.core.augmentations import *
+import glob, os, mrcfile, shutil
+from easymode.segmentation.augmentations import *
 import tensorflow as tf
+
+ROOT = 'C:/Users/mart_/Desktop/easymode'
 
 class N2NDatasetGenerator:
     def __init__(self, mode='splits', samples_per_tomogram=10, box_size=96):
@@ -49,28 +51,28 @@ class N2NDatasetGenerator:
             box_a = vol_a[j:j+self.box_size, k:k+self.box_size, l:l+self.box_size]
             box_b = vol_b[j:j + self.box_size, k:k + self.box_size, l:l + self.box_size]
             if self.mode == 'splits':
-                with mrcfile.new(f'/cephfs/mlast/compu_projects/easymode/training/denoiser/{self.mode}/volumes_{split}/x/{self.box_counter[split]}.mrc', overwrite=True) as m:
+                with mrcfile.new(f'{ROOT}/training/n2n/{self.mode}/volumes_{split}/x/{self.box_counter[split]}.mrc', overwrite=True) as m:
                     m.set_data(box_a.astype(np.float32))
-                with mrcfile.new(f'/cephfs/mlast/compu_projects/easymode/training/denoiser/{self.mode}/volumes_{split}/y/{self.box_counter[split]}.mrc', overwrite=True) as m:
+                with mrcfile.new(f'{ROOT}/training/n2n/{self.mode}/volumes_{split}/y/{self.box_counter[split]}.mrc', overwrite=True) as m:
                     m.set_data(box_b.astype(np.float32))
             elif self.mode == 'direct':
                 box = (box_a + box_b) / 2.0
-                with mrcfile.new(f'/cephfs/mlast/compu_projects/easymode/training/denoiser/{self.mode}/volumes_{split}/x/{self.box_counter[split]}.mrc', overwrite=True) as m:
+                with mrcfile.new(f'{ROOT}/training/n2n/{self.mode}/volumes_{split}/x/{self.box_counter[split]}.mrc', overwrite=True) as m:
                     m.set_data(box.astype(np.float32))
-                with mrcfile.new(f'/cephfs/mlast/compu_projects/easymode/training/denoiser/{self.mode}/volumes_{split}/x/even/{self.box_counter[split]}.mrc', overwrite=True) as m:
+                with mrcfile.new(f'{ROOT}/training/n2n/{self.mode}/volumes_{split}/x/even/{self.box_counter[split]}.mrc', overwrite=True) as m:
                     m.set_data(box_a.astype(np.float32))
-                with mrcfile.new(f'/cephfs/mlast/compu_projects/easymode/training/denoiser/{self.mode}/volumes_{split}/x/odd/{self.box_counter[split]}.mrc', overwrite=True) as m:
+                with mrcfile.new(f'{ROOT}/training/n2n/{self.mode}/volumes_{split}/x/odd/{self.box_counter[split]}.mrc', overwrite=True) as m:
                     m.set_data(box_b.astype(np.float32))
 
             self.box_counter[split] += 1
 
 
     def generate_direct_mode_outputs(self):
-        print(f'Applying easymode denoiser in split mode to the even/odd pairs to generate direct mode training data.')
+        print(f'Applying easymode n2n in split mode to the even/odd pairs to generate direct mode training data.')
         gpus = ','.join(str(i) for i in range(len(tf.config.list_physical_devices('GPU'))))
         for split in ['training', 'validation']:
-            input_dir = f'/cephfs/mlast/compu_projects/easymode/training/denoiser/{self.mode}/volumes_{split}/x/'
-            output_dir = f'/cephfs/mlast/compu_projects/easymode/training/denoiser/{self.mode}/volumes_{split}/y/'
+            input_dir = f'{ROOT}/training/n2n/{self.mode}/volumes_{split}/x/'
+            output_dir = f'{ROOT}/training/n2n/{self.mode}/volumes_{split}/y/'
 
             print(f'easymode denoise --data {input_dir} --output {output_dir} --tta 4 --mode splits --overwrite --gpu {gpus}')
             os.system(f'easymode denoise --data {input_dir} --output {output_dir} --tta 4 --mode splits --overwrite --gpu {gpus}')
@@ -79,44 +81,56 @@ class N2NDatasetGenerator:
             shutil.rmtree(os.path.join(input_dir, 'odd'))
 
     def generate(self):
-        print(f'Preparing to generate training data for denoiser mode {self.mode} with {self.samples_per_tomogram} samples per tomogram.')
+        print(
+            f'Preparing to generate training data for denoiser mode {self.mode} with {self.samples_per_tomogram} samples per tomogram.\n')
 
         if self.mode == 'splits':
-            os.makedirs(f'/cephfs/mlast/compu_projects/easymode/training/denoiser/splits/volumes_training/x', exist_ok=True)
-            os.makedirs(f'/cephfs/mlast/compu_projects/easymode/training/denoiser/splits/volumes_training/y', exist_ok=True)
-            os.makedirs(f'/cephfs/mlast/compu_projects/easymode/training/denoiser/splits/volumes_validation/x', exist_ok=True)
-            os.makedirs(f'/cephfs/mlast/compu_projects/easymode/training/denoiser/splits/volumes_validation/y', exist_ok=True)
+            base_path = f'{ROOT}/training/n2n/splits'
+            shutil.rmtree(f'{base_path}/volumes_training', ignore_errors=True)
+            shutil.rmtree(f'{base_path}/volumes_validation', ignore_errors=True)
+
+            os.makedirs(f'{base_path}/volumes_training/x', exist_ok=True)
+            os.makedirs(f'{base_path}/volumes_training/y', exist_ok=True)
+            os.makedirs(f'{base_path}/volumes_validation/x', exist_ok=True)
+            os.makedirs(f'{base_path}/volumes_validation/y', exist_ok=True)
         elif self.mode == 'direct':
-            os.makedirs(f'/cephfs/mlast/compu_projects/easymode/training/denoiser/direct/volumes_training/x', exist_ok=True)
-            os.makedirs(f'/cephfs/mlast/compu_projects/easymode/training/denoiser/direct/volumes_training/x/even',exist_ok=True)
-            os.makedirs(f'/cephfs/mlast/compu_projects/easymode/training/denoiser/direct/volumes_training/x/odd', exist_ok=True)
-            os.makedirs(f'/cephfs/mlast/compu_projects/easymode/training/denoiser/direct/volumes_training/y', exist_ok=True)
-            os.makedirs(f'/cephfs/mlast/compu_projects/easymode/training/denoiser/direct/volumes_validation/x', exist_ok=True)
-            os.makedirs(f'/cephfs/mlast/compu_projects/easymode/training/denoiser/direct/volumes_validation/x/even', exist_ok=True)
-            os.makedirs(f'/cephfs/mlast/compu_projects/easymode/training/denoiser/direct/volumes_validation/x/odd', exist_ok=True)
-            os.makedirs(f'/cephfs/mlast/compu_projects/easymode/training/denoiser/direct/volumes_validation/y', exist_ok=True)
+            base_path = f'{ROOT}/training/n2n/direct'
+            shutil.rmtree(f'{base_path}/volumes_training', ignore_errors=True)
+            shutil.rmtree(f'{base_path}/volumes_validation', ignore_errors=True)
+
+            os.makedirs(f'{base_path}/volumes_training/x', exist_ok=True)
+            os.makedirs(f'{base_path}/volumes_training/x/even', exist_ok=True)
+            os.makedirs(f'{base_path}/volumes_training/x/odd', exist_ok=True)
+            os.makedirs(f'{base_path}/volumes_training/y', exist_ok=True)
+            os.makedirs(f'{base_path}/volumes_validation/x', exist_ok=True)
+            os.makedirs(f'{base_path}/volumes_validation/x/even', exist_ok=True)
+            os.makedirs(f'{base_path}/volumes_validation/x/odd', exist_ok=True)
+            os.makedirs(f'{base_path}/volumes_validation/y', exist_ok=True)
 
         self.load_splits()
 
         for j, (vol_a, vol_b) in enumerate(zip(self.vols_one, self.vols_two)):
-            print(f'{j+1}/{len(self.vols_one)}: {vol_a}')
+            print(f'{j + 1}/{len(self.vols_one)}: {vol_a}')
             self.sample_tomogram_pair(vol_a, vol_b)
 
         if self.mode == 'direct':
             self.generate_direct_mode_outputs()
 
     def load_splits(self):
-        datasets = [os.path.basename(os.path.dirname(f)) for f in glob.glob('/cephfs/mlast/compu_projects/easymode/datasets/*/')]
+        datasets = [os.path.basename(os.path.dirname(f)) for f in glob.glob(f'{ROOT}/datasets/*/')]
+
+        print(f'Found {len(datasets)} datasets to sample.')
+
         np.random.shuffle(datasets)
         self.vols_one = list()
         self.vols_two = list()
 
         for d in datasets:
-            tomograms = [os.path.basename(f) for f in glob.glob(f'/cephfs/mlast/compu_projects/easymode/datasets/{d}/warp_tiltseries/reconstruction/even/*.mrc')]
+            tomograms = [os.path.basename(f) for f in glob.glob(f'{ROOT}/datasets/{d}/warp_tiltseries/reconstruction/even/*.mrc')]
             np.random.shuffle(tomograms)
             for t in tomograms:
-                path_evn = f'/cephfs/mlast/compu_projects/easymode/datasets/{d}/warp_tiltseries/reconstruction/even/{t}'
-                path_odd = f'/cephfs/mlast/compu_projects/easymode/datasets/{d}/warp_tiltseries/reconstruction/odd/{t}'
+                path_evn = f'{ROOT}/datasets/{d}/warp_tiltseries/reconstruction/even/{t}'
+                path_odd = f'{ROOT}/datasets/{d}/warp_tiltseries/reconstruction/odd/{t}'
                 if os.path.exists(path_evn) and os.path.exists(path_odd):
                     self.vols_one.append(path_evn)
                     self.vols_two.append(path_odd)
@@ -167,13 +181,13 @@ class N2NDataloader:
         return train_x, train_y
 
     def parse_indices(self):
-        sample_directory = f'/cephfs/mlast/compu_projects/easymode/training/denoiser/{self.mode}/volumes_{"validation" if self.validation else "training"}/x/'
+        sample_directory = f'{ROOT}/training/n2n/{self.mode}/volumes_{"validation" if self.validation else "training"}/x/'
         sample_names = sorted([os.path.basename(f) for f in glob.glob(f'{sample_directory}/*.mrc')])
         self.indices = list(range(len(sample_names)))
 
     def get_sample(self, index):
-        train_x = mrcfile.read(f'/cephfs/mlast/compu_projects/easymode/training/denoiser/{self.mode}/volumes_{"validation" if self.validation else "training"}/x/{index}.mrc').data
-        train_y = mrcfile.read(f'/cephfs/mlast/compu_projects/easymode/training/denoiser/{self.mode}/volumes_{"validation" if self.validation else "training"}/y/{index}.mrc').data
+        train_x = mrcfile.read(f'{ROOT}/training/n2n/{self.mode}/volumes_{"validation" if self.validation else "training"}/x/{index}.mrc').data
+        train_y = mrcfile.read(f'{ROOT}/training/n2n/{self.mode}/volumes_{"validation" if self.validation else "training"}/y/{index}.mrc').data
 
         train_x = np.asarray(train_x)
         train_y = np.asarray(train_y)
@@ -202,10 +216,9 @@ class N2NDataloader:
             )
         )
 
-        # Fix for multi-GPU auto-sharding issues
         options = tf.data.Options()
         options.experimental_distribute.auto_shard_policy = tf.data.experimental.AutoShardPolicy.DATA
-        options.threading.private_threadpool_size = 48  # Adjust based on your CPU cores
+        options.threading.private_threadpool_size = 32
         dataset = dataset.with_options(options)
 
         if num_epochs:
@@ -218,12 +231,12 @@ class N2NDataloader:
         return dataset, n_steps
 
 
-def train_denoiser(mode='splits', batch_size=32, box_size=96, epochs=100, lr_start=1e-3, lr_end=1e-5):
+def train_n2n(mode='splits', batch_size=32, box_size=96, epochs=100, lr_start=1e-3, lr_end=1e-5):
     from easymode.n2n.model import create
 
     tf.config.run_functions_eagerly(False)
 
-    print(f'\nTraining denoiser model for mode: {mode}\n')
+    print(f'\nTraining n2n model for mode: {mode}\n')
 
     with tf.distribute.MirroredStrategy().scope():
         model = create()
@@ -234,14 +247,14 @@ def train_denoiser(mode='splits', batch_size=32, box_size=96, epochs=100, lr_sta
     validation_ds, validation_steps = N2NDataloader(mode=mode, batch_size=batch_size, box_size=box_size, validation=True).as_generator(batch_size=batch_size)
 
     # callbacks
-    os.makedirs(f'/cephfs/mlast/compu_projects/easymode/training/denoiser/{mode}/checkpoints/', exist_ok=True)
-    # cb_checkpoint_val = tf.keras.callbacks.ModelCheckpoint(filepath=f'/cephfs/mlast/compu_projects/easymode/training/denoiser/{mode}/checkpoints/' + "validation_loss",
+    os.makedirs(f'{ROOT}/training/n2n/{mode}/checkpoints/', exist_ok=True)
+    # cb_checkpoint_val = tf.keras.callbacks.ModelCheckpoint(filepath=f'{ROOT}/training/n2n/{mode}/checkpoints/' + "validation_loss",
     #                                                        monitor=f'val_loss',
     #                                                        save_best_only=True,
     #                                                        save_weights_only=True,
     #                                                        mode='min',
     #                                                        verbose=1)
-    cb_checkpoint_train = tf.keras.callbacks.ModelCheckpoint(filepath=f'/cephfs/mlast/compu_projects/easymode/training/denoiser/{mode}/checkpoints/' + "training_loss",
+    cb_checkpoint_train = tf.keras.callbacks.ModelCheckpoint(filepath=f'{ROOT}/training/n2n/{mode}/checkpoints/' + "training_loss",
                                                              monitor=f'loss',
                                                              save_best_only=True,
                                                              save_weights_only=True,
@@ -253,7 +266,7 @@ def train_denoiser(mode='splits', batch_size=32, box_size=96, epochs=100, lr_sta
 
     cb_lr = tf.keras.callbacks.LearningRateScheduler(lr_decay, verbose=1)
 
-    cb_csv = tf.keras.callbacks.CSVLogger(f'/cephfs/mlast/compu_projects/easymode/training/denoiser/{mode}/checkpoints/training_log.csv', append=True)
+    cb_csv = tf.keras.callbacks.CSVLogger(f'{ROOT}/training/n2n/{mode}/checkpoints/training_log.csv', append=True)
 
     model.fit(training_ds, steps_per_epoch=training_steps, validation_data=validation_ds, validation_steps=validation_steps, epochs=epochs, validation_freq=1, callbacks=[cb_checkpoint_val, cb_checkpoint_train, cb_lr, cb_csv])
 

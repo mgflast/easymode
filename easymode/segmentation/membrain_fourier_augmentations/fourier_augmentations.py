@@ -5,8 +5,8 @@ import numpy.fft as fft
 
 from scipy.ndimage import gaussian_filter1d
 
-from easymode.membrain_fourier_augmentations.transforms import sample_scalar
-from easymode.membrain_fourier_augmentations.filter_utils import rotational_kernel
+from easymode.segmentation.membrain_fourier_augmentations.transforms import sample_scalar
+from easymode.segmentation.membrain_fourier_augmentations.filter_utils import rotational_kernel
 
 
 def wedge_mask(shape: Tuple[int, int, int], angle: float) -> np.ndarray:

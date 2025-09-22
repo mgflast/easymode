@@ -6,8 +6,8 @@ import mrcfile
 import numpy as np
 from easymode.core.distribution import cache_model, load_model
 
-TILE_SIZE = 160
-OVERLAP = 32
+TILE_SIZE = 128
+OVERLAP = 16
 MAX_CHUNK_SIZE = 64
 
 def tile_volume(volume, patch_size=TILE_SIZE, overlap=OVERLAP):
@@ -56,16 +56,15 @@ def tile_volume(volume, patch_size=TILE_SIZE, overlap=OVERLAP):
 
     return tiles, positions, volume.shape
 
-
-def detile_volume(segmented_tiles, positions, original_shape, patch_size=TILE_SIZE, overlap=OVERLAP):
+def detile_volume(denoised_tiles, positions, original_shape, patch_size=TILE_SIZE, overlap=OVERLAP):
     d, h, w = original_shape
     output_volume = np.zeros((d, h, w), dtype=np.float32)
     stride = patch_size - 2 * overlap
 
-    if segmented_tiles.ndim == 5:
-        segmented_tiles = segmented_tiles.squeeze(-1)
+    if denoised_tiles.ndim == 5:
+        denoised_tiles = denoised_tiles.squeeze(-1)
 
-    for tile, (z_pos, y_pos, x_pos) in zip(segmented_tiles, positions):
+    for tile, (z_pos, y_pos, x_pos) in zip(denoised_tiles, positions):
         center_region = tile[overlap:overlap + stride, overlap:overlap + stride, overlap:overlap + stride]
 
         z_end = min(z_pos + stride, d)
@@ -80,17 +79,16 @@ def detile_volume(segmented_tiles, positions, original_shape, patch_size=TILE_SI
 
     return output_volume
 
-
-def _segment_tile_list(tiles, model, batch_size=8, max_chunk_size=MAX_CHUNK_SIZE):
+def _denoise_tile_list(tiles, model, batch_size=8, max_chunk_size=MAX_CHUNK_SIZE):
     num_tiles = len(tiles)
-    segmented_tiles = []
+    denoised_tiles = []
     for i in range(0, num_tiles, max_chunk_size):
         chunk_end = min(i + max_chunk_size, num_tiles)
         chunk = tiles[i:chunk_end]
 
         try:
             chunk_result = model.predict(chunk, verbose=0, batch_size=batch_size)
-            segmented_tiles.extend(chunk_result)
+            denoised_tiles.extend(chunk_result)
 
         except tf.errors.ResourceExhaustedError:
             print(f"Memory error with chunk size {len(chunk)}, falling back to smaller chunks")
@@ -98,67 +96,58 @@ def _segment_tile_list(tiles, model, batch_size=8, max_chunk_size=MAX_CHUNK_SIZE
             for j in range(i, chunk_end, fallback_chunk_size):
                 small_chunk = tiles[j:min(j + fallback_chunk_size, chunk_end)]
                 small_result = model.predict(small_chunk, verbose=0, batch_size=batch_size)
-                segmented_tiles.extend(small_result)
+                denoised_tiles.extend(small_result)
 
-    return segmented_tiles
+    return denoised_tiles
 
-
-def _segment_tomogram_instance(volume, model, batch_size):
+def _denoise_tomogram_instance(volume, model, batch_size):
     tiles, positions, original_shape = tile_volume(volume)
-    segmented_tiles = _segment_tile_list(tiles, model, batch_size=batch_size, max_chunk_size=MAX_CHUNK_SIZE)
-    segmented_tiles = np.array(segmented_tiles)
-    segmented_volume = detile_volume(segmented_tiles, positions, original_shape)
+    denoised_tiles = _denoise_tile_list(tiles, model, batch_size=batch_size, max_chunk_size=MAX_CHUNK_SIZE)
+    denoised_tiles = np.array(denoised_tiles)
+    denoised_volume = detile_volume(denoised_tiles, positions, original_shape)
 
     tf.keras.backend.clear_session()
     gc.collect()
-    return segmented_volume.astype(np.float32)
+    return denoised_volume.astype(np.float32)
 
-
-def segment_tomogram(model, tomogram_path, tta=1, batch_size=2):
+def denoise_tomogram(model, tomogram_path, tta=1, batch_size=2, iter=1):
     volume = mrcfile.read(tomogram_path).astype(np.float32)
-    volume -= np.mean(volume)
-    volume /= np.std(volume) + 1e-6
+    volume = np.pad(volume, pad_width=16, mode='reflect')
 
-    segmented_volume = np.zeros_like(volume)
-
-    # Below: all 16 combinations of 90-degree rotations and flips that respect the anisotropy of the data.
+    # Below: all 16 combinations of right angle rotations and flips that respect the anisotropy of the data.
     k_xy = [0, 2, 2, 0, 1, 3, 0, 1, 2, 3, 0, 1, 2, 3, 1, 3]
     k_fx = [0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1]
     k_yz = [0, 1, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1]
 
-    for j in range(tta):
-        tta_vol = volume.copy()
-        tta_vol = np.rot90(tta_vol, k=k_xy[j], axes=(1, 2))
-        tta_vol = tta_vol if not k_fx[j] else np.flip(tta_vol, axis=1)
-        tta_vol = np.rot90(tta_vol, k=2 * k_yz[j], axes=(0, 1))
-        segmented_tta_vol = _segment_tomogram_instance(tta_vol, model, batch_size)
-        segmented_tta_vol = np.rot90(segmented_tta_vol, k=-2 * k_yz[j], axes=(0, 1))
-        segmented_tta_vol = segmented_tta_vol if not k_fx[j] else np.flip(segmented_tta_vol, axis=1)
-        segmented_tta_vol = np.rot90(segmented_tta_vol, k=-k_xy[j], axes=(1, 2))
-        segmented_volume += segmented_tta_vol
-    segmented_volume /= tta
+    for i in range(iter):
+        volume -= np.mean(volume)
+        volume /= np.std(volume) + 1e-6
+        denoised_volume = np.zeros_like(volume)
+        for j in range(tta):
+            tta_vol = volume.copy()
+            tta_vol = np.rot90(tta_vol, k=k_xy[j], axes=(1, 2))
+            tta_vol = tta_vol if not k_fx[j] else np.flip(tta_vol, axis=1)
+            tta_vol = np.rot90(tta_vol, k=2 * k_yz[j], axes=(0, 1))
+            denoised_tta_vol = _denoise_tomogram_instance(tta_vol, model, batch_size)
+            denoised_tta_vol = np.rot90(denoised_tta_vol, k=-2 * k_yz[j], axes=(0, 1))
+            denoised_tta_vol = denoised_tta_vol if not k_fx[j] else np.flip(denoised_tta_vol, axis=1)
+            denoised_tta_vol = np.rot90(denoised_tta_vol, k=-k_xy[j], axes=(1, 2))
+            denoised_volume += denoised_tta_vol
+        denoised_volume /= tta
+        volume = denoised_volume
 
-    segmented_volume[:32, :, :] = 0
-    segmented_volume[-32:, :, :] = 0
-    segmented_volume[:, :32, :] = 0
-    segmented_volume[:, -32:, :] = 0
-    segmented_volume[:, :, :32] = 0
-    segmented_volume[:, :, -32:] = 0
-    return segmented_volume
-
+    volume = volume[16:-16, 16:-16, 16:-16]
+    return volume
 
 def save_mrc(pxd, path, data_format, voxel_size=10.0):
     if data_format == 'float32':
         pxd = pxd.astype(np.float32)
-    elif data_format == 'uint16':
-        pxd = (pxd * 255).astype(np.uint16) # scaling to [0, 255] because that's what we're used to in Ais
-    elif data_format == 'int8':
-        pxd = (pxd * 127).astype(np.int8)
+    # TODO: float16
     with mrcfile.new(path, overwrite=True) as m:
         m.set_data(pxd)
         m.voxel_size = voxel_size
 
-def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, batch_size, tta, overwrite, data_format):
+def denoiser_thread(mode, tomogram_list, model_path, output_dir, gpu, batch_size, tta, overwrite, iter):
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
     os.environ['TF_DISABLE_MKL'] = '1'
     os.environ['TF_XLA_FLAGS'] = '--tf_xla_enable_xla_devices=false'
@@ -169,12 +158,11 @@ def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, bat
     mixed_precision.set_global_policy('mixed_float16')
 
     process_start_time = psutil.Process().create_time()
-
     model = load_model(model_path)
 
-    for j, tomogram_path in enumerate(tomogram_list, 1):
-        tomo_name = os.path.splitext(os.path.basename(tomogram_path))[0]
-        output_file = os.path.join(output_dir, f"{tomo_name}__{feature}.mrc")
+    for j, tomogram_tuple in enumerate(tomogram_list, start=1):
+        tomo_name = os.path.splitext(os.path.basename(tomogram_tuple[0]))[0]
+        output_file = os.path.join(output_dir, f"{tomo_name}.mrc")
         wrote_temporary = False
         try:
             if os.path.exists(output_file):
@@ -185,44 +173,60 @@ def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, bat
             with mrcfile.new(output_file, overwrite=True) as m:
                 m.set_data(-1.0 * np.ones((10, 10, 10), dtype=np.float32))
                 wrote_temporary = True
-            segmented_volume = segment_tomogram(model, tomogram_path, tta, batch_size)
 
-            save_mrc(segmented_volume, output_file, data_format)
+
+            if mode=='splits':
+                denoised_volume = (denoise_tomogram(model, tomogram_tuple[0], tta, batch_size) + denoise_tomogram(model, tomogram_tuple[1], tta, batch_size)) / 2.0
+            else:
+                denoised_volume = denoise_tomogram(model, tomogram_tuple[0], tta, batch_size, iter=iter)
+
+            save_mrc(denoised_volume, output_file, data_format='float32')
 
             etc = time.strftime('%H:%M:%S', time.gmtime((time.time() - process_start_time) / j * (len(tomogram_list) - j)))
-            print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {feature} - {os.path.basename(output_file)} - etc {etc}")
+            print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {os.path.basename(output_file)} - etc: {etc}")
         except Exception as e:
             if wrote_temporary:
                 os.remove(output_file)
-            print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {feature} - {os.path.basename(output_file)} - ERROR: {e}")
+            print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {os.path.basename(output_file)} - ERROR: {e}")
 
-def dispatch_segment(feature, data_directory, output_directory, tta=1, gpus=(0,1,2,3), batch_size=8, overwrite=False, data_format='int8'):
-    if output_directory is None:
-        output_directory = data_directory
-    gpus = [int(n) for n in gpus.split(',')]
+def dispatch(input_directory, output_directory, mode='splits', tta=1, batch_size=8, overwrite=False, iter=1):
+    if output_directory == input_directory:
+        print("Please choose an output directory that is different from the input directory - we dont want to overwrite your original volumes.")
+        exit()
 
-    print(f'easymode segment\n'
-          f'feature: {feature}\n'
-          f'data_directory: {data_directory}\n'
+    gpus = ','.join(str(i) for i in range(len(tf.config.list_physical_devices('GPU'))))
+
+    print(f'easymode denoise\n'
+          f'mode: {mode}\n'
+          f'data_directory: {input_directory}\n'
           f'output_directory: {output_directory}\n'
-          f'output_format: {data_format}\n'
           f'gpus: {gpus}\n'
           f'tta: {tta}\n'
           f'overwrite: {overwrite}\n'
           f'batch_size: {batch_size}\n')
 
-    tomograms = sorted(glob.glob(os.path.join(data_directory, '*.mrc')))
+    if mode == 'direct':
+        tomograms = sorted(glob.glob(os.path.join(input_directory, '*.mrc')))
+        tomograms = list(zip(tomograms, tomograms))
+    else:
+        tomograms_evn = sorted(glob.glob(os.path.join(input_directory, 'even', '*.mrc')))
+        tomograms_odd = [os.path.join(input_directory, 'odd', f'{os.path.basename(f)}') for f in tomograms_evn]
+        for t in tomograms_odd:
+            if not os.path.exists(t):
+                raise FileNotFoundError(f"Could not find matching odd tomogram for {t}")
 
-    print(f'Found {len(tomograms)} tomograms to segment in {data_directory}.')
+        tomograms = list(zip(tomograms_evn, tomograms_odd))
 
-    model_path = cache_model(feature)
+    print(f'Found {len(tomograms)} tomograms to denoise in {input_directory}.')
+
+    model_path = cache_model('ddw_splits' if mode=='splits' else 'ddw_direct')
 
     os.makedirs(output_directory, exist_ok=True)
 
+    print(f'Launching denoising processes on {len(gpus)} GPUs.')
     processes = []
     for gpu in gpus:
-        p = multiprocessing.Process(target=segmentation_thread,
-                                    args=(tomograms, model_path, feature, output_directory, gpu, batch_size, tta, overwrite, data_format))
+        p = multiprocessing.Process(target=denoiser_thread, args=(mode, tomograms, model_path, output_directory, gpu, batch_size, tta, overwrite, iter))
         processes.append(p)
         p.start()
         time.sleep(2)
