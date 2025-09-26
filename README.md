@@ -12,7 +12,7 @@ All networks were trained on a dataset of ~850 tilt series from 30 different sou
 
 ### validation
 
-We are currently testing the accuracy of the feature detection networks by subtomogram averaging (STA). For now, the goal is to enable decent-resolution STA of a number of particle types, so that these can be used as references for tilt-series alignment and to navigate datasets better. **Please note that this is still very preliminary!** We use three relatively moderately sized eukaryotic datasets for the validation: S. cerevisiae (500 tilt series), C. reinhardtii (500 tilt series, EMPIAR-11830), and H. sapiens (HeLa) (up to 1263 tilt series and growing, our own)
+We are currently testing the accuracy of the feature detection networks by subtomogram averaging (STA). For now, the goal is to enable decent-resolution STA of a number of particle types, so that these can be used as references for tilt-series alignment and to navigate datasets better. **Please note that this is still very preliminary!** We use three relatively moderately sized eukaryotic datasets for the validation: S. cerevisiae (500 tilt series, by the MPI Dortmund team (see table below)), C. reinhardtii (500 tilt series, EMPIAR-11830), and H. sapiens (HeLa) (up to 1263 tilt series and growing, our own)
 
 ![Ribosome averages obtained using easymode-detected particles](docs/res/ribosome_maps.png)
 
@@ -75,38 +75,38 @@ easymode clean <> --list                                                        
 Not all training data sources are currently listed, as a number of contributors prefer to remain anonymous so long as their work is not published. These contributions are marked with *.
 
 
-| ID          | Contributor / source* | Sample type                                | N  | Pixel size (Å) |
-|-------------|-----------------------|--------------------------------------------|----|----------------|
-| 001_HELA    | Mart Last             | milled H. sapiens (HeLa)                   | 60 | 1.51           |
-| 002_U2OS    | Mart Last             | milled H. sapiens (U2OS)                   | 40 | 2.15           |
-| 003_HSPERM  | Tom Dendooven         | milled H. sapiens (spermatozoa)            | 56 | 1.50           |
-| 004_*       | *                     |                                            | 23 | 1.68           |
-| 005_FIBRO   | Tom Hale              | milled H. sapiens (fibroblasts)            | 52 | 1.33           |
-| 006_*       | *                     |                                            | 20 | 1.69           |
-| 007_APOF    | EMPIAR-10491          | purified apoferritin                       | 37 | 0.79           |
-| 008_HIV     | EMPIAR-10164          | purified HIV particles                     | 10 | 0.68           |
-| 009_SCEREV  | Sebastian Tacke       | milled (hpf, pfib) S. cerevisiae           | 64 | 1.56           |
-| 010_RIBO    | EMPIAR-11111          | purified E. coli 70S ribosomes             | 25 | 1.07           |
-| 011_CHLO    | EMPIAR-12612          | milled S. oleracea chloroplasts            | 23 | 3.52           |
-| 012_CHLAMY  | EMPIAR-11830          | milled C. reinhardtii                      | 52 | 1.96           |
-| 013_DIAT    | EMPIAR-11747          | milled T. pseudonana                       | 7  | 1.07           |
-| 014_CILIA   | EMPIAR-11078          | milled C. reinhardtii ciliary base         | 23 | 3.42           |
-| 015_MMVOLTA | DS-10452              | whole M. mycoides cells                    | 15 | 1.53           |
-| 016_PHANTOM | DS-10440, DS-10445    | E. coli lysate with added proteins         | 19 | 1.53           |
-| 017_MYCP    | EMPIAR-10499          | whole M. pneunomiae cells                  | 65 | 1.70           |
-| 018_ECM     | EMPIAR-11897          | lift-out H. sapiens (extracellular matrix) | 39 | 2.14           |
-| 019_ECOLI   | EMPIAR-12413          | milled E. coli                             | 44 | 1.90           |
-| 020_*       | *                     | *                                          | 30 | 2.13           |
-| 021_*       | *                     | *                                          | 8  | 3.02           |
-| 022_SCOV    | EMPIAR-10493          | purified SARS-CoV-2 virions                | 20 | 1.53           |
-| 023_SPORE   | EMPIAR-12176          | milled E. intestinalis                     | 24 | 2.06           |
-| 024_*       | *                     | *                                          | 17 | 1.96           |
-| 025_RPE     | EMPIAR-10989          | cellular periphery H. sapiens (RPE1)       | 3  | 3.45           |
-| 026_EHV     | EMPIAR-11896          | Emiliania huxleyi virus 201                | 40 | 2.08           |
-| 027_NUCFT   | Forson Gao            | milled S. cerevisiae nuclei                | 21 | 1.51           |
-| 028_ROOF    | DS-10434              | cellular periphery H. sapiens (HEK293)     | 20 | 1.51           |
-| 029_TKIV    | EMPIAR-11058          | milled T. kivui                            | 17 | 1.51           |
-| 030_LDN     | Mart Last             | cellular periphery H. sapiens (U2OS)       | 26 | 2.74           |
+| ID          | Contributor / source*                                                | Sample type                                | N  | Pixel size (Å) |
+|-------------|----------------------------------------------------------------------|--------------------------------------------|----|----------------|
+| 001_HELA    | Mart Last                                                            | milled H. sapiens (HeLa)                   | 60 | 1.51           |
+| 002_U2OS    | Mart Last                                                            | milled H. sapiens (U2OS)                   | 40 | 2.15           |
+| 003_HSPERM  | Tom Dendooven                                                        | milled H. sapiens (spermatozoa)            | 56 | 1.50           |
+| 004_*       | *                                                                    |                                            | 23 | 1.68           |
+| 005_FIBRO   | Tom Hale                                                             | milled H. sapiens (fibroblasts)            | 52 | 1.33           |
+| 006_*       | *                                                                    |                                            | 20 | 1.69           |
+| 007_APOF    | EMPIAR-10491                                                         | purified apoferritin                       | 37 | 0.79           |
+| 008_HIV     | EMPIAR-10164                                                         | purified HIV particles                     | 10 | 0.68           |
+| 009_SCEREV  | Sebastian Tacke, Elisa Lisicki, <br/>Tatjana Taubitz, Stefan Raunser | milled (hpf, pfib) S. cerevisiae           | 64 | 1.56           |
+| 010_RIBO    | EMPIAR-11111                                                         | purified E. coli 70S ribosomes             | 25 | 1.07           |
+| 011_CHLO    | EMPIAR-12612                                                         | milled S. oleracea chloroplasts            | 23 | 3.52           |
+| 012_CHLAMY  | EMPIAR-11830                                                         | milled C. reinhardtii                      | 52 | 1.96           |
+| 013_DIAT    | EMPIAR-11747                                                         | milled T. pseudonana                       | 7  | 1.07           |
+| 014_CILIA   | EMPIAR-11078                                                         | milled C. reinhardtii ciliary base         | 23 | 3.42           |
+| 015_MMVOLTA | DS-10452                                                             | whole M. mycoides cells                    | 15 | 1.53           |
+| 016_PHANTOM | DS-10440, DS-10445                                                   | E. coli lysate with added proteins         | 19 | 1.53           |
+| 017_MYCP    | EMPIAR-10499                                                         | whole M. pneunomiae cells                  | 65 | 1.70           |
+| 018_ECM     | EMPIAR-11897                                                         | lift-out H. sapiens (extracellular matrix) | 39 | 2.14           |
+| 019_ECOLI   | EMPIAR-12413                                                         | milled E. coli                             | 44 | 1.90           |
+| 020_*       | *                                                                    | *                                          | 30 | 2.13           |
+| 021_*       | *                                                                    | *                                          | 8  | 3.02           |
+| 022_SCOV    | EMPIAR-10493                                                         | purified SARS-CoV-2 virions                | 20 | 1.53           |
+| 023_SPORE   | EMPIAR-12176                                                         | milled E. intestinalis                     | 24 | 2.06           |
+| 024_*       | *                                                                    | *                                          | 17 | 1.96           |
+| 025_RPE     | EMPIAR-10989                                                         | cellular periphery H. sapiens (RPE1)       | 3  | 3.45           |
+| 026_EHV     | EMPIAR-11896                                                         | Emiliania huxleyi virus 201                | 40 | 2.08           |
+| 027_NUCFT   | Forson Gao                                                           | milled S. cerevisiae nuclei                | 21 | 1.51           |
+| 028_ROOF    | DS-10434                                                             | cellular periphery H. sapiens (HEK293)     | 20 | 1.51           |
+| 029_TKIV    | EMPIAR-11058                                                         | milled T. kivui                            | 17 | 1.51           |
+| 030_LDN     | Mart Last                                                            | cellular periphery H. sapiens (U2OS)       | 26 | 2.74           |
 
 *DS: datasets on the [CZI CryoET Data Portal](https://cryoetdataportal.czscience.com/)
 
