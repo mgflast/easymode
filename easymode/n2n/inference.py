@@ -6,6 +6,10 @@ import mrcfile
 import numpy as np
 from easymode.core.distribution import cache_model, load_model
 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+tf.get_logger().setLevel('ERROR')
+tf.config.optimizer.set_experimental_options({'layout_optimizer': False})
+
 TILE_SIZE = 128
 OVERLAP = 16
 MAX_CHUNK_SIZE = 64
@@ -150,13 +154,9 @@ def save_mrc(pxd, path, data_format, voxel_size=10.0):
 
 def denoiser_thread(mode, tomogram_list, model_path, output_dir, gpu, batch_size, tta, overwrite, iter):
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
-    os.environ['TF_DISABLE_MKL'] = '1'
-    os.environ['TF_XLA_FLAGS'] = '--tf_xla_enable_xla_devices=false'
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-    os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+
     for device in tf.config.list_physical_devices('GPU'):
         tf.config.experimental.set_memory_growth(device, True)
-    #mixed_precision.set_global_policy('mixed_float16')
 
     process_start_time = psutil.Process().create_time()
     model = load_model(model_path)
@@ -223,6 +223,8 @@ def dispatch(input_directory, output_directory, mode='splits', tta=1, batch_size
     model_path = cache_model('n2n_splits' if mode=='splits' else 'n2n_direct')
 
     os.makedirs(output_directory, exist_ok=True)
+
+    multiprocessing.set_start_method('spawn', force=True)
 
     processes = []
     for gpu in gpus:

@@ -32,6 +32,5 @@ def package_checkpoint(title='', checkpoint_directory='', output_directory='', c
 
     size_mb = os.path.getsize(os.path.join(output_directory, f'{title}.h5')) / (1024 * 1024)
     print(f'Saved {os.path.join(output_directory, title + ".h5")}. File size: {size_mb:.2f} MB')
-
     if cache:
         shutil.copy2(os.path.join(output_directory, f'{title}.h5'), os.path.join(MODEL_CACHE_DIR, f'{title}.h5'))
