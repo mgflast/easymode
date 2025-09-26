@@ -1,4 +1,4 @@
-Pom
+easymode
 -------------
 Copyright (C) 2023 Mart G. F. Last, mgflast@gmail.com, m.g.f.last@lumc.nl
 
