@@ -1,8 +1,10 @@
 import shutil, os
 import tensorflow as tf
+import easymode.core.config as cfg
 
+MODEL_CACHE_DIR = cfg.settings["MODEL_DIRECTORY"]
 
-def package_checkpoint(title='', checkpoint_directory='', output_directory=''):
+def package_checkpoint(title='', checkpoint_directory='', output_directory='', cache=False):
     if 'n2n' in title:
         from easymode.n2n.model import create
     elif 'ddw' in title:
@@ -30,3 +32,6 @@ def package_checkpoint(title='', checkpoint_directory='', output_directory=''):
 
     size_mb = os.path.getsize(os.path.join(output_directory, f'{title}.h5')) / (1024 * 1024)
     print(f'Saved {os.path.join(output_directory, title + ".h5")}. File size: {size_mb:.2f} MB')
+
+    if cache:
+        shutil.copy2(os.path.join(output_directory, f'{title}.h5'), os.path.join(MODEL_CACHE_DIR, f'{title}.h5'))

@@ -5,7 +5,12 @@ from scipy.spatial.transform import Rotation
 from scipy.ndimage import affine_transform
 from easymode.ddw.loss import fft3d, ifft3d
 
-ROOT = 'C:/Users/mart_/Desktop/easymode'
+DEBUG = False
+ROOT = '/cephfs/mlast/compu_projects/easymode'
+if os.name == 'nt':
+    DEBUG = True
+    ROOT = 'C:/Users/Mart Last/Desktop/easymode'
+    print(f'debug mode - running on Windows with root at {ROOT}')
 
 # implementation is based on that of n2n and the ddw description in the paper: https://www.nature.com/articles/s41467-024-51438-y and https://github.com/MLI-lab/DeepDeWedge
 # the ddw data loader is essentially the n2n data loader with extra steps:
@@ -15,6 +20,7 @@ ROOT = 'C:/Users/mart_/Desktop/easymode'
 # M_rot now represents the actual missing wedge, while M is an artificial one.
 # apply M to v0_rot: v0_rot' = F_inv(F(v0_rot) * M_rot)
 # training input is v0_rot', target is v1_rot
+
 
 class DDWDatasetGenerator:
     def __init__(self, mode='splits', box_size=128, samples_per_tomogram=10):
@@ -97,7 +103,7 @@ class DDWDatasetGenerator:
 
     def generate(self):
         print(
-            f'Preparing to generate training data for denoiser mode {self.mode} with {self.samples_per_tomogram} samples per tomogram.\n')
+            f'Preparing to generate training data for ddw mode {self.mode} with {self.samples_per_tomogram} samples per tomogram.\n')
 
         if self.mode == 'splits':
             base_path = f'{ROOT}/training/ddw/splits'
@@ -147,8 +153,9 @@ class DDWDatasetGenerator:
                     self.vols_one.append(path_evn)
                     self.vols_two.append(path_odd)
 
+
 class DDWDataLoader:
-    def __init__(self, mode='splits', wedge_angle=90, batch_size=32, box_size=96, validation=False):
+    def __init__(self, mode='splits', wedge_angle=60, batch_size=32, box_size=96, validation=False):
         self.mode = mode
         self.batch_size = batch_size
         self.box_size = box_size
@@ -156,6 +163,7 @@ class DDWDataLoader:
         self.wedge_angle = wedge_angle
         self.wedge = self.get_wedge(wedge_angle)
         self.indices = list()
+        self.rotate = True
         self.parse_indices()
 
     @staticmethod
@@ -168,8 +176,8 @@ class DDWDataLoader:
         train_y = np.rot90(train_y, k, axes=(1, 2))
 
         if np.random.rand() < 0.5:
-            train_x = np.rot90(train_x, k, axes=(0, 2))
-            train_y = np.rot90(train_y, k, axes=(0, 2))
+            train_x = np.rot90(train_x, k=2, axes=(0, 2))
+            train_y = np.rot90(train_y, k=2, axes=(0, 2))
 
         if np.random.rand() < 0.5:
             train_x = np.flip(train_x, axis=2)
@@ -194,7 +202,7 @@ class DDWDataLoader:
         sample_names = sorted([os.path.basename(f) for f in glob.glob(f'{sample_directory}/*.mrc')])
         self.indices = list(range(len(sample_names)))
 
-    def get_sample(self, index):
+    def load_sample(self, index):
         train_x = mrcfile.read(f'{ROOT}/training/ddw/{self.mode}/volumes_{"validation" if self.validation else "training"}/x/{index}.mrc').data
         train_y = mrcfile.read(f'{ROOT}/training/ddw/{self.mode}/volumes_{"validation" if self.validation else "training"}/y/{index}.mrc').data
 
@@ -204,20 +212,16 @@ class DDWDataLoader:
         return train_x, train_y
 
     def get_wedge(self, mw_angle):
-        expanded_box_size = int(self.box_size * 2**0.5)
-        x = np.fft.fftfreq(expanded_box_size).reshape(-1, 1, 1)
-        z = np.fft.fftfreq(expanded_box_size).reshape(1, 1, -1)
+        wedge = np.zeros((self.box_size, self.box_size, self.box_size), dtype=int)
+        tan_half_angle = np.tan(mw_angle / 180.0 * np.pi / 2.0)
+        for j in range(self.box_size):
+            for k in range(self.box_size):
+                x = j - self.box_size // 2
+                z = k - self.box_size // 2
+                if x**2 >= (z / tan_half_angle)**2 + 1e-9:
+                    wedge[j, :, k] = 1
+        return 1 - wedge
 
-        half_angle = np.radians(mw_angle / 2.0)
-        tan_half_angle = np.tan(half_angle)
-
-        mask = np.where(
-            np.abs(z) > 1e-10,
-            np.abs(x / (z + 1e-8)) > tan_half_angle,
-            True
-        )
-
-        return np.broadcast_to(mask, (expanded_box_size, expanded_box_size, expanded_box_size)).astype(int).squeeze()
 
     def update_wedges(self):
         print(f'Todo: implement update_wedges() and adjust how samples get delivered during training.')
@@ -229,20 +233,20 @@ class DDWDataLoader:
         volume = volume[c[0] - s:c[0] + s, c[1] - s:c[1] + s, c[2] - s:c[2] + s]
         return volume
 
-    @staticmethod
-    def rotate_volume(volume, rotation):
-        rmat = rotation.as_matrix()
-        c = 0.5 * (np.array(volume.shape) - 1)
-        offset = c - rmat @ c
-        return affine_transform(volume, rmat, offset, order=1)
-
+    def rotate_volume(self, volume, rotation):
+        if self.rotate:
+            rmat = rotation.as_matrix()
+            c = 0.5 * (np.array(volume.shape) - 1)
+            offset = c - rmat @ c
+            return affine_transform(volume, rmat, offset, order=1)
+        return volume
 
     def sample_generator(self):
         while True:
             np.random.shuffle(self.indices)
             for j in self.indices:
                 m = self.wedge.copy()
-                v0, v1 = self.get_sample(j)
+                v0, v1 = self.load_sample(j)
                 v0, v1 = self.augment(v0, v1, self.validation)
                 v0, v1 = self.preprocess(v0, v1)
                 if not self.validation and self.mode == 'splits' and np.random.rand() < 0.5:
@@ -263,6 +267,9 @@ class DDWDataLoader:
                 data_stack = np.expand_dims(np.stack([v1, m, m_r], axis=-1), axis=-1)
                 v0 = np.expand_dims(v0, axis=-1)
                 yield v0, data_stack
+
+    def __iter__(self):
+        return self.sample_generator()
 
     def as_generator(self, batch_size, num_epochs=None):
         dataset = tf.data.Dataset.from_generator(
@@ -288,7 +295,7 @@ class DDWDataLoader:
         return dataset, n_steps
 
 
-def train_ddw(mode='splits', batch_size=32, box_size=96, epochs=100, lr_start=1e-3, lr_end=1e-5, wedge_update_interval=5, wedge_angle=90):
+def train_ddw(mode='splits', batch_size=32, box_size=96, epochs=100, lr_start=1e-3, lr_end=1e-5, wedge_update_interval=5, wedge_angle=60, temp=""):
     from easymode.ddw.model import create
 
     tf.config.run_functions_eagerly(False)
@@ -306,14 +313,16 @@ def train_ddw(mode='splits', batch_size=32, box_size=96, epochs=100, lr_start=1e
     validation_ds, validation_steps = validation_loader.as_generator(batch_size=batch_size)
 
     # callbacks
-    os.makedirs(f'{ROOT}/training/ddw/{mode}/checkpoints/', exist_ok=True)
-    cb_checkpoint_val = tf.keras.callbacks.ModelCheckpoint(filepath=f'{ROOT}/training/ddw/{mode}/checkpoints/' + "validation_loss",
+    checkpoint_directory = temp if temp != "" else f'{ROOT}/training/ddw/{mode}/checkpoints/'
+    checkpoint_directory += '/' if not checkpoint_directory.endswith('/') else ''
+    os.makedirs(checkpoint_directory, exist_ok=True)
+    cb_checkpoint_val = tf.keras.callbacks.ModelCheckpoint(filepath=f'{checkpoint_directory}' + "validation_loss",
                                                            monitor=f'val_loss',
                                                            save_best_only=True,
                                                            save_weights_only=True,
                                                            mode='min',
                                                            verbose=1)
-    cb_checkpoint_train = tf.keras.callbacks.ModelCheckpoint(filepath=f'{ROOT}/training/ddw/{mode}/checkpoints/' + "training_loss",
+    cb_checkpoint_train = tf.keras.callbacks.ModelCheckpoint(filepath=f'{checkpoint_directory}' + "training_loss",
                                                              monitor=f'loss',
                                                              save_best_only=True,
                                                              save_weights_only=True,
@@ -321,11 +330,11 @@ def train_ddw(mode='splits', batch_size=32, box_size=96, epochs=100, lr_start=1e
                                                              verbose=1)
 
     def lr_decay(epoch, _):
-        return float(lr_start + (lr_end - lr_start) * ((epoch - 2) / epochs))
+        return float(lr_start + (lr_end - lr_start) * (epoch / epochs))
 
     cb_lr = tf.keras.callbacks.LearningRateScheduler(lr_decay, verbose=1)
 
-    cb_csv = tf.keras.callbacks.CSVLogger(f'{ROOT}/training/ddw/{mode}/checkpoints/training_log.csv', append=True)
+    cb_csv = tf.keras.callbacks.CSVLogger(f'{checkpoint_directory}training_log.csv', append=True)
 
     class WedgeUpdateCallback(tf.keras.callbacks.Callback):
         def on_epoch_end(self, epoch, logs=None):
@@ -334,5 +343,39 @@ def train_ddw(mode='splits', batch_size=32, box_size=96, epochs=100, lr_start=1e
                 validation_loader.update_wedges()
 
     cb_wedge_update = WedgeUpdateCallback()
-
+    if DEBUG:
+        validation_ds = None
+        validation_steps = None
     model.fit(training_ds, steps_per_epoch=training_steps, validation_data=validation_ds, validation_steps=validation_steps, epochs=epochs, validation_freq=1, callbacks=[cb_checkpoint_val, cb_checkpoint_train, cb_lr, cb_csv, cb_wedge_update])
+
+
+if __name__ == '__main__':
+    from easymode.ddw.loss import fft3d
+    from easymode.core.distribution import cache_model, load_model
+
+    def fft(v):
+        return np.abs(fft3d(v).numpy())
+
+    def save(v, n):
+        with mrcfile.new(f'C:/Users/Mart Last/Desktop/easymode/debug/{n}.mrc', overwrite=True) as m:
+            m.set_data(np.squeeze(v).astype(np.float32))
+        with mrcfile.new(f'C:/Users/Mart Last/Desktop/easymode/debug/{n}_fft.mrc', overwrite=True) as m:
+            m.set_data(fft(np.squeeze(v)).astype(np.float32))
+
+    #generator = DDWDatasetGenerator(box_size=96).generate()
+    loader = DDWDataLoader(box_size=64, wedge_angle=60)
+
+    loader.rotate = False
+
+    model = load_model(cache_model('ddw_splits'))
+
+    v0, v1 = loader.load_sample(0)
+    v0 = loader.crop_volume(v0)
+    v1 = loader.crop_volume(v1)
+
+    v0 = np.expand_dims(v0, axis=(0, -1))
+    prediction = np.squeeze(model.predict(v0))
+
+    save(v0, 'v0')
+    save(v1, 'v1')
+    save(prediction, 'prediction')

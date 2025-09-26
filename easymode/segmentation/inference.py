@@ -166,7 +166,7 @@ def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, bat
     os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
     for device in tf.config.list_physical_devices('GPU'):
         tf.config.experimental.set_memory_growth(device, True)
-    mixed_precision.set_global_policy('mixed_float16')
+    #mixed_precision.set_global_policy('mixed_float16')
 
     process_start_time = psutil.Process().create_time()
 
@@ -196,11 +196,11 @@ def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, bat
                 os.remove(output_file)
             print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {feature} - {os.path.basename(output_file)} - ERROR: {e}")
 
-def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_size=8, overwrite=False, data_format='int8'):
+def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_size=8, overwrite=False, data_format='int8', gpus='0'):
     if output_directory is None:
         output_directory = data_directory
 
-    gpus = ','.join(str(i) for i in range(len(tf.config.list_physical_devices('GPU'))))
+    gpus = [int(g) for g in gpus.split(',') if g.strip().isdigit()]
 
     print(f'easymode segment\n'
           f'feature: {feature}\n'

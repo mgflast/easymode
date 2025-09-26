@@ -26,6 +26,7 @@ def main():
     package.add_argument('-t', "--title", type=str, required=True, help="Title of the model to package.")
     package.add_argument('-c', "--checkpoint_directory", type=str, required=True, help="Path to the checkpoint directory to package from.")
     package.add_argument('-ou', "--output_directory", type=str, default='/cephfs/mlast/compu_projects/easymode/training/3d/packaged/', help="Output directory to save the packaged model weights.")
+    package.add_argument('--cache', action='store_true', help='If set, cache the model weights in the easymode model directory.')
 
     subparsers.add_parser('list', help='List the features for which pretrained general segmentation networks are available.')
 
@@ -37,6 +38,7 @@ def main():
     segment.add_argument('--overwrite', action='store_true', help='If set, overwrite existing segmentations in the output directory.')
     segment.add_argument('--batch', type=int, default=1, help='Batch size for segmentation (default 1). Volumes are processed in batches of 160x160x160 shaped tiles. In/decrease batch size depending on available GPU memory.')
     segment.add_argument('--format', type=str, choices=['float32', 'uint16', 'int8'], default='int8', help='Output format for the segmented volumes (default: int8).')
+    segment.add_argument('--gpu', type=str, default='0', help="Comma-separated list of GPU ids to use (default '0').")
 
     pick = subparsers.add_parser('pick', help='Pick particles in segmented volumes.')
     pick.add_argument("feature", metavar='FEATURE', type=str, help="Feature to pick, based on segmentations.")
@@ -69,6 +71,7 @@ def main():
     denoise.add_argument('--overwrite', action='store_true', help='If set, overwrite existing segmentations in the output directory.')
     denoise.add_argument('--batch', type=int, default=1,help='Batch size for segmentation (default 1). Volumes are processed in batches of 128x128x128 shaped tiles. In/decrease batch size depending on available GPU memory.')
     denoise.add_argument('--iter', type=int, default=1, help="Only valid in direct mode: number of denoising iterations to perform (default 1). If you are really starved for contrast, try increasing this - but beware of artifacts.")
+    denoise.add_argument('--gpu', type=str, default='0,', help="Comma-separated list of GPU ids to use (default '0').")
 
 
     denoise_train = subparsers.add_parser('denoise_train', help='Train a denoising network.')
@@ -83,6 +86,7 @@ def main():
     denoise_train.add_argument('--ls', type=float, help="Initial learning rate for the optimizer (default 1e-3).", default=1e-4)
     denoise_train.add_argument('--le', type=float, help="Final learning rate for the optimizer (default 1e-5).", default=1e-5)
     denoise_train.add_argument('--wedge', type=float, help="Size of the missing wedge in degrees, e.g. '90' (default). Only used with method 'ddw'", default=90.0)
+    denoise_train.add_argument('--temp', type=str, default="", help="Temporary dir to write files to during training.")
 
     args, unknown = parser.parse_known_args()
 
@@ -98,23 +102,25 @@ def main():
 
     elif args.command == 'denoise':
         if args.method == 'n2n':
-            from easymode.n2n.inference import dispatch
-            dispatch(mode=args.mode,
+            import easymode.n2n.inference as n2n
+            n2n.dispatch(mode=args.mode,
                      input_directory=args.data,
                      output_directory=args.output,
                      tta=args.tta,
                      batch_size=args.batch,
                      overwrite=args.overwrite,
-                     iter=args.iter)
+                     iter=args.iter,
+                     gpus=args.gpu)
         elif args.method == 'ddw':
-            from easymode.ddw.inference import dispatch
-            dispatch(mode=args.mode,
+            import easymode.ddw.inference as ddw
+            ddw.dispatch(mode=args.mode,
                      input_directory=args.data,
                      output_directory=args.output,
                      tta=args.tta,
                      batch_size=args.batch,
                      overwrite=args.overwrite,
-                     iter=args.iter)
+                     iter=args.iter,
+                     gpus=args.gpu)
 
     elif args.command == 'denoise_train':
         if not args.extract and not args.train:
@@ -131,7 +137,8 @@ def main():
                           box_size=args.box,
                           epochs=args.epochs,
                           lr_start=args.ls,
-                          lr_end=args.le)
+                          lr_end=args.le,
+                          temp=args.temp)
         elif args.method == 'ddw':
             if args.extract:
                 from easymode.ddw.train import DDWDatasetGenerator
@@ -144,7 +151,8 @@ def main():
                           epochs=args.epochs,
                           lr_start=args.ls,
                           lr_end=args.le,
-                          wedge_angle=args.wedge
+                          wedge_angle=args.wedge,
+                          temp=args.temp
                 )
 
     elif args.command == 'segment':
@@ -155,7 +163,8 @@ def main():
                 tta=args.tta,
                 batch_size=args.batch,
                 overwrite=args.overwrite,
-                data_format=args.format)
+                data_format=args.format,
+                gpus = args.gpu)
 
     elif args.command == 'pick':
         from easymode.core.ais_wrapper import pick
@@ -199,7 +208,7 @@ def main():
 
     elif args.command == 'package':
         from easymode.core.packaging import package_checkpoint
-        package_checkpoint(title=args.title, checkpoint_directory=args.checkpoint_directory, output_directory=args.output_directory)
+        package_checkpoint(title=args.title, checkpoint_directory=args.checkpoint_directory, output_directory=args.output_directory, cache=args.cache)
 
     elif args.command == 'list':
         from easymode.core.distribution import list_remote_models

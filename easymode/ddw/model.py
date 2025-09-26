@@ -82,6 +82,7 @@ class EncoderBlock(layers.Layer):
             x = self.downsample_relu(x)
 
         x = self.res_block(x, training=training)
+
         return x
 
 
@@ -126,9 +127,9 @@ class UNet(Model):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        filters = [32, 64, 128, 256, 512]
-        strides = [1, 2, 2, 2, 2]
-        upsample_kernel_sizes = [1, 2, 2, 2, 2]
+        filters = [32, 64, 128, 256]
+        strides = [1, 2, 2, 2]
+        upsample_kernel_sizes = [1, 2, 2, 2]
 
         self.encoders = []
         for i, (f, s) in enumerate(zip(filters, strides)):

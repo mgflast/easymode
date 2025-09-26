@@ -2,7 +2,7 @@ import glob, os, mrcfile, shutil
 from easymode.segmentation.augmentations import *
 import tensorflow as tf
 
-ROOT = 'C:/Users/mart_/Desktop/easymode'
+ROOT = '/cephfs/mlast/compu_projects/easymode'
 
 class N2NDatasetGenerator:
     def __init__(self, mode='splits', samples_per_tomogram=10, box_size=96):
@@ -82,7 +82,7 @@ class N2NDatasetGenerator:
 
     def generate(self):
         print(
-            f'Preparing to generate training data for denoiser mode {self.mode} with {self.samples_per_tomogram} samples per tomogram.\n')
+            f'Preparing to generate training data for n2n mode {self.mode} with {self.samples_per_tomogram} samples per tomogram.\n')
 
         if self.mode == 'splits':
             base_path = f'{ROOT}/training/n2n/splits'
@@ -156,8 +156,8 @@ class N2NDataloader:
         train_y = np.rot90(train_y, k, axes=(1, 2))
 
         if np.random.rand() < 0.5:
-            train_x = np.rot90(train_x, k, axes=(0, 2))
-            train_y = np.rot90(train_y, k, axes=(0, 2))
+            train_x = np.rot90(train_x, k=2, axes=(0, 2))
+            train_y = np.rot90(train_y, k=2, axes=(0, 2))
 
         if np.random.rand() < 0.5:
             train_x = np.flip(train_x, axis=2)
@@ -231,7 +231,7 @@ class N2NDataloader:
         return dataset, n_steps
 
 
-def train_n2n(mode='splits', batch_size=32, box_size=96, epochs=100, lr_start=1e-3, lr_end=1e-5):
+def train_n2n(mode='splits', batch_size=32, box_size=96, epochs=100, lr_start=1e-3, lr_end=1e-5, temp=""):
     from easymode.n2n.model import create
 
     tf.config.run_functions_eagerly(False)
@@ -247,14 +247,16 @@ def train_n2n(mode='splits', batch_size=32, box_size=96, epochs=100, lr_start=1e
     validation_ds, validation_steps = N2NDataloader(mode=mode, batch_size=batch_size, box_size=box_size, validation=True).as_generator(batch_size=batch_size)
 
     # callbacks
-    os.makedirs(f'{ROOT}/training/n2n/{mode}/checkpoints/', exist_ok=True)
-    # cb_checkpoint_val = tf.keras.callbacks.ModelCheckpoint(filepath=f'{ROOT}/training/n2n/{mode}/checkpoints/' + "validation_loss",
+    checkpoint_directory = temp if temp != "" else f'{ROOT}/training/ddw/{mode}/checkpoints/'
+    checkpoint_directory += '/' if not checkpoint_directory.endswith('/') else ''
+    os.makedirs(checkpoint_directory, exist_ok=True)
+    # cb_checkpoint_val = tf.keras.callbacks.ModelCheckpoint(filepath=f'{checkpoint_directory}' + "validation_loss",
     #                                                        monitor=f'val_loss',
     #                                                        save_best_only=True,
     #                                                        save_weights_only=True,
     #                                                        mode='min',
     #                                                        verbose=1)
-    cb_checkpoint_train = tf.keras.callbacks.ModelCheckpoint(filepath=f'{ROOT}/training/n2n/{mode}/checkpoints/' + "training_loss",
+    cb_checkpoint_train = tf.keras.callbacks.ModelCheckpoint(filepath=f'{checkpoint_directory}' + "training_loss",
                                                              monitor=f'loss',
                                                              save_best_only=True,
                                                              save_weights_only=True,
@@ -266,7 +268,7 @@ def train_n2n(mode='splits', batch_size=32, box_size=96, epochs=100, lr_start=1e
 
     cb_lr = tf.keras.callbacks.LearningRateScheduler(lr_decay, verbose=1)
 
-    cb_csv = tf.keras.callbacks.CSVLogger(f'{ROOT}/training/n2n/{mode}/checkpoints/training_log.csv', append=True)
+    cb_csv = tf.keras.callbacks.CSVLogger(f'{checkpoint_directory}training_log.csv', append=True)
 
     model.fit(training_ds, steps_per_epoch=training_steps, validation_data=validation_ds, validation_steps=validation_steps, epochs=epochs, validation_freq=1, callbacks=[cb_checkpoint_val, cb_checkpoint_train, cb_lr, cb_csv])
 

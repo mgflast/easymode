@@ -156,7 +156,7 @@ def denoiser_thread(mode, tomogram_list, model_path, output_dir, gpu, batch_size
     os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
     for device in tf.config.list_physical_devices('GPU'):
         tf.config.experimental.set_memory_growth(device, True)
-    mixed_precision.set_global_policy('mixed_float16')
+    #mixed_precision.set_global_policy('mixed_float16')
 
     process_start_time = psutil.Process().create_time()
     model = load_model(model_path)
@@ -190,12 +190,12 @@ def denoiser_thread(mode, tomogram_list, model_path, output_dir, gpu, batch_size
                 os.remove(output_file)
             print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {os.path.basename(output_file)} - ERROR: {e}")
 
-def dispatch(input_directory, output_directory, mode='splits', tta=1, batch_size=8, overwrite=False, iter=1):
+def dispatch(input_directory, output_directory, mode='splits', tta=1, batch_size=8, overwrite=False, iter=1, gpus="0"):
     if output_directory == input_directory:
         print("Please choose an output directory that is different from the input directory - we dont want to overwrite your original volumes.")
         exit()
 
-    gpus = ','.join(str(i) for i in range(len(tf.config.list_physical_devices('GPU'))))
+    gpus = [int(g) for g in gpus.split(',') if g.strip().isdigit()]
 
     print(f'easymode denoise\n'
           f'mode: {mode}\n'
