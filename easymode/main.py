@@ -42,6 +42,7 @@ def main():
 
     pick = subparsers.add_parser('pick', help='Pick particles in segmented volumes.')
     pick.add_argument("feature", metavar='FEATURE', type=str, help="Feature to pick, based on segmentations.")
+    pick.add_argument("--filament", action='store_true', help="Trace filaments & sample coordinates at a given spacing. If not set, will pick isolated particles. See Ais docs.")
     pick.add_argument('--data', required=True, type=str, help="Path to directory containing input .mrc's.")
     pick.add_argument('--output', required=False, type=str, default=None, help="Directory to save output coordinate files to. If left empty, will save to the input data directory.")
     pick.add_argument('--threshold', required=False, type=float, default=128, help="Threshold to apply to volumes prior to finding local maxima (default 128). Regardless of the segmentation .mrc dtype, the value range is assumed to be 0-255.")
@@ -174,7 +175,8 @@ def main():
              spacing=args.spacing,
              size=args.size,
              binning=args.binning,
-             tomostar=args.tomostar)
+             tomostar=args.tomostar,
+             filament=args.filament,)
 
     elif args.command == 'reconstruct':
         from easymode.core.warp_wrapper import reconstruct

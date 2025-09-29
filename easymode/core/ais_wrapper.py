@@ -9,9 +9,10 @@ def _run(cmd, capture=False):
     return ret.stdout
 
 
-def pick(data_directory, target, output_directory, spacing, size, binning=2, processes=112, tomostar=True):
+def pick(data_directory, target, output_directory, spacing, size, binning=2, processes=112, tomostar=True, filament=False):
     print(f'easymode pick\n'
           f'feature: {target}\n'
+          f'filament_mode: {filament}\n'
           f'data_directory: {data_directory}\n'
           f'output_directory: {output_directory}\n'
           f'output_pattern: *__{target}_coords.star\n'
@@ -21,7 +22,7 @@ def pick(data_directory, target, output_directory, spacing, size, binning=2, pro
           f'n_processes: {processes}\n'
           f'rename to .tomostar: {tomostar}\n')
 
-    command = f'ais pick -t {target} -d {data_directory} -ou {output_directory} -spacing {spacing} -size {size} -b {binning} -p {processes}'
+    command = f'ais pick -t {target} -d {data_directory} -ou {output_directory} -spacing {spacing} -size {size} -b {binning} -p {processes} {"-filament" if filament else ""}'
     _run(command)
     if tomostar:
         files = glob.glob(f'{output_directory}/*__{target}_coords.star')
@@ -33,7 +34,10 @@ def pick(data_directory, target, output_directory, spacing, size, binning=2, pro
             data["rlnMicrographName"] = tomo
             starfile.write({"particles": data}, f)
 
-    print(f"\n\033[38;5;208m{''}found {n_particles} particles in total. {''}\033[0m\n")
+    if filament:
+        print(f"\n\033[38;5;208m{''}found {n_particles} particles in total. that's {n_particles * spacing / 10000.0} um of {target} :) {''}\033[0m\n")
+    else:
+        print(f"\n\033[38;5;208m{''}found {n_particles} particles in total. {''}\033[0m\n")
     print(f"\033[33m"
           f"as a reminder, the WarpTools coordinate ingestion command is something like:\n\n"
           f"WarpTools ts_export_particles "

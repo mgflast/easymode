@@ -48,13 +48,14 @@ class DataLoader:
 
         label = mrcfile.read(f'/cephfs/mlast/compu_projects/easymode/training/3d/data/{datagroup}/label/{index}.mrc')
         validity = mrcfile.read(f'/cephfs/mlast/compu_projects/easymode/training/3d/data/{datagroup}/validity/{index}.mrc')
+
         label[validity == 0] = 2
-        label[:32, :, :] = 2
-        label[-32:, :, :] = 2
-        label[:, :32, :] = 2
-        label[:, -32:, :] = 2
-        label[:, :, :32] = 2
-        label[:, :, -32:] = 2
+        label[:16, :, :] = 2
+        label[-16:, :, :] = 2
+        label[:, :16, :] = 2
+        label[:, -16:, :] = 2
+        label[:, :, :16] = 2
+        label[:, :, -16:] = 2
 
         if datagroup == 'Junk3D' or 'Not' in datagroup:
             label[label == 1] = 0

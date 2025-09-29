@@ -3,7 +3,6 @@ import requests
 import json
 from pathlib import Path
 from huggingface_hub import hf_hub_download, HfApi
-import tensorflow as tf
 import easymode.core.config as cfg
 
 # Configuration
@@ -94,6 +93,7 @@ def download_model(repo_id, filename, local_path, version_path):
 
 
 def load_model_weights(weights_path):
+    import tensorflow as tf
     if 'n2n' in os.path.basename(weights_path):
         from easymode.n2n.model import create
     elif 'ddw' in os.path.basename(weights_path):
@@ -191,6 +191,8 @@ def list_remote_models():
         models = []
 
         for model_file in sorted(model_files):
+            if 'ddw' in model_file or 'n2n' in model_file:
+                continue
             title = model_file.replace('.h5', '')
             models.append({'title': title, 'filename': model_file})
 

@@ -118,8 +118,13 @@ def _segment_tomogram_instance(volume, model, batch_size):
     return segmented_volume.astype(np.float32)
 
 
-def segment_tomogram(model, tomogram_path, tta=1, batch_size=2):
+def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, binning=1):
     volume = mrcfile.read(tomogram_path).astype(np.float32)
+
+    _j, _k, _l = volume.shape
+    if binning > 1:
+        volume = volume[:_j // binning * binning, :_k // binning * binning, :_l // binning * binning].reshape((_j // binning, binning, _k // binning, binning, _l // binning, binning)).mean(axis=(1, 3, 5))
+
     volume -= np.mean(volume)
     volume /= np.std(volume) + 1e-6
 
@@ -142,12 +147,18 @@ def segment_tomogram(model, tomogram_path, tta=1, batch_size=2):
         segmented_volume += segmented_tta_vol
     segmented_volume /= tta
 
+    if binning > 1:
+        from scipy.ndimage import zoom
+        j, k, l = segmented_volume.shape
+        segmented_volume = zoom(segmented_volume, (_j / j, _k / k, _l / l), order=0)
+
     segmented_volume[:32, :, :] = 0
     segmented_volume[-32:, :, :] = 0
     segmented_volume[:, :32, :] = 0
     segmented_volume[:, -32:, :] = 0
     segmented_volume[:, :, :32] = 0
     segmented_volume[:, :, -32:] = 0
+
     return segmented_volume
 
 
@@ -162,7 +173,7 @@ def save_mrc(pxd, path, data_format, voxel_size=10.0):
         m.set_data(pxd)
         m.voxel_size = voxel_size
 
-def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, batch_size, tta, overwrite, data_format):
+def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, batch_size, tta, overwrite, data_format, binning=1):
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
 
     for device in tf.config.list_physical_devices('GPU'):
@@ -185,7 +196,7 @@ def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, bat
             with mrcfile.new(output_file, overwrite=True) as m:
                 m.set_data(-1.0 * np.ones((10, 10, 10), dtype=np.float32))
                 wrote_temporary = True
-            segmented_volume = segment_tomogram(model, tomogram_path, tta, batch_size)
+            segmented_volume = segment_tomogram(model, tomogram_path, tta, batch_size, binning)
 
             save_mrc(segmented_volume, output_file, data_format)
 
@@ -195,6 +206,14 @@ def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, bat
             if wrote_temporary:
                 os.remove(output_file)
             print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {feature} - {os.path.basename(output_file)} - ERROR: {e}")
+
+FEATURE_BINNING_VALUES = {
+    'ribosome': 1,
+    'membrane': 1,
+    'microtubule': 1,
+    'tric': 1,
+    'mitochondrion': 2,
+}
 
 def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_size=8, overwrite=False, data_format='int8', gpus='0'):
     if output_directory is None:
@@ -225,7 +244,7 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
     processes = []
     for gpu in gpus:
         p = multiprocessing.Process(target=segmentation_thread,
-                                    args=(tomograms, model_path, feature, output_directory, gpu, batch_size, tta, overwrite, data_format))
+                                    args=(tomograms, model_path, feature, output_directory, gpu, batch_size, tta, overwrite, data_format, FEATURE_BINNING_VALUES[feature]))
         processes.append(p)
         p.start()
         time.sleep(2)
