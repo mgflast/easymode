@@ -9,7 +9,7 @@ def _run(cmd, capture=False):
     return ret.stdout
 
 
-def pick(data_directory, target, output_directory, spacing, size, binning=2, processes=112, tomostar=True, filament=False):
+def pick(data_directory, target, output_directory, spacing, size, binning=2, processes=112, tomostar=True, filament=False, per_filament_star_file=False):
     print(f'easymode pick\n'
           f'feature: {target}\n'
           f'filament_mode: {filament}\n'
@@ -24,7 +24,8 @@ def pick(data_directory, target, output_directory, spacing, size, binning=2, pro
 
     command = f'ais pick -t {target} -d {data_directory} -ou {output_directory} -spacing {spacing} -size {size} -b {binning} -p {processes} {"-filament" if filament else ""}'
     _run(command)
-    if tomostar:
+
+    if tomostar:  # rename the rlnMicrograph name to account for the Warp(Tools) .tomostar / _10.00Apx.mrc discrepancy
         files = glob.glob(f'{output_directory}/*__{target}_coords.star')
         n_particles = 0
         for j, f in enumerate(files):
@@ -34,8 +35,23 @@ def pick(data_directory, target, output_directory, spacing, size, binning=2, pro
             data["rlnMicrographName"] = tomo
             starfile.write({"particles": data}, f)
 
+    if per_filament_star_file and filament:  # split into one file per filament, rather than one file per tomogram
+        n_filaments = 0
+        files = glob.glob(f'{output_directory}/*__{target}_coords.star')
+        for j, f in enumerate(files):
+            data = starfile.read(f)
+            for filament_id in data['aisFilamentID'].unique():
+                n_filaments += 1
+                filament_df = data[data['aisFilamentID'] == filament_id]
+                out_path = f.replace('.star', f'_filament_{int(filament_id)}_coords.star')
+                starfile.write({"particles": filament_df}, out_path)
+            os.remove(f)
+
     if filament:
-        print(f"\n\033[38;5;208m{''}found {n_particles} particles in total. that's {n_particles * spacing / 10000.0} um of {target} :) {''}\033[0m\n")
+        if per_filament_star_file:
+            print(f"\n\033[38;5;208m{''}found {n_particles} particles along {n_filaments} filaments. that's {n_particles * spacing / 10000.0} um of {target} :) {''}\033[0m\n")
+        else:
+            print(f"\n\033[38;5;208m{''}found {n_particles} particles in total. that's {n_particles * spacing / 10000.0} um of {target} :) {''}\033[0m\n")
     else:
         print(f"\n\033[38;5;208m{''}found {n_particles} particles in total. {''}\033[0m\n")
     print(f"\033[33m"
@@ -53,3 +69,4 @@ def pick(data_directory, target, output_directory, spacing, size, binning=2, pro
           f"\n\n"
           f"(but make sure you adapt the parameters to your use case)\n"
           f"\033[0m")
+

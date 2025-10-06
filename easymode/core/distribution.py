@@ -66,7 +66,7 @@ def save_version_info(version_path, version_info):
 
 
 def download_model(repo_id, filename, local_path, version_path):
-    print(f"Downloading {repo_id}/{filename}...")
+    print(f"Downloading {repo_id}/{filename}...\n")
 
     try:
         # Ensure cache directory exists
@@ -85,7 +85,7 @@ def download_model(repo_id, filename, local_path, version_path):
         if remote_version:
             save_version_info(version_path, remote_version)
 
-        print(f"\nDownloaded successfully to {local_path}\n\n")
+        print(f"\nNetworks weights saved to cache at {local_path}\n\n")
         return local_path
 
     except Exception as e:
@@ -102,7 +102,7 @@ def load_model_weights(weights_path):
         from easymode.segmentation.model import create
 
     model = create()
-    dummy_input = tf.zeros((1, 96, 96, 96, 1))
+    dummy_input = tf.zeros((1, 160, 160, 160, 1))
     _ = model(dummy_input)
     model.load_weights(weights_path)
 
@@ -121,14 +121,13 @@ def cache_model(model_title, force_download=False, silent=False):
         if not online:
             if local_exists:
                 print(
-                    "Local model found. There may be updates available, but we cannot check without an internet connection.")
+                    "\nLocal model found. There may be updates available, but we cannot check without an internet connection.")
             else:
                 print(
-                    f"The required network weights are not available in the local cache {MODEL_CACHE_DIR} and there is no internet connection available to download them - aborting...")
+                    f"\nThe required network weights are not available in the local cache {MODEL_CACHE_DIR} and there is no internet connection available to download them - aborting...")
                 exit()
         else:
-            print(
-                f"The required network weights for {model_title} are not available in the local cache. Downloading now...")
+            print( f"\nThe required network weights for {model_title} are not available in the local cache.")
             download_model(info['repo_id'], info['filename'], info['local_path'], info['version_path'])
 
     elif local_exists and online:

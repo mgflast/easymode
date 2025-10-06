@@ -181,6 +181,7 @@ def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, bat
 
     process_start_time = psutil.Process().create_time()
 
+    print(f'GPU {gpu} - loading model ({model_path}).')
     model = load_model(model_path)
 
     for j, tomogram_path in enumerate(tomogram_list, 1):
@@ -190,7 +191,7 @@ def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, bat
         try:
             if os.path.exists(output_file):
                 file_age = os.path.getmtime(output_file)
-                if not overwrite or file_age > process_start_time - 60:
+                if not overwrite or file_age < process_start_time:
                     continue
 
             with mrcfile.new(output_file, overwrite=True) as m:
@@ -201,11 +202,11 @@ def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, bat
             save_mrc(segmented_volume, output_file, data_format)
 
             etc = time.strftime('%H:%M:%S', time.gmtime((time.time() - process_start_time) / j * (len(tomogram_list) - j)))
-            print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {feature} - {os.path.basename(output_file)} - etc {etc}")
+            print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {feature} - {os.path.basename(tomogram_path)} - etc {etc}")
         except Exception as e:
             if wrote_temporary:
                 os.remove(output_file)
-            print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {feature} - {os.path.basename(output_file)} - ERROR: {e}")
+            print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {feature} - {os.path.basename(tomogram_path)} - ERROR: {e}")
 
 FEATURE_BINNING_VALUES = {
     'ribosome': 1,
@@ -213,6 +214,7 @@ FEATURE_BINNING_VALUES = {
     'microtubule': 1,
     'tric': 1,
     'mitochondrion': 2,
+    'actin': 1,
 }
 
 def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_size=8, overwrite=False, data_format='int8', gpus='0'):
@@ -244,16 +246,13 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
     processes = []
     for gpu in gpus:
         p = multiprocessing.Process(target=segmentation_thread,
-                                    args=(tomograms, model_path, feature, output_directory, gpu, batch_size, tta, overwrite, data_format, FEATURE_BINNING_VALUES[feature]))
+                                    args=(tomograms, model_path, feature, output_directory, gpu, batch_size, tta, overwrite, data_format, FEATURE_BINNING_VALUES.get(feature, 1)))
         processes.append(p)
         p.start()
         time.sleep(2)
 
     for p in processes:
         p.join()
-
-
-
 
 
 

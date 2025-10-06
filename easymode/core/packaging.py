@@ -15,11 +15,8 @@ def package_checkpoint(title='', checkpoint_directory='', output_directory='', c
     checkpoint_path = os.path.join(checkpoint_directory, checkpoint_files[-1])
 
     model = create()
-    _ = model(tf.zeros((1, 128, 128, 128, 1)))
-
-    # Create a checkpoint object to load only model weights, not optimizer state
-    checkpoint = tf.train.Checkpoint(model=model)
-    checkpoint.restore(checkpoint_path).expect_partial()
+    _ = model(tf.zeros((1, 160, 160, 160, 1)))
+    model.load_weights(checkpoint_path).expect_partial()
 
     for layer in model.layers:
         if layer.get_weights():

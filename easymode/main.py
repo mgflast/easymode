@@ -13,7 +13,7 @@ def main():
     train_parser.add_argument('-f', "--features", nargs="+", required=True, help="List of features to train on, e.g. 'Ribosome3D Junk3D' - corresponding data directories are expected in /cephfs/mlast/compu_projects/easymode/training/3d/data/{features}")
     train_parser.add_argument('-e', "--epochs", type=int, help="Number of epochs to train for (default 500).", default=500)
     train_parser.add_argument('-b', "--batch_size", type=int, help="Batch size for training (default 8).", default=8)
-    train_parser.add_argument('-lr', "--lr_start", type=float, help="Initial learning rate for the optimizer (default 1e-3).", default=1e-4)
+    train_parser.add_argument('-ls', "--lr_start", type=float, help="Initial learning rate for the optimizer (default 1e-3).", default=1e-4)
     train_parser.add_argument('-le', "--lr_end", type=float, help="Final learning rate for the optimizer (default 1e-5).", default=1e-5)
 
     set_params = subparsers.add_parser('set', help='Set environment variables.')
@@ -21,10 +21,9 @@ def main():
     set_params.add_argument('--aretomo3_path', type=str, help="Path to the AreTomo3 executable.")
     set_params.add_argument('--aretomo3_env', type=str, help="Command to initialize the AreTomo3 environment, e.g. 'module load aretomo/3.1.0'")
 
-
     package = subparsers.add_parser('package', help='Package model and weights. Note that this is used for 3D models only; 2D models are packaged and distributed with Ais.')
-    package.add_argument('-t', "--title", type=str, required=True, help="Title of the model to package.")
     package.add_argument('-c', "--checkpoint_directory", type=str, required=True, help="Path to the checkpoint directory to package from.")
+    package.add_argument('-t', "--title", type=str, default=None, help="Title of the model to package. If not provided, the name of the checkpoint directory is used.")
     package.add_argument('-ou', "--output_directory", type=str, default='/cephfs/mlast/compu_projects/easymode/training/3d/packaged/', help="Output directory to save the packaged model weights.")
     package.add_argument('--cache', action='store_true', help='If set, cache the model weights in the easymode model directory.')
 
@@ -50,6 +49,7 @@ def main():
     pick.add_argument('--spacing', required=False, type=float, default=10.0, help="Minimum distance between particles in Angstrom.")
     pick.add_argument('--size', required=False, type=float, default=10.0, help="Minimum particle size in cubic Angstrom.")
     pick.add_argument('--no_tomostar', dest='tomostar', action='store_false', help='Include this flag in order NOT to rename tomograms in the .star files from etc_10.00Apx.mrc to etc.tomostar.')
+    pick.add_argument('--separate_filaments', action='store_true', help='Write one .star file per filament instead of one per tomogram.')
 
     reconstruct = subparsers.add_parser('reconstruct', help='Reconstruct tomograms using WarpTools and AreTomo3.')
     reconstruct.add_argument('--frames', type=str, required=True, help="Directory containing raw frames.")
@@ -176,7 +176,8 @@ def main():
              size=args.size,
              binning=args.binning,
              tomostar=args.tomostar,
-             filament=args.filament,)
+             filament=args.filament,
+             per_filament_star_file=args.separate_filaments)
 
     elif args.command == 'reconstruct':
         from easymode.core.warp_wrapper import reconstruct
@@ -210,7 +211,7 @@ def main():
 
     elif args.command == 'package':
         from easymode.core.packaging import package_checkpoint
-        package_checkpoint(title=args.title, checkpoint_directory=args.checkpoint_directory, output_directory=args.output_directory, cache=args.cache)
+        package_checkpoint(title=args.checkpoint_directory.strip() if args.title is None else args.title, checkpoint_directory=args.checkpoint_directory, output_directory=args.output_directory, cache=args.cache)
 
     elif args.command == 'list':
         from easymode.core.distribution import list_remote_models

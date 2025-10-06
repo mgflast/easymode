@@ -159,6 +159,8 @@ def denoiser_thread(mode, tomogram_list, model_path, output_dir, gpu, batch_size
         tf.config.experimental.set_memory_growth(device, True)
 
     process_start_time = psutil.Process().create_time()
+
+    print(f'GPU {gpu} - loading model ({model_path}).')
     model = load_model(model_path)
 
     for j, tomogram_tuple in enumerate(tomogram_list, start=1):

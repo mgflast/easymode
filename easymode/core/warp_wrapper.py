@@ -133,7 +133,7 @@ def reconstruct(frames, mdocs, apix, dose, extension=None, tomo_apix=10.0, thick
 
     if steps[1]:
         print(f'\n\033[96mImporting tiltseries\033[0m')
-        _run(f'WarpTools ts_import --mdocs {mdoc_path} --frameseries warp_frameseries --tilt_exposure {dose} --min_intensity 0.3 --dont_invert --output tomostar')
+        _run(f'WarpTools ts_import --mdocs {mdoc_path} --frameseries warp_frameseries --tilt_exposure {dose} --min_intensity 0.3 --dont_invert --output tomostar --override_axis')
 
     if steps[2]:
         print(f'\n\033[96mAssembling .st files\033[0m')

@@ -18,7 +18,7 @@ def masked_dice_loss(y_true, y_pred, smooth=1e-6):
     intersection = tf.reduce_sum(y_true_masked * y_pred_masked)
     union = tf.reduce_sum(y_true_masked) + tf.reduce_sum(y_pred_masked)
 
-    dice = (2. * intersection + smooth) / (union + smooth)
+    dice = (2.0 * intersection + smooth) / (union + smooth)
     return 1.0 - dice
 
 def masked_dice(y_true, y_pred):
@@ -167,13 +167,12 @@ class UNet(Model):
         self.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=0.0004),
             loss=combined_masked_bce_dice_loss,
-            metrics=[masked_dice, 'binary_accuracy'],
+            metrics=[masked_dice, masked_bce_loss],
             run_eagerly=False,
             steps_per_execution=16,
         )
 
     def call(self, inputs, training=None):
-        # Encoder path
         encoder_outputs = []
         x = inputs
 
@@ -181,9 +180,8 @@ class UNet(Model):
             x = encoder(x, training=training)
             encoder_outputs.append(x)
 
-        # Decoder path
-        skip_connections = encoder_outputs[:-1][::-1]  # Reverse, exclude bottleneck
-        x = encoder_outputs[-1]  # Start with bottleneck
+        skip_connections = encoder_outputs[:-1][::-1]
+        x = encoder_outputs[-1]
 
         for i, decoder in enumerate(self.decoders):
             skip = skip_connections[i] if i < len(skip_connections) else None

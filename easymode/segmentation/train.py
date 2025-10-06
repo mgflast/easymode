@@ -2,12 +2,19 @@ import glob, os, mrcfile
 from easymode.segmentation.augmentations import *
 import tensorflow as tf
 
-AUGMENTATIONS_ROT_XZ_YZ = 0.33 #0.333
-AUGMENTATIONS_ROT_XY = 0.33 #0.333
+AUGMENTATIONS_ROT_XZ_YZ = 0.33 #0.33 #0.333
+AUGMENTATIONS_ROT_XY = 0.33 #0.33 #0.333
 AUGMENATIONS_MISSING_WEDGE = 0.0 # 0.0
-AUGMENTATIONS_GAUSSIAN = 0.33 #0.2
-AUGMENTATIONS_SCALE = 0.33
+AUGMENTATIONS_GAUSSIAN = 0.33 #0.33 #0.2
+AUGMENTATIONS_SCALE = 0.33 #0.33
 
+
+DEBUG = False
+ROOT = '/cephfs/mlast/compu_projects/easymode'
+if os.name == 'nt':
+    DEBUG = True
+    ROOT = 'Z:/compu_projects/easymode'
+    print(f'debug mode - running on Windows with root at {ROOT}')
 
 class DataLoader:
     def __init__(self, features, batch_size=8, validation=False):
@@ -21,7 +28,7 @@ class DataLoader:
     def load_data(self):
         self.samples = list()
         for f in self.features:
-            available_samples = [os.path.basename(n).split('.')[0] for n in glob.glob(f'/cephfs/mlast/compu_projects/easymode/training/3d/data/{f}/ddw/*.mrc')]
+            available_samples = [os.path.basename(n).split('.')[0] for n in glob.glob(f'{ROOT}/training/3d/data/{f}/raw/*.mrc')]
             for n in available_samples:
                 self.samples.append((f, n))
 
@@ -32,22 +39,22 @@ class DataLoader:
                 self.positive_samples.append(self.samples[j])
 
         if self.validation:
-            self.samples = [s for i, s in enumerate(self.samples) if i % 10 == 0]
+            self.samples = [s for i, s in enumerate(self.samples) if i % 20 == 0]
         else:
-            self.samples = [s for i, s in enumerate(self.samples) if i % 10 != 0]
+            self.samples = [s for i, s in enumerate(self.samples) if i % 20 != 0]
 
         print(f'Loaded {len(self.samples)} samples for {"validation" if self.validation else "training"}')
 
     def get_sample(self, datagroup, index):
         flavours = random.sample(['even', 'odd', 'ddw', 'cryocare', 'raw'], 2)
-
         mixing_factor = random.uniform(0.0, 1.0)
-        img_a = mrcfile.read(f'/cephfs/mlast/compu_projects/easymode/training/3d/data/{datagroup}/{flavours[0]}/{index}.mrc')
-        img_b = mrcfile.read(f'/cephfs/mlast/compu_projects/easymode/training/3d/data/{datagroup}/{flavours[1]}/{index}.mrc')
+
+        img_a = mrcfile.read(f'{ROOT}/training/3d/data/{datagroup}/{flavours[0]}/{index}.mrc')
+        img_b = mrcfile.read(f'{ROOT}/training/3d/data/{datagroup}/{flavours[1]}/{index}.mrc')
         img = img_a * mixing_factor + img_b * (1 - mixing_factor)
 
-        label = mrcfile.read(f'/cephfs/mlast/compu_projects/easymode/training/3d/data/{datagroup}/label/{index}.mrc')
-        validity = mrcfile.read(f'/cephfs/mlast/compu_projects/easymode/training/3d/data/{datagroup}/validity/{index}.mrc')
+        label = mrcfile.read(f'{ROOT}/training/3d/data/{datagroup}/label/{index}.mrc')
+        validity = mrcfile.read(f'{ROOT}/training/3d/data/{datagroup}/validity/{index}.mrc')
 
         label[validity == 0] = 2
         label[:16, :, :] = 2
@@ -64,7 +71,7 @@ class DataLoader:
 
     def check_label_positivity(self, idx):
         sample = self.samples[idx]
-        label = mrcfile.read(f'/cephfs/mlast/compu_projects/easymode/training/3d/data/{sample[0]}/label/{sample[1]}.mrc')
+        label = mrcfile.read(f'{ROOT}/training/3d/data/{sample[0]}/label/{sample[1]}.mrc')
         return np.sum(label == 1) > 0
 
     def augment(self, img, label):
@@ -99,12 +106,12 @@ class DataLoader:
         if random.uniform(0.0, 1.0) < AUGMENTATIONS_SCALE:
             img, label = scale(img, label)
 
-        label[:32, :, :] = 2
-        label[-32:, :, :] = 2
-        label[:, :32, :] = 2
-        label[:, -32:, :] = 2
-        label[:, :, :32] = 2
-        label[:, :, -32:] = 2
+        label[:16, :, :] = 2
+        label[-16:, :, :] = 2
+        label[:, :16, :] = 2
+        label[:, -16:, :] = 2
+        label[:, :, :16] = 2
+        label[:, :, -16:] = 2
 
         return img, label
 
@@ -141,7 +148,7 @@ class DataLoader:
         return dataset, n_steps
 
 
-def train_model(title='', features='', batch_size=8, epochs=2000, lr_start=1e-3, lr_end=1e-5):
+def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, lr_end=1e-5):
     from easymode.segmentation.model import create
 
     tf.config.run_functions_eagerly(False)
@@ -157,14 +164,14 @@ def train_model(title='', features='', batch_size=8, epochs=2000, lr_start=1e-3,
     validation_ds, validation_steps = DataLoader(features, batch_size=batch_size, validation=True).as_generator(batch_size=batch_size)
 
     # callbacks
-    os.makedirs(f'/cephfs/mlast/compu_projects/easymode/training/3d/checkpoints/{title}', exist_ok=True)
-    cb_checkpoint_val = tf.keras.callbacks.ModelCheckpoint(filepath=f'/cephfs/mlast/compu_projects/easymode/training/3d/checkpoints/{title}/' + "validation_loss",
+    os.makedirs(f'{ROOT}/training/3d/checkpoints/{title}', exist_ok=True)
+    cb_checkpoint_val = tf.keras.callbacks.ModelCheckpoint(filepath=f'{ROOT}/training/3d/checkpoints/{title}/' + "validation_loss",
                                                            monitor=f'val_loss',
                                                            save_best_only=True,
                                                            save_weights_only=True,
                                                            mode='min',
                                                            verbose=1)
-    cb_checkpoint_train = tf.keras.callbacks.ModelCheckpoint(filepath=f'/cephfs/mlast/compu_projects/easymode/training/3d/checkpoints/{title}/' + "training_loss",
+    cb_checkpoint_train = tf.keras.callbacks.ModelCheckpoint(filepath=f'{ROOT}/training/3d/checkpoints/{title}/' + "training_loss",
                                                              monitor=f'loss',
                                                              save_best_only=True,
                                                              save_weights_only=True,
@@ -172,9 +179,28 @@ def train_model(title='', features='', batch_size=8, epochs=2000, lr_start=1e-3,
                                                              verbose=1)
 
     def lr_decay(epoch, _):
-        return float(lr_start + (lr_end - lr_start) * ((epoch - 2) / epochs))
+        return float(lr_start + (lr_end - lr_start) * (epoch / epochs))
 
     cb_lr = tf.keras.callbacks.LearningRateScheduler(lr_decay, verbose=1)
 
-    cb_csv = tf.keras.callbacks.CSVLogger(f'/cephfs/mlast/compu_projects/easymode/training/3d/checkpoints/{title}/training_log.csv', append=True)
+    cb_csv = tf.keras.callbacks.CSVLogger(f'{ROOT}/training/3d/checkpoints/{title}/training_log.csv', append=True)
     model.fit(training_ds, steps_per_epoch=training_steps * 8, validation_data=validation_ds, validation_steps=validation_steps, epochs=epochs, validation_freq=1, callbacks=[cb_checkpoint_val, cb_checkpoint_train, cb_lr, cb_csv])
+
+
+if __name__ == "__main__":
+    features = ['NotMitochondrion3D']
+    loader = DataLoader(features, batch_size=8, validation=False)
+
+    os.makedirs('C:/Users/Mart Last/Desktop/debug', exist_ok=True)
+
+    for k in range(8):
+        datagroup, index = loader.samples[0]
+        img, label = loader.get_sample(datagroup, index)
+        # img, label = loader.augment(img, label)
+        # img, label = loader.preprocess(img, label)
+
+        img_squeeze = np.squeeze(img)
+        label_squeeze = np.squeeze(label)
+
+        mrcfile.write(f'C:/Users/Mart Last/Desktop/debug/test_img_{k}.mrc', img_squeeze, overwrite=True)
+        mrcfile.write(f'C:/Users/Mart Last/Desktop/debug/test_label_{k}.mrc', label_squeeze, overwrite=True)
