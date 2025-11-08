@@ -10,80 +10,57 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 tf.get_logger().setLevel('ERROR')
 tf.config.optimizer.set_experimental_options({'layout_optimizer': False})
 
-TILE_SIZE = 160
-OVERLAP = 32
-MAX_CHUNK_SIZE = 64
+TILE_SIZE = [128, 256, 256]
+OVERLAP = [32, 32, 32]
+MAX_CHUNK_SIZE = 1
 
-def tile_volume(volume, patch_size=TILE_SIZE, overlap=OVERLAP):
+
+def tile_volume(volume, patch_size, overlap):
+    (pz, py, px) = patch_size; (oz, oy, ox) = overlap
     d, h, w = volume.shape
-    stride = patch_size - 2 * overlap
+    sz, sy, sx = pz - 2*oz, py - 2*oy, px - 2*ox
 
-    z_boxes = max(1, (d + stride - 1) // stride)
-    y_boxes = max(1, (h + stride - 1) // stride)
-    x_boxes = max(1, (w + stride - 1) // stride)
+    z_boxes = max(1, (d + sz - 1) // sz)
+    y_boxes = max(1, (h + sy - 1) // sy)
+    x_boxes = max(1, (w + sx - 1) // sx)
 
-    tiles = []
-    positions = []
+    tiles, positions = [], []
+    for zi in range(z_boxes):
+        for yi in range(y_boxes):
+            for xi in range(x_boxes):
+                z_start = zi*sz - oz; y_start = yi*sy - oy; x_start = xi*sx - ox
+                vz0 = max(0, z_start); vy0 = max(0, y_start); vx0 = max(0, x_start)
+                vz1 = min(d, z_start + pz); vy1 = min(h, y_start + py); vx1 = min(w, x_start + px)
+                extracted = volume[vz0:vz1, vy0:vy1, vx0:vx1]
 
-    for z_idx in range(z_boxes):
-        for y_idx in range(y_boxes):
-            for x_idx in range(x_boxes):
-                z_start = z_idx * stride - overlap
-                y_start = y_idx * stride - overlap
-                x_start = x_idx * stride - overlap
-
-                vol_z_start = max(0, z_start)
-                vol_y_start = max(0, y_start)
-                vol_x_start = max(0, x_start)
-
-                vol_z_end = min(d, z_start + patch_size)
-                vol_y_end = min(h, y_start + patch_size)
-                vol_x_end = min(w, x_start + patch_size)
-
-                extracted = volume[vol_z_start:vol_z_end, vol_y_start:vol_y_end, vol_x_start:vol_x_end]
-
-                tile = np.zeros((patch_size, patch_size, patch_size), dtype=volume.dtype)
-
-                tile_z_start = vol_z_start - z_start
-                tile_y_start = vol_y_start - y_start
-                tile_x_start = vol_x_start - x_start
-
-                tile[tile_z_start:tile_z_start + extracted.shape[0],
-                tile_y_start:tile_y_start + extracted.shape[1],
-                tile_x_start:tile_x_start + extracted.shape[2]] = extracted
+                tile = np.zeros((pz, py, px), dtype=volume.dtype)
+                tz0 = vz0 - z_start; ty0 = vy0 - y_start; tx0 = vx0 - x_start
+                tile[tz0:tz0+extracted.shape[0], ty0:ty0+extracted.shape[1], tx0:tx0+extracted.shape[2]] = extracted
 
                 tiles.append(tile)
-                positions.append((z_idx * stride, y_idx * stride, x_idx * stride))
+                positions.append((zi*sz, yi*sy, xi*sx))
 
-    tiles = np.array(tiles)
-    tiles = np.expand_dims(tiles, axis=-1)
-
+    tiles = np.expand_dims(np.array(tiles), axis=-1)
     return tiles, positions, volume.shape
 
-
-def detile_volume(segmented_tiles, positions, original_shape, patch_size=TILE_SIZE, overlap=OVERLAP):
+def detile_volume(segmented_tiles, positions, original_shape, patch_size, overlap):
+    (pz, py, px) = patch_size; (oz, oy, ox) = overlap
     d, h, w = original_shape
-    output_volume = np.zeros((d, h, w), dtype=np.float32)
-    stride = patch_size - 2 * overlap
+    sz, sy, sx = pz - 2*oz, py - 2*oy, px - 2*ox
 
-    if segmented_tiles.ndim == 5:
-        segmented_tiles = segmented_tiles.squeeze(-1)
+    out = np.zeros((d, h, w), dtype=np.float32)
+    wgt = np.zeros((d, h, w), dtype=np.float32)
+    if segmented_tiles.ndim == 5: segmented_tiles = segmented_tiles.squeeze(-1)
 
     for tile, (z_pos, y_pos, x_pos) in zip(segmented_tiles, positions):
-        center_region = tile[overlap:overlap + stride, overlap:overlap + stride, overlap:overlap + stride]
+        center = tile[oz:oz+sz, oy:oy+sy, ox:ox+sx]
+        z_end = min(z_pos+sz, d); y_end = min(y_pos+sy, h); x_end = min(x_pos+sx, w)
+        az, ay, ax = z_end - z_pos, y_end - y_pos, x_end - x_pos
+        out[z_pos:z_end, y_pos:y_end, x_pos:x_end] += center[:az, :ay, :ax]
+        wgt[z_pos:z_end, y_pos:y_end, x_pos:x_end] += 1.0
 
-        z_end = min(z_pos + stride, d)
-        y_end = min(y_pos + stride, h)
-        x_end = min(x_pos + stride, w)
-
-        actual_z = z_end - z_pos
-        actual_y = y_end - y_pos
-        actual_x = x_end - x_pos
-
-        output_volume[z_pos:z_end, y_pos:y_end, x_pos:x_end] = center_region[:actual_z, :actual_y, :actual_x]
-
-    return output_volume
-
+    wgt[wgt == 0] = 1.0
+    return out / wgt
 
 def _segment_tile_list(tiles, model, batch_size=8, max_chunk_size=MAX_CHUNK_SIZE):
     num_tiles = len(tiles)
@@ -107,18 +84,30 @@ def _segment_tile_list(tiles, model, batch_size=8, max_chunk_size=MAX_CHUNK_SIZE
     return segmented_tiles
 
 
-def _segment_tomogram_instance(volume, model, batch_size):
-    tiles, positions, original_shape = tile_volume(volume)
+def _segment_tomogram_instance(volume, model, batch_size, tile_size, overlap):
+    tiles, positions, original_shape = tile_volume(volume, tile_size, overlap)
     segmented_tiles = _segment_tile_list(tiles, model, batch_size=batch_size, max_chunk_size=MAX_CHUNK_SIZE)
     segmented_tiles = np.array(segmented_tiles)
-    segmented_volume = detile_volume(segmented_tiles, positions, original_shape)
+    segmented_volume = detile_volume(segmented_tiles, positions, original_shape, tile_size, overlap)
 
     tf.keras.backend.clear_session()
     gc.collect()
     return segmented_volume.astype(np.float32)
 
+def _pad_volume(volume, min_pad=16, div=32):
+    j, k, l = volume.shape
+    pads = []
+    for n in (j, k, l):
+        total_pad = max(2*min_pad, ((n + 2*min_pad + div - 1)//div)*div - n)
+        before = total_pad // 2
+        after = total_pad - before
+        pads.append((before, after))
+    padded = np.pad(volume, pads, mode='reflect')
+    return padded, tuple(pads)
+
 
 def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, binning=1):
+    global TILE_SIZE, OVERLAP
     volume = mrcfile.read(tomogram_path).astype(np.float32)
 
     _j, _k, _l = volume.shape
@@ -127,8 +116,12 @@ def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, binning=1):
 
     volume -= np.mean(volume)
     volume /= np.std(volume) + 1e-6
-
+    volume, padding = _pad_volume(volume)
     segmented_volume = np.zeros_like(volume)
+
+    TILE_SIZE = (96, min(256, segmented_volume.shape[1]), min(256, segmented_volume.shape[2]))
+    OVERLAP[1] = 0 if TILE_SIZE[1] == segmented_volume.shape[1] else 32
+    OVERLAP[2] = 0 if TILE_SIZE[2] == segmented_volume.shape[2] else 32
 
     # Below: all 16 combinations of 90-degree rotations and flips that respect the anisotropy of the data.
     k_xy = [0, 2, 2, 0, 1, 3, 0, 1, 2, 3, 0, 1, 2, 3, 1, 3]
@@ -140,24 +133,20 @@ def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, binning=1):
         tta_vol = np.rot90(tta_vol, k=k_xy[j], axes=(1, 2))
         tta_vol = tta_vol if not k_fx[j] else np.flip(tta_vol, axis=1)
         tta_vol = np.rot90(tta_vol, k=2 * k_yz[j], axes=(0, 1))
-        segmented_tta_vol = _segment_tomogram_instance(tta_vol, model, batch_size)
+        segmented_tta_vol = _segment_tomogram_instance(tta_vol, model, batch_size, TILE_SIZE, OVERLAP)
         segmented_tta_vol = np.rot90(segmented_tta_vol, k=-2 * k_yz[j], axes=(0, 1))
         segmented_tta_vol = segmented_tta_vol if not k_fx[j] else np.flip(segmented_tta_vol, axis=1)
         segmented_tta_vol = np.rot90(segmented_tta_vol, k=-k_xy[j], axes=(1, 2))
         segmented_volume += segmented_tta_vol
     segmented_volume /= tta
 
+    (j0, j1), (k0, k1), (l0, l1) = padding
+    segmented_volume = segmented_volume[j0:segmented_volume.shape[0]-j1, k0:segmented_volume.shape[1]-k1, l0:segmented_volume.shape[2]-l1]
+
     if binning > 1:
         from scipy.ndimage import zoom
         j, k, l = segmented_volume.shape
         segmented_volume = zoom(segmented_volume, (_j / j, _k / k, _l / l), order=0)
-
-    segmented_volume[:32, :, :] = 0
-    segmented_volume[-32:, :, :] = 0
-    segmented_volume[:, :32, :] = 0
-    segmented_volume[:, -32:, :] = 0
-    segmented_volume[:, :, :32] = 0
-    segmented_volume[:, :, -32:] = 0
 
     return segmented_volume
 
@@ -190,13 +179,14 @@ def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, bat
         wrote_temporary = False
         try:
             if os.path.exists(output_file):
-                file_age = os.path.getmtime(output_file)
-                if not overwrite or file_age < process_start_time:
+                temp_file_write_time = os.path.getmtime(output_file)
+                if not overwrite or temp_file_write_time > process_start_time:
                     continue
 
             with mrcfile.new(output_file, overwrite=True) as m:
                 m.set_data(-1.0 * np.ones((10, 10, 10), dtype=np.float32))
                 wrote_temporary = True
+
             segmented_volume = segment_tomogram(model, tomogram_path, tta, batch_size, binning)
 
             save_mrc(segmented_volume, output_file, data_format)
@@ -208,13 +198,20 @@ def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, bat
                 os.remove(output_file)
             print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {feature} - {os.path.basename(tomogram_path)} - ERROR: {e}")
 
+
 FEATURE_BINNING_VALUES = {
     'ribosome': 1,
     'membrane': 1,
     'microtubule': 1,
     'tric': 1,
-    'mitochondrion': 2,
+    'mitochondrion': 3,
     'actin': 1,
+    'vault': 1,
+    'npc': 2,
+    'nuclear_envelope': 2,
+    'void': 2,
+    'cytoplasm': 3,
+    'nucleoplasm': 3
 }
 
 def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_size=8, overwrite=False, data_format='int8', gpus='0'):
@@ -235,7 +232,7 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
 
     tomograms = sorted(glob.glob(os.path.join(data_directory, '*.mrc')))
 
-    print(f'Found {len(tomograms)} tomograms to segment in {data_directory}.')
+    print(f'Found {len(tomograms)} tomograms to segment in {data_directory}.\n')
 
     model_path = cache_model(feature)
 

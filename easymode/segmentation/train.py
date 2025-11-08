@@ -3,9 +3,9 @@ from easymode.segmentation.augmentations import *
 import tensorflow as tf
 
 AUGMENTATIONS_ROT_XZ_YZ = 0.33 #0.33 #0.333
-AUGMENTATIONS_ROT_XY = 0.33 #0.33 #0.333
-AUGMENATIONS_MISSING_WEDGE = 0.0 # 0.0
-AUGMENTATIONS_GAUSSIAN = 0.33 #0.33 #0.2
+AUGMENTATIONS_ROT_XY = 0.5 #0.33 #0.333
+AUGMENTATIONS_MISSING_WEDGE = 0.0 # 0.0
+AUGMENTATIONS_GAUSSIAN = 0.5 #0.33 #0.2
 AUGMENTATIONS_SCALE = 0.33 #0.33
 
 
@@ -46,7 +46,7 @@ class DataLoader:
         print(f'Loaded {len(self.samples)} samples for {"validation" if self.validation else "training"}')
 
     def get_sample(self, datagroup, index):
-        flavours = random.sample(['even', 'odd', 'ddw', 'cryocare', 'raw'], 2)
+        flavours = random.sample(['even', 'odd', 'cryocare', 'cryocare', 'raw'], 2) ## todo: undo replacing ddw with cryocare!
         mixing_factor = random.uniform(0.0, 1.0)
 
         img_a = mrcfile.read(f'{ROOT}/training/3d/data/{datagroup}/{flavours[0]}/{index}.mrc')
@@ -54,9 +54,9 @@ class DataLoader:
         img = img_a * mixing_factor + img_b * (1 - mixing_factor)
 
         label = mrcfile.read(f'{ROOT}/training/3d/data/{datagroup}/label/{index}.mrc')
-        validity = mrcfile.read(f'{ROOT}/training/3d/data/{datagroup}/validity/{index}.mrc')
+        validity = mrcfile.read(f'{ROOT}/training/3d/data/{datagroup}/validity/{index}.mrc')  # binary mask of valid regions (1 = valid, 0 = invalid)
 
-        label[validity == 0] = 2
+        label[validity == 0] = 2 ## training output: 0 = background, 1 = feature, 2 = ignore
         label[:16, :, :] = 2
         label[-16:, :, :] = 2
         label[:, :16, :] = 2
@@ -100,7 +100,7 @@ class DataLoader:
             img, label = rotate_continuous_xy(img, label)
 
         # AUGMENTATION 7 - missing wedge simulation - exclusive
-        if random.uniform(0.0, 1.0) < AUGMENATIONS_MISSING_WEDGE:
+        if random.uniform(0.0, 1.0) < AUGMENTATIONS_MISSING_WEDGE:
             img, label = remove_wedge(img, label)
 
         if random.uniform(0.0, 1.0) < AUGMENTATIONS_SCALE:
@@ -133,7 +133,7 @@ class DataLoader:
             np.random.shuffle(self.positive_samples)
             for j in range(len(self.samples)):
                 if j % self.batch_size == 0:
-                    datagroup, index = self.positive_samples[j // self.batch_size]
+                    datagroup, index = self.positive_samples[(j // self.batch_size) % len(self.positive_samples)]
                 else:
                     datagroup, index = self.samples[j]
 

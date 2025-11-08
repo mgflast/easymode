@@ -47,7 +47,7 @@ class DDWDatasetGenerator:
                 coordinates.append((0, j * box_size, i * box_size))
         np.random.shuffle(coordinates)
 
-        # if not enough samples (because the XY plane doesn't fit enough), randomly position some more. We're splitting training and validation on a per tomogram basis, so a bit of potential overlap is ok.
+        # if not enough samples (because the XY plane doesn't fit enough), randomly position some more. We're splitting training and validation on a per-tomogram basis, so a bit of overlap between boxes is fine.
         if len(coordinates) < n_samples:
             while len(coordinates) < n_samples:
                 coordinates.append((0, random.randint(0, shape[1] - box_size), random.randint(0, shape[2] - box_size)))
@@ -186,7 +186,7 @@ class DDWDataLoader:
         return train_x, train_y
 
     @staticmethod
-    def preprocess(v0, v1   ):
+    def preprocess(v0, v1):
         v0 = v0.astype(np.float32)
         v0 -= np.mean(v0)
         v0 /= np.std(v0) + 1e-8
@@ -363,19 +363,55 @@ if __name__ == '__main__':
             m.set_data(fft(np.squeeze(v)).astype(np.float32))
 
     #generator = DDWDatasetGenerator(box_size=96).generate()
-    loader = DDWDataLoader(box_size=64, wedge_angle=60)
+    loader = DDWDataLoader(box_size=96, wedge_angle=60)
+    m = loader.wedge.copy()
+    for i in range(10):
+        v0, v1 = loader.load_sample(i)
 
-    loader.rotate = False
+        rotation = Rotation.random()
+        v0 = loader.rotate_volume(v0, rotation)
+        v1 = loader.rotate_volume(v1, rotation)
+        m_r = loader.rotate_volume(m, rotation)
 
-    model = load_model(cache_model('ddw_splits'))
+        v0 = loader.crop_volume(v0)
+        v1 = loader.crop_volume(v1)
+        m = loader.crop_volume(m)
+        m_r = loader.crop_volume(m_r)
 
-    v0, v1 = loader.load_sample(0)
-    v0 = loader.crop_volume(v0)
-    v1 = loader.crop_volume(v1)
+        v0 = tf.math.real(ifft3d(m * fft3d(v0)))
+        save(v0, f'{i}_input')
+        save(v1, f'{i}_target')
 
-    v0 = np.expand_dims(v0, axis=(0, -1))
-    prediction = np.squeeze(model.predict(v0))
 
-    save(v0, 'v0')
-    save(v1, 'v1')
-    save(prediction, 'prediction')
+    # m = loader.wedge.copy()
+    # save(m, 'wedge')
+    # v0, v1 = loader.load_sample(0)
+    # save(v0, '0_v0_raw')
+    # save(v1, '0_v1_raw')
+    # v0, v1 = loader.augment(v0, v1)
+    # save(v0, '1_v0_augmented')
+    # save(v1, '1_v1_augmented')
+    # v0, v1 = loader.preprocess(v0, v1)
+    # save(v0, '2_v0_preprocessed')
+    # save(v1, '2_v1_preprocessed')
+    #
+    # rotation = Rotation.random()
+    # v0 = loader.rotate_volume(v0, rotation)
+    # v1 = loader.rotate_volume(v1, rotation)
+    # m_r = loader.rotate_volume(m, rotation)
+    # save(v0, '3_v0_rotated')
+    # save(v1, '3_v1_rotated')
+    # save(m_r, '3_wedge_rotated')
+    #
+    # v0 = loader.crop_volume(v0)
+    # v1 = loader.crop_volume(v1)
+    # m = loader.crop_volume(m)
+    # m_r = loader.crop_volume(m_r)
+    # save(v0, '4_v0_cropped')
+    # save(v1, '4_v1_cropped')
+    # save(m, '4_wedge_cropped')
+    # save(m_r, '4_wedge_rotated_cropped')
+    #
+    # v0 = tf.math.real(ifft3d(m * fft3d(v0)))
+    # save(v0, '5_v0_missing_wedge_applied')
+

@@ -9,20 +9,28 @@ def _run(cmd, capture=False):
     return ret.stdout
 
 
-def pick(data_directory, target, output_directory, spacing, size, binning=2, processes=112, tomostar=True, filament=False, per_filament_star_file=False):
+def pick(data_directory, target, output_directory, threshold, spacing, size, binning=2, processes=112, tomostar=True, filament=False, per_filament_star_file=False, filament_length=500, centroid=False, min_particles=0):
     print(f'easymode pick\n'
           f'feature: {target}\n'
           f'filament_mode: {filament}\n'
           f'data_directory: {data_directory}\n'
           f'output_directory: {output_directory}\n'
           f'output_pattern: *__{target}_coords.star\n'
+          f'threshold: {threshold}\n'
           f'spacing: {spacing} Å\n'
           f'size: {size} Å^3\n'
           f'binning: {binning}\n'
           f'n_processes: {processes}\n'
-          f'rename to .tomostar: {tomostar}\n')
+          f'rename to .tomostar: {tomostar}\n'
+          f'per_filament_star_file: {per_filament_star_file}\n'
+          f'filament_length: {filament_length} nm\n'
+          f'centroid: {centroid}\n')
 
-    command = f'ais pick -t {target} -d {data_directory} -ou {output_directory} -spacing {spacing} -size {size} -b {binning} -p {processes} {"-filament" if filament else ""}'
+    command = f'ais pick -t {target} -d {data_directory} -ou {output_directory} -threshold {threshold} -spacing {spacing} -size {size} -b {binning} -p {processes} --min-particles {min_particles}'
+    if filament:
+        command += f' -filament -length {filament_length}'
+    if centroid:
+        command += ' -centroid'
     _run(command)
 
     if tomostar:  # rename the rlnMicrograph name to account for the Warp(Tools) .tomostar / _10.00Apx.mrc discrepancy

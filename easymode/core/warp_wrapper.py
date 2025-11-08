@@ -1,12 +1,14 @@
 import os, time, glob, multiprocessing, subprocess, shutil, json, mrcfile, tifffile
 import easymode.core.config as cfg
 
-def _run(cmd, capture=False):
+def _run(cmd, capture=False, ignore_error=False):
     print(f'\033[42m{cmd}\033[0m\n')
     ret = subprocess.run(cmd, shell=True, capture_output=capture, text=True if capture else None)
     if ret.returncode != 0:
         print(f'\033[91merror running {cmd}\033[0m')
-        exit()
+        if not ignore_error:
+            exit()
+        print(f'\033[93mcontinuing despite error...\033[0m')
     return ret.stdout
 
 def _aretomo3_thread(tomo_list, gpu):
@@ -129,7 +131,7 @@ def reconstruct(frames, mdocs, apix, dose, extension=None, tomo_apix=10.0, thick
 
     if steps[0]:
         print(f'\n\033[96mMotion correction & CTF estimation\033[0m')
-        _run(f'WarpTools fs_motion_and_ctf --settings warp_frameseries.settings --c_grid 2x2x1 --c_defocus_max 8 --c_use_sum --out_averages {"--out_average_halves" if halfmaps else ""} --perdevice 2 --c_range_max {2 * apix}')
+        _run(f'WarpTools fs_motion_and_ctf --settings warp_frameseries.settings --c_grid 2x2x1 --c_defocus_max 8 --c_use_sum --out_averages {"--out_average_halves" if halfmaps else ""} --perdevice {"1" if extension == "*.eer" else "2"} --c_range_max {2 * apix}')
 
     if steps[1]:
         print(f'\n\033[96mImporting tiltseries\033[0m')
@@ -137,7 +139,7 @@ def reconstruct(frames, mdocs, apix, dose, extension=None, tomo_apix=10.0, thick
 
     if steps[2]:
         print(f'\n\033[96mAssembling .st files\033[0m')
-        _run(f'WarpTools ts_stack --settings warp_tiltseries.settings --perdevice 2')
+        _run(f'WarpTools ts_stack --settings warp_tiltseries.settings --perdevice 1')
 
     # auto AreTomo
     if steps[3]:
@@ -158,11 +160,11 @@ def reconstruct(frames, mdocs, apix, dose, extension=None, tomo_apix=10.0, thick
 
     if steps[5]:
         print(f'\n\033[96mEstimating tilt series CTF\033[0m')
-        _run(f'WarpTools ts_ctf --settings warp_tiltseries.settings --range_high 10.0 --defocus_max 8 --perdevice 2')
+        _run(f'WarpTools ts_ctf --settings warp_tiltseries.settings --range_high 10.0 --defocus_max 8 --perdevice 1')
 
     if steps[6]:
         print(f'\n\033[96mChecking handedness\033[0m')
-        std_out_hand = _run(f'WarpTools ts_defocus_hand --settings warp_tiltseries.settings --check', capture=True)
+        std_out_hand = _run(f'WarpTools ts_defocus_hand --settings warp_tiltseries.settings --check', capture=True, ignore_error=True)
         print(std_out_hand)
         correlation = 1.0
         for line in std_out_hand.split('\n'):
@@ -174,7 +176,7 @@ def reconstruct(frames, mdocs, apix, dose, extension=None, tomo_apix=10.0, thick
             _run(f'WarpTools ts_defocus_hand --settings warp_tiltseries.settings --set_flip')
 
         print(f'\n\033[96mReconstructing volumes\033[0m')
-        _run(f'WarpTools ts_reconstruct --settings warp_tiltseries.settings --angpix {tomo_apix} --dont_invert {"--halfmap_frames" if halfmaps else ""} --perdevice 2')
+        _run(f'WarpTools ts_reconstruct --settings warp_tiltseries.settings --angpix {tomo_apix} --dont_invert {"--halfmap_frames" if halfmaps else ""} --perdevice 1')
 
         n_mdocs = len(glob.glob(os.path.join(mdoc_path, '*.mdoc')))
         n_tomo_out = len(glob.glob(os.path.join(root, 'warp_tiltseries', 'reconstruction', f'*{10.00:.2f}Apx.mrc')))

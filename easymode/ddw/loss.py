@@ -12,7 +12,7 @@ def ifft3d(x):
 
 def DDWLoss(input_stack, y_pred):
     y_true = input_stack[..., 0]
-
+    y_pred = tf.squeeze(y_pred, axis=-1)
     l1_loss = tf.reduce_sum(tf.math.abs(y_true - y_pred)) / tf.size(y_true, out_type=tf.float32)
     return l1_loss
     #

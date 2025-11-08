@@ -13,13 +13,13 @@ def main():
     train_parser.add_argument('-f', "--features", nargs="+", required=True, help="List of features to train on, e.g. 'Ribosome3D Junk3D' - corresponding data directories are expected in /cephfs/mlast/compu_projects/easymode/training/3d/data/{features}")
     train_parser.add_argument('-e', "--epochs", type=int, help="Number of epochs to train for (default 500).", default=500)
     train_parser.add_argument('-b', "--batch_size", type=int, help="Batch size for training (default 8).", default=8)
-    train_parser.add_argument('-ls', "--lr_start", type=float, help="Initial learning rate for the optimizer (default 1e-3).", default=1e-4)
+    train_parser.add_argument('-ls', "--lr_start", type=float, help="Initial learning rate for the optimizer (default 1e-3).", default=1e-3)
     train_parser.add_argument('-le', "--lr_end", type=float, help="Final learning rate for the optimizer (default 1e-5).", default=1e-5)
 
     set_params = subparsers.add_parser('set', help='Set environment variables.')
-    set_params.add_argument('--cache_directory', type=str, help="Path to the directory to store and search for easymode network weights in.")
-    set_params.add_argument('--aretomo3_path', type=str, help="Path to the AreTomo3 executable.")
-    set_params.add_argument('--aretomo3_env', type=str, help="Command to initialize the AreTomo3 environment, e.g. 'module load aretomo/3.1.0'")
+    set_params.add_argument('--cache-directory', type=str, help="Path to the directory to store and search for easymode network weights in.")
+    set_params.add_argument('--aretomo3-path', type=str, help="Path to the AreTomo3 executable.")
+    set_params.add_argument('--aretomo3-env', type=str, help="Command to initialize the AreTomo3 environment, e.g. 'module load aretomo/3.1.0'")
 
     package = subparsers.add_parser('package', help='Package model and weights. Note that this is used for 3D models only; 2D models are packaged and distributed with Ais.')
     package.add_argument('-c', "--checkpoint_directory", type=str, required=True, help="Path to the checkpoint directory to package from.")
@@ -41,15 +41,18 @@ def main():
 
     pick = subparsers.add_parser('pick', help='Pick particles in segmented volumes.')
     pick.add_argument("feature", metavar='FEATURE', type=str, help="Feature to pick, based on segmentations.")
-    pick.add_argument("--filament", action='store_true', help="Trace filaments & sample coordinates at a given spacing. If not set, will pick isolated particles. See Ais docs.")
     pick.add_argument('--data', required=True, type=str, help="Path to directory containing input .mrc's.")
     pick.add_argument('--output', required=False, type=str, default=None, help="Directory to save output coordinate files to. If left empty, will save to the input data directory.")
     pick.add_argument('--threshold', required=False, type=float, default=128, help="Threshold to apply to volumes prior to finding local maxima (default 128). Regardless of the segmentation .mrc dtype, the value range is assumed to be 0-255.")
     pick.add_argument('--binning', required=False, type=int, default=2, help="Binning factor to apply before processing (faster, possibly less accurate). Default is 2.")
     pick.add_argument('--spacing', required=False, type=float, default=10.0, help="Minimum distance between particles in Angstrom.")
     pick.add_argument('--size', required=False, type=float, default=10.0, help="Minimum particle size in cubic Angstrom.")
-    pick.add_argument('--no_tomostar', dest='tomostar', action='store_false', help='Include this flag in order NOT to rename tomograms in the .star files from etc_10.00Apx.mrc to etc.tomostar.')
-    pick.add_argument('--separate_filaments', action='store_true', help='Write one .star file per filament instead of one per tomogram.')
+    pick.add_argument('--no_tomostar', dest='tomostar', action='store_false',help='Include this flag in order NOT to rename tomograms in the .star files from etc_10.00Apx.mrc to etc.tomostar.')
+    pick.add_argument("--filament", action='store_true', help="Trace filaments & sample coordinates at a given spacing. If not set, will pick isolated particles. See Ais docs.")
+    pick.add_argument('--length', required=False, type=float, default=500.0, help="For filament tracing: minimum filament length to place picks along, in Angstrom (default 500).")
+    pick.add_argument('--separate_filaments', action='store_true', help='For filament tracing: write one .star file per filament instead of one per tomogram.')
+    pick.add_argument('--centroid', action='store_true', help='When picking globular particles, set this flag to sample coordinates at the centroid of each connected component instead of at the deepest point in the threshold level isosurface. Use only when individual particles are well separated!')
+    pick.add_argument('--min_particles', type=int, default=0, help="Minimum number of particles per tomogram to output a .star file (default 0). If fewer particles are found, no .star file is written for that tomogram.")
 
     reconstruct = subparsers.add_parser('reconstruct', help='Reconstruct tomograms using WarpTools and AreTomo3.')
     reconstruct.add_argument('--frames', type=str, required=True, help="Directory containing raw frames.")
@@ -172,12 +175,16 @@ def main():
         pick(target=args.feature.lower(),
              data_directory=args.data,
              output_directory=args.output if args.output is not None else args.data,
+             threshold=args.threshold,
              spacing=args.spacing,
              size=args.size,
              binning=args.binning,
              tomostar=args.tomostar,
              filament=args.filament,
-             per_filament_star_file=args.separate_filaments)
+             per_filament_star_file=args.separate_filaments,
+             filament_length=args.length,
+             centroid=args.centroid,
+             min_particles=args.min_particles)
 
     elif args.command == 'reconstruct':
         from easymode.core.warp_wrapper import reconstruct
