@@ -16,6 +16,7 @@ def main():
     train_parser.add_argument('-ls', "--lr_start", type=float, help="Initial learning rate for the optimizer (default 1e-3).", default=1e-3)
     train_parser.add_argument('-le', "--lr_end", type=float, help="Final learning rate for the optimizer (default 1e-5).", default=1e-5)
 
+
     set_params = subparsers.add_parser('set', help='Set environment variables.')
     set_params.add_argument('--cache-directory', type=str, help="Path to the directory to store and search for easymode network weights in.")
     set_params.add_argument('--aretomo3-path', type=str, help="Path to the AreTomo3 executable.")
@@ -65,6 +66,7 @@ def main():
     reconstruct.add_argument('--shape', type=str, default=None, help="Frame shape (e.g. 4096x4096). If not provided, the shape is inferred from the data.")
     reconstruct.add_argument('--steps', type=str, default='1111111', help="7-character string indicating which processing steps to perform (default: '1111111'). Each character corresponds to a specific step: 1 to perform the step, 0 to skip it. The steps are: 1) Frame motion and CTF, 2) Importing tilt series, 3) Creating tilt stacks, 4) Tilt series alignment, 5) Import alignments, 6) Tilt series CTF, 7) Reconstruct volumes.")
     reconstruct.add_argument('--no_halfmaps', dest='halfmaps', action='store_false', help="If set, do not generate half-maps during motion correction or tomogram reconstruction. This precludes most methods of denoising.")
+    reconstruct.add_argument('--force_align', action='store_true', help="If set, force AreTomo3 alignment of tilt series even if alignment files are already present.")
 
     denoise = subparsers.add_parser('denoise', help='Denoise or enhance contrast of tomograms.')
     denoise.add_argument('--data', type=str, required=True, help="Directory containing tomograms to denoise. In mode 'splits', this directory is expected to contain two subdirectories 'even' and 'odd' with the respective tomogram splits.")
@@ -101,7 +103,7 @@ def main():
                     batch_size=args.batch_size,
                     epochs=args.epochs,
                     lr_start=args.lr_start,
-                    lr_end=args.lr_end
+                    lr_end=args.lr_end,
                     )
 
     elif args.command == 'denoise':
@@ -197,7 +199,8 @@ def main():
                     thickness=args.thickness,
                     shape=args.shape,
                     steps=args.steps,
-                    halfmaps=args.halfmaps)
+                    halfmaps=args.halfmaps,
+                    force_align=args.force_align)
 
     elif args.command == 'set':
         if args.cache_directory:

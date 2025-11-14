@@ -144,7 +144,7 @@ Not all training data sources are currently listed, because a number of contribu
 | 037_MESWT   | EMPIAR-12460                                                         | milled M. musculus (embryonic stem cell)   | 18  | 2.68           |
 | 038_POMBE   | EMPIAR-10988                                                         | milled S. pombe                            | 9   | 3.37           |
 | 039_JUMBO   | EMPIAR-11198                                                         | milled E. amylovora + RAY phage            | 32  | 4.27           |
-| 040_SLO     | DS-10004                                                             | milled (hpf, pfib) C. elegans              |  | 1.50           |
+| 040_SLO     | DS-10004                                                             | milled (hpf, pfib) C. elegans              | 100 | 1.50           |
 
 
 *DS: datasets on the [CZI CryoET Data Portal](https://cryoetdataportal.czscience.com/)

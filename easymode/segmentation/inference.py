@@ -119,7 +119,8 @@ def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, binning=1):
     volume, padding = _pad_volume(volume)
     segmented_volume = np.zeros_like(volume)
 
-    TILE_SIZE = (96, min(256, segmented_volume.shape[1]), min(256, segmented_volume.shape[2]))
+    TILE_SIZE = (min(256, segmented_volume.shape[0]), min(256, segmented_volume.shape[1]), min(256, segmented_volume.shape[2]))
+    OVERLAP[0] = 0 if TILE_SIZE[0] == segmented_volume.shape[0] else 32
     OVERLAP[1] = 0 if TILE_SIZE[1] == segmented_volume.shape[1] else 32
     OVERLAP[2] = 0 if TILE_SIZE[2] == segmented_volume.shape[2] else 32
 

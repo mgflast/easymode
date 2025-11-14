@@ -11,26 +11,38 @@ def _run(cmd, capture=False, ignore_error=False):
         print(f'\033[93mcontinuing despite error...\033[0m')
     return ret.stdout
 
-def _aretomo3_thread(tomo_list, gpu):
+def _aretomo3_thread(tomo_list, gpu, force_align=False):
     t_start = time.time()
-
     print(f'{cfg.settings["ARETOMO3_ENV"]}')
+    n_done = 0
     for j, tomo in enumerate(tomo_list):
         tomo_dir = os.path.join('warp_tiltseries', 'tiltstack', os.path.splitext(os.path.basename(tomo))[0])
+        vol_done = (not force_align) and len(glob.glob(os.path.join(tomo_dir, '*_Vol.mrc'))) > 0
+        if vol_done:
+            n_done += 1
+            continue
         lock_path = os.path.join(tomo, '.lock')
         if not os.path.exists(lock_path):
-            with open(lock_path, 'w') as f:
-                f.write('')
-            subprocess.run(f'{cfg.settings["ARETOMO3_PATH"]} -InPrefix {tomo_dir}/ -InSuffix .st -OutDir {tomo_dir}/ -CorrCTF 0 -TiltCor 1 -Cmd 1 -Serial 1 -VolZ 0 -AtBin 8 -AlignZ 0 -SplitSum 0 -OutImod 1 -Gpu {gpu}', shell=True, check=True, stdout=subprocess.DEVNULL)
-            etc = (time.time() - t_start) / (j + 1) * (len(tomo_list) - j)
-            etc_h = int(etc // 3600)
-            etc_m = int((etc % 3600) // 60)
-            etc_s = int(etc % 60)
-            print(f'{j + 1}/{len(tomo_list)} (GPU {gpu}) - done aligning {tomo} - estimated time to completion: {etc_h}h {etc_m}m {etc_s}s')
-
+            with open(lock_path, 'w') as f: f.write('')
+            cmd = f'{cfg.settings["ARETOMO3_PATH"]} -InPrefix {tomo_dir}/ -InSuffix .st -OutDir {tomo_dir}/ -CorrCTF 0 -TiltCor 1 -Cmd 1 -Serial 1 -VolZ 0 -AtBin 8 -AlignZ 0 -SplitSum 0 -OutImod 1 -Gpu {gpu}'
+            try:
+                print(f'GPU {gpu}: Running AreTomo for {tomo}')
+                ret = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
+            except subprocess.CalledProcessError as e:
+                print(f'\033[91mGPU {gpu}: AreTomo failed for {tomo} (exit {e.returncode}).\033[0m')
+                print(f'cmd: {cmd}')
+                if e.stdout: print(f'stdout:\n{e.stdout}')
+                if e.stderr: print(f'stderr:\n{e.stderr}')
+                continue
+            n_done += 1
+            etc = (time.time() - t_start) / n_done * (len(tomo_list) - (j + 1)) if n_done > 0 else 0
+            etc_h = int(etc // 3600); etc_m = int((etc % 3600) // 60); etc_s = int(etc % 60)
+            print(f'{n_done}/{len(tomo_list)} (GPU {gpu}) - done aligning {tomo} - estimated time to completion: {etc_h}h {etc_m}m {etc_s}s')
     print(f'GPU {gpu} thread finished in {time.time() - t_start:.2f} seconds.')
 
-def _aretomo_dispatch(tomo_list):
+
+
+def _aretomo_dispatch(tomo_list, force_align=False):
     t_start = time.time()
     tomo_dir = os.path.join('warp_tiltseries', 'tiltstack', os.path.splitext(os.path.basename(tomo_list[0]))[0])
     print(f'Base command: \033[42m{cfg.settings["ARETOMO3_PATH"]} -InPrefix {tomo_dir}/ -InSuffix .st -OutDir {tomo_dir}/ -CorrCTF 0 -TiltCor 1 -Cmd 1 -FlipVol 1 -Serial 1 -VolZ 0 -AtBin 8 -AlignZ 0 -SplitSum 0 -OutImod 1\033[0m\n')
@@ -39,21 +51,20 @@ def _aretomo_dispatch(tomo_list):
         if os.path.exists(os.path.join(t, '.lock')):
             os.remove(os.path.join(t, '.lock'))
 
-    processes = list()
+    processes = []
     PER_DEVICE = 1
     gpus = get_gpu_list()
     for gpu in gpus:
         for i in range(PER_DEVICE):
-            p = multiprocessing.Process(target=_aretomo3_thread, args=(tomo_list, gpu))
+            p = multiprocessing.Process(target=_aretomo3_thread, args=(tomo_list, gpu, force_align))
             print(f'Launching AreTomo3 on GPU ID {gpu} (thread {i}).')
             processes.append(p)
             p.start()
-            time.sleep(0.1)
+            time.sleep(0.5)
 
-    for p in processes:
-        p.join()
-
+    for p in processes: p.join()
     print(f'\033[38;5;208mAreTomo alignment completed in {time.time() - t_start:.2f} seconds ({(time.time() - t_start) / len(tomo_list):.2f} per tilt series).\033[0m')
+
 
 def find_extension(frames_path):
     extensions = {
@@ -97,9 +108,7 @@ def get_gpu_list():
         except:
             return []
 
-
-
-def reconstruct(frames, mdocs, apix, dose, extension=None, tomo_apix=10.0, thickness=3000, shape=None, steps='1111111', halfmaps=True):
+def reconstruct(frames, mdocs, apix, dose, extension=None, tomo_apix=10.0, thickness=3000, shape=None, steps='1111111', halfmaps=True, force_align=False):
     root = os.getcwd()
     frames_path = frames if os.path.exists(frames) else os.path.join(root, frames)
     mdoc_path = mdocs if os.path.exists(mdocs) else os.path.join(root, mdocs)
@@ -145,7 +154,7 @@ def reconstruct(frames, mdocs, apix, dose, extension=None, tomo_apix=10.0, thick
     if steps[3]:
         print(f'\n\033[96mAligning with AreTomo (/public/EM/AreTomo/Aretomo)\033[0m')
         tomos = sorted([f for f in glob.glob(os.path.join(root, 'warp_tiltseries', 'tiltstack', '*')) if os.path.isdir(f)])
-        _aretomo_dispatch(tomos)
+        _aretomo_dispatch(tomos, force_align=force_align)
 
     if steps[4]:
         print(f'\n\033[96mOrganising alignment files\033[0m')
