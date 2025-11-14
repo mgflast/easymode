@@ -120,9 +120,9 @@ def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, binning=1):
     segmented_volume = np.zeros_like(volume)
 
     TILE_SIZE = (min(256, segmented_volume.shape[0]), min(256, segmented_volume.shape[1]), min(256, segmented_volume.shape[2]))
-    OVERLAP[0] = 0 if TILE_SIZE[0] == segmented_volume.shape[0] else 32
-    OVERLAP[1] = 0 if TILE_SIZE[1] == segmented_volume.shape[1] else 32
-    OVERLAP[2] = 0 if TILE_SIZE[2] == segmented_volume.shape[2] else 32
+    OVERLAP[0] = 0 if TILE_SIZE[0] == segmented_volume.shape[0] else 48
+    OVERLAP[1] = 0 if TILE_SIZE[1] == segmented_volume.shape[1] else 48
+    OVERLAP[2] = 0 if TILE_SIZE[2] == segmented_volume.shape[2] else 48
 
     # Below: all 16 combinations of 90-degree rotations and flips that respect the anisotropy of the data.
     k_xy = [0, 2, 2, 0, 1, 3, 0, 1, 2, 3, 0, 1, 2, 3, 1, 3]
@@ -234,6 +234,9 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
     tomograms = sorted(glob.glob(os.path.join(data_directory, '*.mrc')))
 
     print(f'Found {len(tomograms)} tomograms to segment in {data_directory}.\n')
+
+    if len(tomograms) == 0:
+        return
 
     model_path = cache_model(feature)
 
