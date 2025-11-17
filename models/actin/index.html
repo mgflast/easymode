@@ -1361,7 +1361,7 @@
 
 <p><code>easymode segment actin</code></p>
 <p>The actin model was trained to output a cylindrical tube with a diameter of 60 Å along actin filaments. It was one of the most challenging models to train thus far and remains somewhat experimental.</p>
-<p>In combination with the <code>--filament</code> flag in <code>easymode pick</code>, the model enables vectorization of microtubules and picking of particles spaced at regular intervals along individual filaments, with an <strong>accurate prior on the particle orientation</strong> and class labels linking particles to the parent filaments (_aisFilamentID). Use the <code>--per-filament</code> flag to write .star files for individual actin filaments. </p>
+<p>In combination with the <code>--filament</code> flag in <code>easymode pick</code>, the model enables tracing actin filaments and picking of particles at regular intervals along individual filaments, with an <strong>accurate prior on the particle orientation</strong> and class labels linking particles to the parent filaments (_aisFilamentID). Use the <code>--per-filament</code> flag to write .star files for individual actin filaments. </p>
 <p><strong>Example output</strong>
 <br></p>
 <p style="text-align:center;">
@@ -1370,7 +1370,7 @@
     Video failed to load.
   </video>
 </p>
-<p>Example of <code>easymode segment actin</code> output overlayed on a tomogram from training dataset 001_HELA. We have yet to validate the model on unseen data (by subtomogram averaging)</p>
+<p>Example of <code>easymode segment actin</code> output overlaid on a tomogram from training dataset 001_HELA. We have yet to validate the model on unseen data (by subtomogram averaging)</p>
 
 
 

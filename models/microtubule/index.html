@@ -1361,7 +1361,7 @@
 
 <p><code>easymode segment microtubule</code></p>
 <p>The microtubule model was trained to output a cylindrical tube with a diameter of 180 Å along microtubules, approximately <strong>annotating the lumen of microtubules only</strong>. As a result, closely adjacent microtubules are still segmented as individual filaments.</p>
-<p>In combination with the <code>--filament</code> flag in <code>easymode pick</code>, the model enables vectorization of microtubules and picking of particles spaced at regular intervals along individual filaments, with an <strong>accurate prior on the particle orientation</strong> and class labels linking particles to the parent filaments (_aisFilamentID). Use the <code>--per-filament</code> flag to write .star files for individual microtubules. This allows subtomogram averaging of individual filaments. </p>
+<p>In combination with the <code>--filament</code> flag in <code>easymode pick</code>, the model enables tracing individual microtubules and picking particles at regular intervals along individual filaments, with an <strong>accurate prior on the particle orientation</strong> and class labels linking particles to the parent filaments (_aisFilamentID). Use the <code>--per-filament</code> flag to write .star files for individual microtubules. This allows subtomogram averaging of individual filaments. </p>
 <p>For validation, we segmented, picked, and averaged microtubules in a large dataset of FIB-milled HeLa cell tomograms. After using per-filament averaging to determine polarity and protofilament count, then subboxing individual protofilaments, we achieved a 4.6 Å overall resolution (49k particles). </p>
 <p><img alt="Microtubule average" src="../../assets/microtubule_maps.png" /></p>
 <div class="admonition note">
@@ -1376,7 +1376,7 @@
     Video failed to load.
   </video>
 </p>
-<p>Example of <code>easymode segment microtuble</code> output overlayed on a tomogram from EMPIAR-11899 (FIB-milled D. discoideum), a dataset which was not used to train this model.</p>
+<p>Example of <code>easymode segment microtuble</code> output overlaid on a tomogram from EMPIAR-11899 (FIB-milled D. discoideum), a dataset which was not used to train this model.</p>
 
 
 

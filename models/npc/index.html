@@ -1362,7 +1362,14 @@
 <p><code>easymode segment npc</code></p>
 <p>Unlike most species models, the npc (nuclear pore complex) model operates at 20 Å/px, resulting in ~8x faster inference. Downsampling is performed automatically, so input tomograms still should be the default 10 Å/px. As in most other cases, we used a 2D Ais UNet to generate pseudo-labels for training the easymode 3D UNet.</p>
 <p>Nuclear pore complexes aren't very rare but occur at low copy numbers. We used dataset <a href="https://www.ebi.ac.uk/empiar/EMPIAR-11845">EMPIAR-11845</a>, consisting of 152 tomograms of FIB-milled D. discoideum cells, for validation of model by subtomogram averaging. This dataset was acquired with a relatively large pixel size and most tomograms contain part of the nuclear envelope, so the data offered a sufficient number of NPC instances for averaging. Some of the tomograms in this dataset were also included in the training data for this model, so there is a degree of contamination between training and validation in this case; we will repeat validation on a separate dataset later. </p>
-<p>🚧🚧🚧</p>
+<p><br></p>
+<p style="text-align:center;">
+  <video autoplay loop muted playsinline controls style="width:100%; max-width:720px; aspect-ratio:16/9; background:#fff; border-radius:8px; display:block; margin:auto;">
+    <source src="../../assets/npc.mp4" type="video/mp4">
+    Video failed to load.
+  </video>
+</p>
+<p>Example of <code>easymode segment npc</code> output overlaid on a tomogram from EMPIAR-11845 (FIB-milled D. discoideum).</p>
 
 
 
