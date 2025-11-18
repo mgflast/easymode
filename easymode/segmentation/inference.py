@@ -114,8 +114,8 @@ def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, binning=1):
     if binning > 1:
         volume = volume[:_j // binning * binning, :_k // binning * binning, :_l // binning * binning].reshape((_j // binning, binning, _k // binning, binning, _l // binning, binning)).mean(axis=(1, 3, 5))
 
-    volume -= np.mean(volume)
-    volume /= np.std(volume) + 1e-6
+    volume -= np.mean(volume[32:-32, 32:-32, 32:-32])
+    volume /= np.std(volume[32:-32, 32:-32, 32:-32]) + 1e-6
     volume, padding = _pad_volume(volume)
     segmented_volume = np.zeros_like(volume)
 
@@ -212,7 +212,9 @@ FEATURE_BINNING_VALUES = {
     'nuclear_envelope': 2,
     'void': 2,
     'cytoplasm': 3,
-    'nucleoplasm': 3
+    'nucleoplasm': 3,
+    'cytoplasmic_granule': 1,
+    'mitochondrial_granule': 1,
 }
 
 def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_size=8, overwrite=False, data_format='int8', gpus='0'):

@@ -68,7 +68,7 @@ def pick(data_directory, target, output_directory, threshold, spacing, size, bin
           f"--settings warp_tiltseries.settings "
           f"--input_directory {output_directory} "
           f"--coords_angpix 10.0 "
-          f"--output_star relion/{output_directory.strip().split('/')[-1]}/particles.star "
+          f"--output_star relion/{target}/particles.star "
           f"--output_angpix 5.0 "
           f"--box 64 "
           f"--diameter 250 "

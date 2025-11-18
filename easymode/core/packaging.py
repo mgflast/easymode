@@ -18,11 +18,6 @@ def package_checkpoint(title='', checkpoint_directory='', output_directory='', c
     _ = model(tf.zeros((1, 160, 160, 160, 1)))
     model.load_weights(checkpoint_path).expect_partial()
 
-    for layer in model.layers:
-        if layer.get_weights():
-            fp16_weights = [w.astype('float16') for w in layer.get_weights()]
-            layer.set_weights(fp16_weights)
-
     os.makedirs(output_directory, exist_ok=True)
 
     model.save_weights(os.path.join(output_directory, f'{title}.h5'))
