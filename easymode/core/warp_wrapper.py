@@ -78,17 +78,21 @@ def find_extension(frames_path):
     return max(extensions, key=extensions.get)
 
 def find_shape(frames_path, extension):
+    extension = extension.replace('*', '')
     if extension == '.eer':
+        print(f'.eer files - shape is 4096x4096')
         return 4096, 4096
     elif extension == '.mrc':
         import mrcfile
         sample_file = glob.glob(os.path.join(frames_path, f'*{extension}'))[0]
         with mrcfile.open(sample_file, permissive=True) as mrc:
+            print(f'.mrc files - shape detected as {mrc.data.shape[-2]}x{mrc.data.shape[-1]}')
             return mrc.data.shape[-2], mrc.data.shape[-1]
     elif extension in ['.tif', '.tiff']:
         import tifffile
         sample_file = glob.glob(os.path.join(frames_path, f'*{extension}'))[0]
         with tifffile.TiffFile(sample_file) as tif:
+            print(f'.tif files - shape detected as {tif.pages[0].shape[-2]}x{tif.pages[0].shape[-1]}')
             return tif.pages[0].shape[-2], tif.pages[0].shape[-1]
     return 4000, 4000
 
@@ -184,6 +188,7 @@ def reconstruct(frames, mdocs, apix, dose, extension=None, tomo_apix=10.0, thick
             print(f'\033[38;5;208mCorrecting handedness!.\n\033[0m')
             _run(f'WarpTools ts_defocus_hand --settings warp_tiltseries.settings --set_flip')
 
+    if steps[7]:
         print(f'\n\033[96mReconstructing volumes\033[0m')
         _run(f'WarpTools ts_reconstruct --settings warp_tiltseries.settings --angpix {tomo_apix} --dont_invert {"--halfmap_frames" if halfmaps else ""} --perdevice 1')
 

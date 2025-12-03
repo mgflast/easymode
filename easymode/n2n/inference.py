@@ -4,7 +4,7 @@ import gc
 from tensorflow.keras import mixed_precision
 import mrcfile
 import numpy as np
-from easymode.core.distribution import cache_model, load_model
+from easymode.core.distribution import get_model, load_model
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 tf.get_logger().setLevel('ERROR')
@@ -197,10 +197,17 @@ def dispatch(input_directory, output_directory, mode='splits', tta=1, batch_size
         print("Please choose an output directory that is different from the input directory - we dont want to overwrite your original volumes.")
         exit()
 
-    gpus = [int(g) for g in gpus.split(',') if g.strip().isdigit()]
+    if gpus is None:
+        gpus = list(range(0, len(tf.config.list_physical_devices('GPU'))))
+    else:
+        gpus = [int(g) for g in gpus.split(',') if g.strip().isdigit()]
+
+    if len(gpus) == 0:
+        print("\033[93m" + "warning: no GPUs detected. processing will continue, but using CPUs only!" + "\033[0m")
 
     print(f'easymode denoise\n'
           f'mode: {mode}\n'
+          f'method: n2n\n'
           f'data_directory: {input_directory}\n'
           f'output_directory: {output_directory}\n'
           f'gpus: {gpus}\n'
@@ -222,7 +229,7 @@ def dispatch(input_directory, output_directory, mode='splits', tta=1, batch_size
 
     print(f'Found {len(tomograms)} tomograms to denoise in {input_directory}.')
 
-    model_path = cache_model('n2n_splits' if mode=='splits' else 'n2n_direct')
+    model_path = get_model('n2n_splits' if mode=='splits' else 'n2n_direct')[0]
 
     os.makedirs(output_directory, exist_ok=True)
 

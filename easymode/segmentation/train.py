@@ -2,7 +2,7 @@ import glob, os, mrcfile
 from easymode.segmentation.augmentations import *
 import tensorflow as tf
 
-AUGMENTATIONS_ROT_XZ_YZ = 0.33 #0.33 #0.333
+AUGMENTATIONS_ROT_XZ_YZ = 0.5 #0.33 #0.333
 AUGMENTATIONS_ROT_XY = 0.5 #0.33 #0.333
 AUGMENTATIONS_MISSING_WEDGE = 0.0 # 0.0
 AUGMENTATIONS_GAUSSIAN = 0.5 #0.33 #0.2
@@ -46,7 +46,7 @@ class DataLoader:
         print(f'Loaded {len(self.samples)} samples for {"validation" if self.validation else "training"}')
 
     def get_sample(self, datagroup, index):
-        flavours = random.sample(['even', 'odd', 'cryocare', 'cryocare', 'raw'], 2) ## todo: undo replacing ddw with cryocare!
+        flavours = random.sample(['even', 'odd', 'cryocare', 'cryocare', 'raw', 'cryocare'], 2) ## 251127: test training predominantly on lowest-noise flavours
         mixing_factor = random.uniform(0.0, 1.0)
 
         img_a = mrcfile.read(f'{ROOT}/training/3d/data/{datagroup}/{flavours[0]}/{index}.mrc')
@@ -137,8 +137,10 @@ class DataLoader:
                 else:
                     datagroup, index = self.samples[j]
 
+
                 img, label = self.get_sample(datagroup, index)
-                img, label = self.augment(img, label)
+                if not self.validation:
+                    img, label = self.augment(img, label)
                 img, label = self.preprocess(img, label)
                 yield img, label
 
@@ -184,7 +186,7 @@ def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, 
     cb_lr = tf.keras.callbacks.LearningRateScheduler(lr_decay, verbose=1)
 
     cb_csv = tf.keras.callbacks.CSVLogger(f'{ROOT}/training/3d/checkpoints/{title}/training_log.csv', append=True)
-    model.fit(training_ds, steps_per_epoch=training_steps * 8, validation_data=validation_ds, validation_steps=validation_steps, epochs=epochs, validation_freq=1, callbacks=[cb_checkpoint_val, cb_checkpoint_train, cb_lr, cb_csv])
+    model.fit(training_ds, steps_per_epoch=training_steps   , validation_data=validation_ds, validation_steps=validation_steps, epochs=epochs, validation_freq=1, callbacks=[cb_checkpoint_val, cb_checkpoint_train, cb_lr, cb_csv])
 
 
 if __name__ == "__main__":

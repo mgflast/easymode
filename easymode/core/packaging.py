@@ -1,10 +1,12 @@
-import shutil, os
+import os
 import tensorflow as tf
 import easymode.core.config as cfg
+from datetime import datetime, timezone
+import json
 
 MODEL_CACHE_DIR = cfg.settings["MODEL_DIRECTORY"]
 
-def package_checkpoint(title='', checkpoint_directory='', output_directory='', cache=False):
+def package_checkpoint(title='', checkpoint_directory='', output_directory='', apix=10.0):
     if 'n2n' in title:
         from easymode.n2n.model import create
     elif 'ddw' in title:
@@ -20,9 +22,15 @@ def package_checkpoint(title='', checkpoint_directory='', output_directory='', c
 
     os.makedirs(output_directory, exist_ok=True)
 
-    model.save_weights(os.path.join(output_directory, f'{title}.h5'))
+    model.save_weights(os.path.join(MODEL_CACHE_DIR, f'{title}.h5'))
 
     size_mb = os.path.getsize(os.path.join(output_directory, f'{title}.h5')) / (1024 * 1024)
     print(f'Saved {os.path.join(output_directory, title + ".h5")}. File size: {size_mb:.2f} MB')
-    if cache:
-        shutil.copy2(os.path.join(output_directory, f'{title}.h5'), os.path.join(MODEL_CACHE_DIR, f'{title}.h5'))
+
+    metadata = {
+        'apix': apix,
+        'timestamp':  datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    }
+
+    with open(os.path.join(output_directory, f'{title}_metadata.json'), 'w', encoding='utf-8') as j:
+        json.dump(metadata, j, indent=2)

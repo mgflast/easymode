@@ -4,7 +4,7 @@ from scipy.ndimage import rotate, gaussian_filter, zoom
 
 from easymode.segmentation.membrain_fourier_augmentations.fourier_augmentations import MissingWedgeMaskAndFourierAmplitudeMatchingCombined
 
-ROT_XZ_YZ_MAX_ANGLE = 10.0
+ROT_XZ_YZ_MAX_ANGLE = 25.0
 ROT_XY_MAX_ANGLE = 10.0
 
 def rotate_90_xy(img, label):
