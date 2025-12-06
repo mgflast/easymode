@@ -14,19 +14,33 @@ The dataset is biased towards eukaryotic and specifically human cell types. For 
 
 ### installation
 
-**From PyPI (recommended):**
+#### User
+
+Install [*uv*](https://docs.astral.sh/uv/getting-started/installation/) then run all
+*easymode* commands with *uvx*.
+
+```shell
+uvx easymode --help
+```
+
+*uv* will manage a Python environment for you behind the scenes, easy! 🤠
+
+#### Multi User Installation
+
+If installing for multiple users, please install easymode as you would any other Python
+package.
+
 ```bash
+git clone https://github.com/mgflast/easymode.git
+<create python environment in whatever way you prefer>
 pip install easymode
 ```
 
-**From source:**
-```bash
-git clone https://github.com/mgflast/easymode.git
-cd easymode
-pip install -e .
-```
 
-**For development:**
+#### Developer
+
+Assuming understanding of Python development workflows:
+
 ```bash
 git clone https://github.com/mgflast/easymode.git
 cd easymode
