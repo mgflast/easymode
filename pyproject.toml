@@ -87,6 +87,8 @@ dev = [
     "mypy",
     "pre-commit-uv",
     "ruff",
+    "torch>=2.0.0",
+    "h5py",
 ]
 
 # https://docs.astral.sh/ruff
@@ -144,6 +146,8 @@ disallow_untyped_defs = false
 [[tool.mypy.overrides]]
 module = [
     "tensorflow.*",
+    "torch.*",
+    "h5py.*",
     "mrcfile.*",
     "scipy.*",
     "huggingface_hub.*",
