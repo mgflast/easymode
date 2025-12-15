@@ -9,8 +9,10 @@
       
       
       
-        <link rel="prev" href="../nuclear_envelope/">
+        <link rel="prev" href="../mitochondrial_granule/">
       
+      
+        <link rel="next" href="../cytoplasm/">
       
       
       <link rel="icon" href="../../assets/favicon.png">
@@ -18,7 +20,7 @@
     
     
       
-        <title>🚧 Nucleus - easymode</title>
+        <title>  - easymode</title>
       
     
     
@@ -109,7 +111,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              🚧 Nucleus
+               
             
           </span>
         </div>
@@ -787,6 +789,29 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../training_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    easymode training collection
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -806,10 +831,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_3" >
         
           
-          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="">
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="">
             
   
   
@@ -822,8 +847,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
             <span class="md-nav__icon md-icon"></span>
             🐦 Species
           </label>
@@ -979,7 +1004,7 @@
   
   
   <span class="md-ellipsis">
-    🚧 Prohibitin
+    🔵 Prohibitin
     
   </span>
   
@@ -997,12 +1022,12 @@
   
   
     <li class="md-nav__item">
-      <a href="../hps60.md" class="md-nav__link">
+      <a href="../vimentin/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    🚧 HSP60
+    🚧 Vimentin
     
   </span>
   
@@ -1069,10 +1094,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" checked>
         
           
-          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="">
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="">
             
   
   
@@ -1085,8 +1110,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_3_3">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_4">
             <span class="md-nav__icon md-icon"></span>
             🏞️ Biomes
           </label>
@@ -1188,6 +1213,37 @@
                 
   
   
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    🟢 Nucleus
+    
+  </span>
+  
+
+      </a>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
   
   
     <li class="md-nav__item">
@@ -1196,7 +1252,7 @@
   
   
   <span class="md-ellipsis">
-    🔵 Cytoplasm
+    🟢 Cytoplasm
     
   </span>
   
@@ -1219,43 +1275,12 @@
   
   
   <span class="md-ellipsis">
-    🔵 Nuclear envelope
+    🟢 Nuclear envelope
     
   </span>
   
 
       </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-    
-  
-  
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
-        
-  
-  
-  <span class="md-ellipsis">
-    🚧 Nucleus
-    
-  </span>
-  
-
-      </a>
-      
     </li>
   
 
@@ -1355,15 +1380,28 @@
   
 
 
-  <h1>🚧 Nucleus</h1>
+  <h1>🟢 Nucleus</h1>
 
-<p>🚧</p>
+<p><code>easymode segment nucleus</code></p>
+<p>The nucleus envelope model was trained at 50 Å/px and has a receptive field of 6400 Å. </p>
+<p>Segmenting the nucleus can be useful to generate masks for picking, or to add context to picked particles. For example, for subtomogram averaging (STA) of nuclear pore complexes (NPCs), it is important to assign a consistent polarity to every particle - i.e., to identify the distinct cytoplasmic and nuclear sides. During validation of the NPC model by STA, after generating an initial average with Relion5, we used the nucleus and cytoplasm models to refine the orientation of each individual particle.</p>
+<p><br></p>
+<p style="text-align:center;">
+  <video autoplay loop muted playsinline controls style="width:100%; max-width:720px; aspect-ratio:16/9; background:#fff; border-radius:8px; display:block; margin:auto;">
+    <source src="../../assets/nucleus.mp4" type="video/mp4">
+    Video failed to load.
+  </video>
+</p>
+<p>Example of <code>easymode segment nucleus --2d</code> output overlaid on a tomogram from EMPIAR-11845 (FIB-milled D. discoideum) - note that while this dataset was included in the training collection, the tomogram was not.</p>
 
 
 
 
 
 
+
+  
+  
 
 
 
