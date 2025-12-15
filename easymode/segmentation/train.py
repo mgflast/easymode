@@ -186,7 +186,7 @@ def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, 
     cb_lr = tf.keras.callbacks.LearningRateScheduler(lr_decay, verbose=1)
 
     cb_csv = tf.keras.callbacks.CSVLogger(f'{ROOT}/training/3d/checkpoints/{title}/training_log.csv', append=True)
-    model.fit(training_ds, steps_per_epoch=training_steps   , validation_data=validation_ds, validation_steps=validation_steps, epochs=epochs, validation_freq=1, callbacks=[cb_checkpoint_val, cb_checkpoint_train, cb_lr, cb_csv])
+    model.fit(training_ds, steps_per_epoch=training_steps * 4, validation_data=validation_ds, validation_steps=validation_steps, epochs=epochs, validation_freq=5, callbacks=[cb_checkpoint_val, cb_checkpoint_train, cb_lr, cb_csv])
 
 
 if __name__ == "__main__":

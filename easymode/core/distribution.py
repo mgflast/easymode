@@ -150,7 +150,7 @@ def clear_model_cache(model_title=None):
 
 
 def list_remote_models():
-    """List models in HF repo and show local / update status."""
+    """List features and whether they have 3d, 2d, or both models."""
     if not is_online():
         print("Cannot list remote models: No internet connection")
         return []
@@ -158,54 +158,49 @@ def list_remote_models():
     try:
         api = HfApi()
         repo_files = api.list_repo_files(HF_REPO_ID)
-        model_files = [f for f in repo_files if f.endswith(".h5")]
-        if not model_files:
-            print("No model files found in repository")
-            return []
 
-        # detect which features also have a 2D .scnm variant
-        scnm_bases = {os.path.basename(f)[:-5] for f in repo_files if f.endswith(".scnm")}
+        # collect bases from h5 (3d)
+        h5_bases = {
+            os.path.splitext(os.path.basename(f))[0]
+            for f in repo_files
+            if f.endswith(".h5") and "ddw" not in f and "n2n" not in f
+        }
+
+        # collect bases from scnm (2d)
+        scnm_bases = {
+            os.path.splitext(os.path.basename(f))[0]
+            for f in repo_files
+            if f.endswith(".scnm")
+        }
+
+        # union of all bases
+        all_bases = sorted(h5_bases | scnm_bases)
 
         print("\neasymode can currently segment the following features:\n")
         models = []
 
-        for model_file in sorted(model_files):
-            if "ddw" in model_file or "n2n" in model_file: continue
+        for base in all_bases:
+            has_3d = base in h5_bases
+            has_2d = base in scnm_bases
 
-            base = os.path.basename(model_file).replace(".h5", "")
-            info = get_model_info(base)
-
-            weights_local = os.path.exists(info["weights_path"])
-            local_meta = read_local_metadata(info["metadata_path"])
-            remote_meta = get_remote_metadata(base)
-            update_available = timestamps_differ(local_meta, remote_meta) if weights_local else False
-
-            if weights_local:
-                status = "(update available)" if update_available else "(cached)"
+            if has_3d and has_2d:
+                dim = "3D/2D"
+            elif has_3d:
+                dim = "3D only"
             else:
-                status = "(available for download)"
+                dim = "2D only (--2d)"
 
-            dim = "3d/2d" if base in scnm_bases else "3d only"
-
-            print(f"   > {base.ljust(30)} {status} {dim}")
+            print(f"   > {base.ljust(30)} {dim}")
 
             models.append({
                 "title": base,
-                "weights_filename": model_file,
-                "weights_local": weights_local,
-                "update_available": update_available,
-                "local_metadata": local_meta,
-                "remote_metadata": remote_meta,
-                "has_2d": base in scnm_bases,
+                "dim": dim,
+                "has_3d": has_3d,
+                "has_2d": has_2d,
             })
 
         print()
         return models
-
-    except Exception as e:
-        print(f"Error listing remote models: {e}")
-        return []
-
 
     except Exception as e:
         print(f"Error listing remote models: {e}")

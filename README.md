@@ -141,7 +141,7 @@ Not all training data sources are currently listed, because a number of contribu
 | 025_RPE     | EMPIAR-10989                                                         | cellular periphery H. sapiens (RPE1)       | 3  (3)        | 3.45           |
 | 026_EHV     | EMPIAR-11896                                                         | Emiliania huxleyi virus 201                | 40 (10)       | 2.08           |
 | 027_NUCFT   | Forson Gao                                                           | milled S. cerevisiae nuclei                | 21 (15)       | 1.51           |
-| 028_ROOF    | CDPDS-10434, CDPDS-10431                                             | cellular periphery H. sapiens (HEK293)     | 107 (19)      | 2.17           |
+| 028_ROOF    | CDPDS-10434                                                          | cellular periphery H. sapiens (HEK293)     | 20 (19)       | 2.17           |
 | 029_TKIV    | EMPIAR-11058                                                         | milled T. kivui                            | 17 (7)        | 3.52           |
 | 030_LDN     | Mart Last                                                            | cellular periphery H. sapiens (U2OS)       | 26 (7)        | 2.74           |
 | 031_MITO    | Mart Last                                                            | milled H. sapiens (HeLa, mitochondria)     | 63 (59)       | 1.34           |
@@ -157,11 +157,12 @@ Not all training data sources are currently listed, because a number of contribu
 | 041_RPEM    | Cong Yu                                                              | milled H. sapiens (RPE1)                   | 17 (7)        | 1.57           |
 | 042_NPCSC   | EMPIAR-10466                                                         | milled S. cerevisiae                       | 177 (0)       | 3.45           | 
 | 043_DICTY2  | EMPIAR-11899 (to be included after validation)                       | milled D. discoideum                       | 0 (0)         | 1.22           |
+| 044_JURKAT  | Mart Last                                                            | milled H. sapiens (Jurkat)                 | 0 (0)         | 1.97           |
 | 045_NPHL    | *                                                                    | *                                          | 231 (0)       | 1.56           |
-| 046_BIOF    | *                                                                    | *                                          |               |                |
+| 046_ROOF2   | CDPDS-10431                                                          | cellular preiphery H. sapiens (HEK293)     | 87 (0)        | 2.17           |
 | 047_ECPP7   | DS-10455                                                             | E. coli + PP7 virus-like particles         | 30 (0)        |                |
 | 048_ELSO    | DS-10444                                                             | human endo-/lysosomes                      | 30 (0)        |                |
-| 049_*       | *                                                                    | *                                          |               |                |
+| 049_VIOF    | *                                                                    | *                                          |               |                |
 | 050_*       | *                                                                    | *                                          |               |                |
 
 EMPIAR: [EM Public Image Archive](https://www.ebi.ac.uk/empiar/) dataset

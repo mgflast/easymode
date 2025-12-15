@@ -38,7 +38,7 @@ def masked_dice_loss(y_true, y_pred, smooth=1e-6):
 #     return 1.0 - masked_dice_loss(y_true, y_pred)
 
 def combined_masked_bce_dice_loss(y_true, y_pred):
-    return 0.3 * masked_bce_loss(y_true, y_pred) +  0.7 * masked_dice_loss(y_true, y_pred)
+    return 1.0 * masked_bce_loss(y_true, y_pred) #+  0.7 * masked_dice_loss(y_true, y_pred)
 
 
 class ResBlock3D(layers.Layer):
@@ -181,8 +181,7 @@ class UNet(Model):
             optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
             loss=combined_masked_bce_dice_loss,
             metrics=[masked_accuracy],
-            run_eagerly=False,
-            steps_per_execution=16,
+            run_eagerly=False
         )
 
     def call(self, inputs, training=None):

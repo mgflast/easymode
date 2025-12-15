@@ -45,15 +45,16 @@ def pick(data_directory, target, output_directory, threshold, spacing, size, bin
             data["rlnMicrographName"] = tomo
             starfile.write({"particles": data}, f)
 
-    if per_filament_star_file and filament:  # split into one file per filament, rather than one file per tomogram
+    if per_filament_star_file and filament:
         n_filaments = 0
         files = glob.glob(f'{output_directory}/*__{target}_coords.star')
         for j, f in enumerate(files):
             data = starfile.read(f)
             for filament_id in data['aisFilamentID'].unique():
                 n_filaments += 1
-                filament_df = data[data['aisFilamentID'] == filament_id]
-                filament_df['aisFilamentID'] = n_filaments  # replace the filament ID with a global one.
+                mask = data['aisFilamentID'] == filament_id
+                filament_df = data.loc[mask].copy()  # <- explicit copy avoids warning
+                filament_df.loc[:, 'aisFilamentID'] = n_filaments  # <- safe assignment
                 out_path = f.replace('.star', f'_filament_{int(filament_id)}_coords.star')
                 starfile.write({"particles": filament_df}, out_path)
             os.remove(f)
@@ -86,7 +87,7 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
     import tensorflow as tf
 
     if output_directory is None:
-        output_directory = data_directory
+        output_directory = 'segmented'
 
     if gpus is None:
         gpus = list(range(0, len(tf.config.list_physical_devices('GPU'))))
@@ -99,16 +100,25 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
 
     print(f'easymode segment\n'
           f'model_path: {feature}\n'
-          f'data_directory: {data_directory}\n'
+          f'input_data: {data_directory}\n'
           f'output_directory: {output_directory}\n'
           f'gpus: {gpus}\n'
           f'tta: {tta}\n'
           f'overwrite: {overwrite}\n'
           f'ais_2d_nets: True')
 
-    tomograms = sorted(glob.glob(os.path.join(data_directory, '*.mrc')))
+    patterns = data_directory if isinstance(data_directory, (list, tuple)) else [data_directory]
 
-    print(f'Found {len(tomograms)} tomograms to segment in {data_directory}.\n')
+    # collect tomograms from dirs/files/patterns
+    tomograms = []
+    for p in patterns:
+        if os.path.isdir(p):
+            tomograms.extend(glob.glob(os.path.join(p, '*.mrc')))
+        else:
+            tomograms.extend(glob.glob(p))
+    tomograms = sorted(set(tomograms))
+
+    print(f'Found {len(tomograms)} tomograms to segment.\n')
 
     if len(tomograms) == 0:
         return
@@ -120,6 +130,8 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
 
     model_apix = metadata['apix']
 
-    command = f'ais segment -m {model_path} -apix {model_apix} -d {data_directory} -ou {output_directory} --tta {tta} -p 1 --overwrite {"1" if overwrite else "0"} -gpu {gpus}'
+    data_arg = " ".join(patterns)
+    command = f'ais segment -m {model_path} -apix {model_apix} -d {data_arg} -ou {output_directory} -tta {tta} -p 1 --overwrite {"1" if overwrite else "0"} -gpu {gpus}'
+
     _run(command)
 

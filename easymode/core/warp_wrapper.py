@@ -77,6 +77,16 @@ def find_extension(frames_path):
         extensions[e] = len(glob.glob(os.path.join(frames_path, e)))
     return max(extensions, key=extensions.get)
 
+def find_apix(mdoc_path):
+    test_mdoc = glob.glob(os.path.join(mdoc_path, '*.mdoc'))[0]
+    apix = [f.split(' = ')[-1] for f in open(test_mdoc).read().split('\n') if 'PixelSpacing' in f][0]
+    return float(apix)
+
+def find_dose(mdoc_path):
+    test_mdoc = glob.glob(os.path.join(mdoc_path, '*.mdoc'))[0]
+    dose = [f.split(' = ')[-1] for f in open(test_mdoc).read().split('\n') if 'ExposureDose' in f][0]
+    return float(dose)
+
 def find_shape(frames_path, extension):
     extension = extension.replace('*', '')
     if extension == '.eer':
@@ -112,26 +122,34 @@ def get_gpu_list():
         except:
             return []
 
-def reconstruct(frames, mdocs, apix, dose, extension=None, tomo_apix=10.0, thickness=3000, shape=None, steps='1111111', halfmaps=True, force_align=False):
+def reconstruct(frames, mdocs, apix=None, dose=None, extension=None, tomo_apix=10.0, thickness=3000, shape=None, steps='1111111', halfmaps=True, force_align=False):
     root = os.getcwd()
     frames_path = frames if os.path.exists(frames) else os.path.join(root, frames)
     mdoc_path = mdocs if os.path.exists(mdocs) else os.path.join(root, mdocs)
     extension = extension if extension is not None else find_extension(frames_path)
     extension = f'.{extension}' if not '.' in extension else extension
 
-    print(f'Easymode warp reconstruct - settings:'
-          f'\n  root: {root}'
-          f'\n  frames path: {frames_path}'
-          f'\n  mdoc path: {mdoc_path}'
-          f'\n  extension: {extension}'
-          f'\n  apix: {apix}'
-          f'\n  dose: {dose}'
-          f'\n  tomo apix: {tomo_apix}'
-          f'\n  thickness: {thickness}'
-          f'\n  shape: {shape if shape is not None else "auto"}'
-          f'\n  steps: {steps}')
+    print(f'easymode reconstruct settings:'
+          f'\nroot: {root}'
+          f'\nframes path: {frames_path}'
+          f'\nmdoc path: {mdoc_path}'
+          f'\nextension: {extension}'
+          f'\napix: {apix}'
+          f'\ndose: {dose}'
+          f'\ntomo apix: {tomo_apix}'
+          f'\nthickness: {thickness}'
+          f'\nshape: {shape if shape is not None else "auto"}'
+          f'\nsteps: {steps}')
+
+    if dose is None:
+        dose = find_dose(mdoc_path)
+        print(f'inferred dose per frame: {dose} e-/A^2')
+    if apix is None:
+        apix = find_apix(mdoc_path)
+        print(f'inferred pixel size: {apix} A/pixel')
 
     print(f'\n\033[96mRunning Warp easymode in {root}.\033[0m')
+
 
     print(f'\n\033[96mCreating settings (frame series)\033[0m')
     _run(f'WarpTools create_settings --folder_data {frames_path} --folder_processing warp_frameseries --output warp_frameseries.settings --extension "*{extension}" --angpix {apix} --exposure {dose}')
@@ -144,7 +162,7 @@ def reconstruct(frames, mdocs, apix, dose, extension=None, tomo_apix=10.0, thick
 
     if steps[0]:
         print(f'\n\033[96mMotion correction & CTF estimation\033[0m')
-        _run(f'WarpTools fs_motion_and_ctf --settings warp_frameseries.settings --c_grid 2x2x1 --c_defocus_max 8 --c_use_sum --out_averages {"--out_average_halves" if halfmaps else ""} --perdevice {"1" if extension == "*.eer" else "2"} --c_range_max {2 * apix}')
+        _run(f'WarpTools fs_motion_and_ctf --settings warp_frameseries.settings --c_grid 2x2x1 --c_defocus_max 8 --c_use_sum --out_averages {"--out_average_halves" if halfmaps else ""} --perdevice {"2" if extension in ["*.tiff", "*.tif"] else "1"} --c_range_max {2 * apix}')
 
     if steps[1]:
         print(f'\n\033[96mImporting tiltseries\033[0m')
