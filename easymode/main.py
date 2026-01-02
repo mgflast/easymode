@@ -81,6 +81,14 @@ def main():
     denoise.add_argument('--iter', type=int, default=1, help="Only valid in direct mode: number of denoising iterations to perform (default 1). If you are really starved for contrast, try increasing this - but beware of artifacts.")
     denoise.add_argument('--gpu', type=str, default='0,', help="Comma-separated list of GPU ids to use (default '0').")
 
+    if os.path.exists('/lmb/home/mlast/easymode_dev'):
+        tilt_train = subparsers.add_parser('tilt_train', description='Train tilt selection network.')
+        tilt_train.add_argument('-e', "--epochs", type=int, help="Number of epochs to train for (default 200).", default=200)
+        tilt_train.add_argument('-b', "--batch_size", type=int, help="Batch size for training (default 8).", default=8)
+        tilt_train.add_argument('-ls', "--lr_start", type=float, help="Initial learning rate for the optimizer (default 5e-3).", default=5e-3)
+        tilt_train.add_argument('-le', "--lr_end", type=float, help="Final learning rate for the optimizer (default 5e-5).", default=5e-5)
+
+
     args, unknown = parser.parse_known_args()
 
     if args.command == 'train':
@@ -92,7 +100,12 @@ def main():
                     lr_start=args.lr_start,
                     lr_end=args.lr_end,
                     )
-
+    elif args.command == 'tilt_train':
+        from easymode.tiltfilter.train import train_model
+        train_model(batch_size=args.batch_size,
+                    epochs=args.epochs,
+                    lr_start=args.lr_start,
+                    lr_end=args.lr_end, )
     elif args.command == 'denoise':
         if args.method == 'n2n':
             import easymode.n2n.inference as n2n
@@ -147,7 +160,7 @@ def main():
         from easymode.core.ais_wrapper import pick
         pick(target=args.feature,
              data_directory=args.data,
-             output_directory=args.output if args.output is not None else args.data,
+             output_directory=args.output,
              threshold=args.threshold,
              spacing=args.spacing,
              size=args.size,

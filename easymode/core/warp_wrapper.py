@@ -15,6 +15,7 @@ def _aretomo3_thread(tomo_list, gpu, force_align=False):
     t_start = time.time()
     print(f'{cfg.settings["ARETOMO3_ENV"]}')
     n_done = 0
+    subprocess.run(cfg.settings["ARETOMO3_ENV"], shell=True)
     for j, tomo in enumerate(tomo_list):
         tomo_dir = os.path.join('warp_tiltseries', 'tiltstack', os.path.splitext(os.path.basename(tomo))[0])
         vol_done = (not force_align) and len(glob.glob(os.path.join(tomo_dir, '*_Vol.mrc'))) > 0
@@ -85,7 +86,7 @@ def find_apix(mdoc_path):
 def find_dose(mdoc_path):
     test_mdoc = glob.glob(os.path.join(mdoc_path, '*.mdoc'))[0]
     dose = [f.split(' = ')[-1] for f in open(test_mdoc).read().split('\n') if 'ExposureDose' in f][0]
-    return float(dose)
+    return (float(dose)**2)**0.5
 
 def find_shape(frames_path, extension):
     extension = extension.replace('*', '')

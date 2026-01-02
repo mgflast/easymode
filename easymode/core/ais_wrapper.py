@@ -12,6 +12,9 @@ def _run(cmd, capture=False):
 
 
 def pick(data_directory, target, output_directory, threshold, spacing, size, binning=2, tomostar=True, filament=False, per_filament_star_file=False, filament_length=500, centroid=False, min_particles=0):
+    if output_directory is None:
+        output_directory = f'coordinates/{target}'
+
     print(f'easymode pick\n'
           f'feature: {target}\n'
           f'filament_mode: {filament}\n'

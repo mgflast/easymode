@@ -116,7 +116,7 @@ Not all training data sources are currently listed, because a number of contribu
 |-------------|----------------------------------------------------------------------|--------------------------------------------|---------------|----------------|
 | 001_HELA    | Mart Last                                                            | milled H. sapiens (HeLa)                   | 60 (59)       | 1.51           |
 | 002_U2OS    | Mart Last                                                            | milled H. sapiens (U2OS)                   | 40 (26)       | 2.15           |
-| 003_HSPERM  | Tom Dendooven                                                        | milled H. sapiens (spermatozoa)            | 56 (41)       | 1.50           |
+| 003_HSPERM  | Tom Dendooven, Alia dos Santos, Matteo Allegretti                    | milled H. sapiens (spermatozoa)            | 56 (41)       | 1.50           |
 | 004_*       | *                                                                    | *                                          | 23 (20)       | 1.68           |
 | 005_FIBRO   | Tom Hale                                                             | milled H. sapiens (fibroblasts)            | 52 (47)       | 1.33           |
 | 006_*       | *                                                                    | *                                          | 20 (16)       | 1.69           |
@@ -157,13 +157,12 @@ Not all training data sources are currently listed, because a number of contribu
 | 041_RPEM    | Cong Yu                                                              | milled H. sapiens (RPE1)                   | 17 (7)        | 1.57           |
 | 042_NPCSC   | EMPIAR-10466                                                         | milled S. cerevisiae                       | 177 (0)       | 3.45           | 
 | 043_DICTY2  | EMPIAR-11899 (to be included after validation)                       | milled D. discoideum                       | 0 (0)         | 1.22           |
-| 044_JURKAT  | Mart Last                                                            | milled H. sapiens (Jurkat)                 | 0 (0)         | 1.97           |
+| 044_JURKAT  | Mart Last                                                            | milled H. sapiens (Jurkat)                 | 177 (0)       | 1.97           |
 | 045_NPHL    | *                                                                    | *                                          | 231 (0)       | 1.56           |
 | 046_ROOF2   | CDPDS-10431                                                          | cellular preiphery H. sapiens (HEK293)     | 87 (0)        | 2.17           |
 | 047_ECPP7   | DS-10455                                                             | E. coli + PP7 virus-like particles         | 30 (0)        |                |
 | 048_ELSO    | DS-10444                                                             | human endo-/lysosomes                      | 30 (0)        |                |
-| 049_VIOF    | *                                                                    | *                                          |               |                |
-| 050_*       | *                                                                    | *                                          |               |                |
+| 049_CHR     | *                                                                    | *                                          | 30            |                |
 
 EMPIAR: [EM Public Image Archive](https://www.ebi.ac.uk/empiar/) dataset
 CDPDS: [CryoET Data Portal](https://cryoetdataportal.czscience.com/) dataset

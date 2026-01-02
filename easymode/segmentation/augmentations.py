@@ -8,13 +8,13 @@ ROT_XZ_YZ_MAX_ANGLE = 25.0
 ROT_XY_MAX_ANGLE = 10.0
 
 def rotate_90_xy(img, label):
-    k = random.randint(0, 3)
+    k = random.randint(0, 4)
     img = np.rot90(img, k=k, axes=(1, 2))
     label = np.rot90(label, k=k, axes=(1, 2))
     return img, label
 
 def rotate_90_xz(img, label):
-    k = random.randint(0, 1) * 2
+    k = random.randint(0, 2) * 2
     img = np.rot90(img, k=k, axes=(0, 2))
     label = np.rot90(label, k=k, axes=(0, 2))
     return img, label
