@@ -118,13 +118,18 @@ def load_model_weights(weights_path):
     import tensorflow as tf
     if "n2n" in os.path.basename(weights_path):
         from easymode.n2n.model import create
+        dummy_input = tf.zeros((1, 160, 160, 160, 1))
     elif "ddw" in os.path.basename(weights_path):
         from easymode.ddw.model import create
+        dummy_input = tf.zeros((1, 160, 160, 160, 1))
+    elif "tilt" in os.path.basename(weights_path):
+        from easymode.tiltfilter.model import create
+        dummy_input = [tf.zeros((1, 256, 256, 1)), tf.zeros((1, 256, 256, 1))]
     else:
         from easymode.segmentation.model import create
+        dummy_input = tf.zeros((1, 160, 160, 160, 1))
 
     model = create()
-    dummy_input = tf.zeros((1, 160, 160, 160, 1))
     _ = model(dummy_input)
     model.load_weights(weights_path)
     return model
@@ -163,7 +168,7 @@ def list_remote_models():
         h5_bases = {
             os.path.splitext(os.path.basename(f))[0]
             for f in repo_files
-            if f.endswith(".h5") and "ddw" not in f and "n2n" not in f
+            if f.endswith(".h5") and "ddw" not in f and "n2n" not in f and not "tilt" in f
         }
 
         # collect bases from scnm (2d)

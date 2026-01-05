@@ -1,7 +1,6 @@
 import os, glob, time, multiprocessing, psutil
 import tensorflow as tf
 import gc
-from tensorflow.keras import mixed_precision
 import mrcfile
 import numpy as np
 from easymode.core.distribution import get_model, load_model

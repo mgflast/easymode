@@ -81,15 +81,24 @@ def main():
     denoise.add_argument('--iter', type=int, default=1, help="Only valid in direct mode: number of denoising iterations to perform (default 1). If you are really starved for contrast, try increasing this - but beware of artifacts.")
     denoise.add_argument('--gpu', type=str, default='0,', help="Comma-separated list of GPU ids to use (default '0').")
 
+    select_tilts = subparsers.add_parser('select_tilts', help='Automatic marking of tilt images to be excluded from tomogram reconstruction')
+    select_tilts.add_argument('--tiltstack', type=str, required=False, default="warp_tiltseries/tiltstack", help="Directory containing tilt stacks OR path to a single tilt stack OR glob pattern for multiple tilt stack files.")
+    select_tilts.add_argument('--tomostar', type=str, required=False, default=None, help="Directory containing Warp-style tomogram star files.")
+    select_tilts.add_argument('--output', type=str, required=False, default=None, help="Directory to save output tomogram star files.")
+    select_tilts.add_argument('--tta', type=int, required=False, default=1, help="Test-time augmentation factor (default 1). Input images can be processed multiple times in different orientations and the results averaged to yield a (potentially) better result. Higher values increase computation time. Maximum is 8, default is 1.")
+    select_tilts.add_argument('--gpu', type=str, default='0,', help="Comma-separated list of GPU ids to use (default '0').")
+    select_tilts.add_argument('--overwrite', action='store_true', help='If set, overwrite existing .tomostar files. When processing a directory of tomostar files, a backup of these files is always created regardless of this setting.')
+    select_tilts.add_argument('--extension', type=str, default='*.tomostar', help='Filetype extension of the tomogram star files. Default: *.tomostar')
+
     if os.path.exists('/lmb/home/mlast/easymode_dev'):
         tilt_train = subparsers.add_parser('tilt_train', description='Train tilt selection network.')
         tilt_train.add_argument('-e', "--epochs", type=int, help="Number of epochs to train for (default 200).", default=200)
-        tilt_train.add_argument('-b', "--batch_size", type=int, help="Batch size for training (default 8).", default=8)
-        tilt_train.add_argument('-ls', "--lr_start", type=float, help="Initial learning rate for the optimizer (default 5e-3).", default=5e-3)
-        tilt_train.add_argument('-le', "--lr_end", type=float, help="Final learning rate for the optimizer (default 5e-5).", default=5e-5)
+        tilt_train.add_argument('-b', "--batch_size", type=int, help="Batch size for training (default 32).", default=32)
+        tilt_train.add_argument('-ls', "--lr_start", type=float, help="Initial learning rate for the optimizer (default 5e-3).", default=1e-3)
+        tilt_train.add_argument('-le', "--lr_end", type=float, help="Final learning rate for the optimizer (default 5e-5).", default=1e-5)
 
 
-    args, unknown = parser.parse_known_args()
+    args = parser.parse_args()
 
     if args.command == 'train':
         from easymode.segmentation.train import train_model
@@ -127,6 +136,15 @@ def main():
                      overwrite=args.overwrite,
                      iter=args.iter,
                      gpus=args.gpu)
+    elif args.command == 'select_tilts':
+            import easymode.tiltfilter.inference as tiltfilter
+            tiltfilter.dispatch(input_tiltstack=args.tiltstack,
+                                input_tomostar=args.tomostar,
+                                output_directory=args.output,
+                                tta=args.tta,
+                                gpus=args.gpu,
+                                overwrite=args.overwrite,
+                                extension=args.extension)
     elif args.command == 'segment':
         features = [f.lower() for f in args.features]
 

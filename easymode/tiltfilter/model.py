@@ -1,26 +1,27 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Input, Conv2D, ReLU, GlobalAveragePooling2D, Dense, Concatenate
+from tensorflow.keras.layers import Input, Conv2D, ReLU, GlobalAveragePooling2D, Dense, Concatenate, BatchNormalization
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 
+def block(x, f):
+    x = Conv2D(filters=f, strides=1, kernel_size=(3, 3), padding='same')(x)
+    x = BatchNormalization()(x)
+    x = ReLU()(x)
+    x = Conv2D(filters=f, strides=2, kernel_size=(3, 3), padding='same')(x)
+    x = BatchNormalization()(x)
+    x = ReLU()(x)
+    return x
 
 def make_encoder():
     input = Input(shape=(None, None, 1))
 
-    block1_0 = Conv2D(32, 3, strides=1, activation='relu', padding='same')(input)
-    block1_1 = Conv2D(32, 3, strides=2, activation='relu', padding='same')(block1_0)
+    b1 = block(input, 32)
+    b2 = block(b1, 64)
+    b3 = block(b2, 128)
+    b4 = block(b3, 256)
+    b5 = block(b4, 512)
 
-    block2_0 = Conv2D(64, 3, strides=1, activation='relu', padding='same')(block1_1)
-    block2_1 = Conv2D(64, 3, strides=2, activation='relu', padding='same')(block2_0)
-
-    block3_0 = Conv2D(128, 3, strides=1, activation='relu', padding='same')(block2_1)
-    block3_1 = Conv2D(128, 3, strides=2, activation='relu', padding='same')(block3_0)
-
-    block4_0 = Conv2D(256, 3, strides=1, activation='relu', padding='same')(block3_1)
-    block4_1 = Conv2D(256, 3, strides=2, activation='relu', padding='same')(block4_0)
-
-    block5_0 = Conv2D(512, 3, strides=1, activation='relu', padding='same')(block4_1)
-    output = GlobalAveragePooling2D()(block4_0)
+    output = GlobalAveragePooling2D()(b5)
 
     return Model(input, output, name="encoder")
 
@@ -36,12 +37,15 @@ def create():
 
     z = Concatenate()([e0, e1, tf.abs(e0 - e1), e0 * e1])
     z = Dense(256, activation='relu')(z)
-    z = Dense(128, activation='relu')(z)
+    z = Dense(64, activation='relu')(z)
 
     out = Dense(1, activation='sigmoid')(z)
 
     model = Model(inputs=[x0, x1], outputs=out)
 
-    model.compile(optimizer=Adam(1e-3), loss='binary_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer=Adam(1e-3), loss='binary_crossentropy',
+                  metrics=[tf.keras.metrics.Precision(name="prec"),
+                           tf.keras.metrics.Recall(name="rec"),
+                           'accuracy'])
 
     return model
