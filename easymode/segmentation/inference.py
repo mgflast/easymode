@@ -241,6 +241,7 @@ def dispatch_segment( feature, data_directory, output_directory, tta=1, batch_si
 
     if len(gpus) == 0:
         print("\033[93m" + "warning: no GPUs detected. processing will continue, but using CPUs only!" + "\033[0m")
+        gpus = [-1]
 
     print(
         f'easymode segment\n'

@@ -6,7 +6,7 @@
 ## easymode
 ### a collection of pretrained general networks for cellular cryoET
 
-Easymode is a collection of general pretrained neural networks for cellular cryo-electron tomography (cryoET). The goal is to offer single command line interface functions to handle one of the most time-consuming and tedious steps of the cryoET workflow: feature detection. **Inspired and based upon [Membrain-seg](https://github.com/teamtomo/membrain-seg), easymode provides general pretrained networks for segmentation of cellular cryoET data.**    
+Easymode is a collection of general pretrained neural networks for cellular cryo-electron tomography (cryoET). The goal is to offer single command line interface functions to handle one of the most time-consuming and tedious steps of the cryoET workflow: feature detection. **Inspired by and based upon [Membrain-seg](https://github.com/teamtomo/membrain-seg), easymode provides general pretrained networks for segmentation of cellular cryoET data.**    
 
 All networks were trained on a dataset of over 2000 tilt series from 50 different sources, covering many prokaryotic, archaeal, and eukaryotic species, different sample preparation techniques (cryo-FIB, lift-out, purified organelles, purified proteins, intact virus particles, whole cells), different hardware configurations (e.g., K2/K3/Falcon4i, 200/300 kV, Volta phase plate), a range of acquisition pixel sizes, electron doses, and defocus values, and lots of different original applications including various subtomogram averaging and benchmarking projects. 
 
@@ -88,7 +88,7 @@ To turn raw data into reconstructed tomograms, you can then run the following co
 easymode reconstruct --frames <frames_directory> --mdocs <mdocs_directory> --apix <pixel_size> --dose <dose_per_tilt>
 easymode reconstruct --frames warp_tiltseries/frames --mdocs warp_tiltseries/mdocs --apix 1.56 --dose 4.6
 ```
-We also distribute pretrained networks for two denoising methods: Noise2Noise (n2n, like cryoCARE) and DeepDeWedge. For each denoising method we offer two processing modes: 'splits', to denoise using even/odd volume splits, or 'direct', to denoise full volumes. This latter method is enabled by transfer learning, where we use the results of even/odd denoising to train networks to denoise straight from full volumes. Although this is not quite statistically sound, the denoising results are decent, the process is twice as fast, and you can save a lot of time and memory by not having to generate even/odd frame and volume splits. 
+We also distribute pretrained networks for two denoising methods: Noise2Noise (n2n, like cryoCARE) and DeepDeWedge (work in progress!). For each denoising method we offer two processing modes: 'splits', to denoise using even/odd volume splits, or 'direct', to denoise full volumes. This latter method is enabled by transfer learning, where we use the results of even/odd denoising to train networks to denoise straight from full volumes. Although this is not quite statistically sound, the denoising results are decent, the process is twice as fast, and you can save a lot of time and memory by not having to generate even/odd frame and volume splits. 
 To use easymode denoising, run:
 ```
 easymode denoise --method {'ddw', 'n2n'} --mode {'splits', 'direct'} --data <directory containing tomograms OR containing subdirectories 'even' and 'odd', depending on selected mode> ...

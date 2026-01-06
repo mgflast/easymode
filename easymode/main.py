@@ -84,11 +84,13 @@ def main():
     select_tilts = subparsers.add_parser('select_tilts', help='Automatic marking of tilt images to be excluded from tomogram reconstruction')
     select_tilts.add_argument('--tiltstack', type=str, required=False, default="warp_tiltseries/tiltstack", help="Directory containing tilt stacks OR path to a single tilt stack OR glob pattern for multiple tilt stack files.")
     select_tilts.add_argument('--tomostar', type=str, required=False, default=None, help="Directory containing Warp-style tomogram star files.")
+    select_tilts.add_argument('--xml', type=str, required=False, default=None, help="Directory containing Warp-style tilt series .xml files. If provided, xmls will be updated to reflect excluded tilts.")
     select_tilts.add_argument('--output', type=str, required=False, default=None, help="Directory to save output tomogram star files.")
     select_tilts.add_argument('--tta', type=int, required=False, default=1, help="Test-time augmentation factor (default 1). Input images can be processed multiple times in different orientations and the results averaged to yield a (potentially) better result. Higher values increase computation time. Maximum is 8, default is 1.")
     select_tilts.add_argument('--gpu', type=str, default='0,', help="Comma-separated list of GPU ids to use (default '0').")
     select_tilts.add_argument('--overwrite', action='store_true', help='If set, overwrite existing .tomostar files. When processing a directory of tomostar files, a backup of these files is always created regardless of this setting.')
     select_tilts.add_argument('--extension', type=str, default='*.tomostar', help='Filetype extension of the tomogram star files. Default: *.tomostar')
+    select_tilts.add_argument('--threshold', type=float, default=0.5, help='Minimum score for a tilt to be kept. Network scores tilts 0.0 to 1.0, where 0 is bad and 1 is good. Default: 0.5')
 
     if os.path.exists('/lmb/home/mlast/easymode_dev'):
         tilt_train = subparsers.add_parser('tilt_train', description='Train tilt selection network.')
@@ -140,11 +142,13 @@ def main():
             import easymode.tiltfilter.inference as tiltfilter
             tiltfilter.dispatch(input_tiltstack=args.tiltstack,
                                 input_tomostar=args.tomostar,
+                                input_xml=args.xml,
                                 output_directory=args.output,
                                 tta=args.tta,
                                 gpus=args.gpu,
                                 overwrite=args.overwrite,
-                                extension=args.extension)
+                                extension=args.extension,
+                                threshold=args.threshold)
     elif args.command == 'segment':
         features = [f.lower() for f in args.features]
 

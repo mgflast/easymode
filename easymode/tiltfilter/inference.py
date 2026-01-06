@@ -15,15 +15,18 @@ tf.config.optimizer.set_experimental_options({'layout_optimizer': False})
 class TiltSelectionJob:
     TRAINED_AT_BIN = 16
 
-    def __init__(self, tiltstack, tomostar_file=None, output_directory=None):
+    def __init__(self, tiltstack, tomostar_file=None, output_directory=None, xml_directory=None):
         self.tiltstack = tiltstack
         self.tomostar_file = tomostar_file
         self.output_directory = output_directory
         self.tiltstack_file = None
+        self.xml_directory = xml_directory
+        self.xml_file = None
         self.output_file = None
         self.init_time = time.time()
         self.parse_inputs()
         self.started = False
+        self.report = False
 
         print(f'job on --tiltstack {self.tiltstack} and --tomostar parsed as {self.tomostar_file}')
 
@@ -48,6 +51,12 @@ class TiltSelectionJob:
                 else:
                     if os.path.isfile(c):
                         self.tiltstack_file = c
+
+        # Find xml file
+        if self.xml_directory is not None:
+            self.xml_file = os.path.join(self.xml_directory, f'{tomo}.xml')
+            if not os.path.exists(self.xml_file):
+                self.xml_file = None
 
         # Determine output file path
         if self.output_directory is None:
@@ -88,16 +97,58 @@ class TiltSelectionJob:
                 _x0 = np.flip(_x0, axis=1)
                 _x1 = np.flip(_x1, axis=1)
 
-            y += np.squeeze(model.predict([_x0, _x1]))
+            instance_y = np.squeeze(model.predict([_x0, _x1]))
+            y += instance_y
 
         return y / tta
 
-    def process(self, model, tta, overwrite):
+    def set_xml_flags(self, df, xml_file):
+        from lxml import etree
+        import os
+
+        parser = etree.XMLParser(remove_blank_text=False)
+        tree = etree.parse(xml_file, parser)
+        root = tree.getroot()
+
+        movie_el = root.find('.//{*}MoviePath')
+        use_el = root.find('.//{*}UseTilt')
+        if movie_el is None or use_el is None:
+            return
+
+        xml_movies = movie_el.text.split()
+        use_text = use_el.text
+        xml_use = [line.strip() for line in use_text.split('\n') if line.strip()]
+
+        if len(xml_movies) != len(xml_use):
+            return
+
+        if 'wrpMovieName' not in df.columns or 'tiltInclude' not in df.columns:
+            return
+
+        inc_by_base = {os.path.basename(p): bool(int(v))
+                       for p, v in zip(df['wrpMovieName'].astype(str), df['tiltInclude'].astype(int))}
+
+        missing = 0
+        n_false = 0
+        for i, p in enumerate(xml_movies):
+            b = os.path.basename(p)
+            if b in inc_by_base:
+                v = inc_by_base[b]
+                xml_use[i] = "True" if v else "False"
+                if not v:
+                    n_false += 1
+            else:
+                missing += 1
+
+        use_el.text = '\n'.join(xml_use)
+        tree.write(xml_file, encoding="utf-8", xml_declaration=True, pretty_print=False)
+
+    def process(self, model, tta, overwrite, threshold=0.5):
         if os.path.exists(self.output_file):
             if os.path.getmtime(self.output_file) > self.init_time:  # output exists, written after process started - another thread did it
-                return
+                return None
             if not overwrite:  # output exists, and we don't want to overwrite
-                return
+                return 'skipped (output already exists)' if self.report else None
 
         with open(self.output_file, 'w') as f:
             pass # placeholder file made to signal this stack is being processed.
@@ -129,19 +180,23 @@ class TiltSelectionJob:
             query_tilt = TiltSelectionJob.preprocess(stack[j, :, :])
             proc_stack.append(query_tilt)
             y = TiltSelectionJob.predict_tta(reference_tilt, query_tilt, model, tta)
-            if y < 1.0 - 1e-8:
-                print(y, self.tomostar_file)
-            df.loc[j, 'tiltInclude'] = int(y > 0.5)
+            df.loc[j, 'tiltInclude'] = int(y > threshold)
             df.loc[j, 'tiltScore'] = f"{y:.4f}"
 
         # Write final .tomostar files.
         starfile.write(df, self.output_file)
-        proc_stack = np.squeeze(np.array(proc_stack, dtype=np.float32))
-        mrcfile.new(self.output_file.replace('.tomostar', '.mrc'), overwrite=overwrite, data=proc_stack)
 
+        # Apply result to XML file if available
+        if self.xml_file is not None:
+            self.set_xml_flags(df, self.xml_file)
 
+        # Save stack (for debugging)
+        # proc_stack = np.squeeze(np.array(proc_stack, dtype=np.float32))
+        # mrcfile.new(self.output_file.replace('.tomostar', '.mrc'), overwrite=overwrite, data=proc_stack)
 
-def inference_thread(job_list, model_path, gpu, tta, overwrite):
+        return None
+
+def inference_thread(job_list, model_path, gpu, tta, overwrite, threshold=0.5, is_reporter_thread=False):
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
 
     for device in tf.config.list_physical_devices('GPU'):
@@ -153,12 +208,16 @@ def inference_thread(job_list, model_path, gpu, tta, overwrite):
     model = load_model(model_path)
 
     for j, job in enumerate(job_list, 1):
-        job.process(model, tta, overwrite)
+        job.report = is_reporter_thread
+        job_out = job.process(model, tta, overwrite, threshold=threshold)
         etc = time.strftime('%H:%M:%S', time.gmtime((time.time() - process_start_time) / j * (len(job_list) - j)))
-        print(f"{j}/{len(job_list)} (on GPU {gpu}) - {job.output_file} - etc {etc}")
+        if job_out is None:
+            print(f"{j}/{len(job_list)} (on GPU {gpu}) - {job.output_file} - etc {etc}")
+        else:
+            print(f"{j}/{len(job_list)} (on GPU {gpu}) - {job.output_file} - etc {etc}" + f" - {job_out}")
 
 
-def parse_inputs(input_tiltstack, input_tomostar, output_directory, extension='*.tomostar'):
+def parse_inputs(input_tiltstack, input_tomostar, input_xml, output_directory, extension='*.tomostar'):
     if not "." in extension:
         extension = f".{extension}"
     if not "*" in extension:
@@ -169,23 +228,23 @@ def parse_inputs(input_tiltstack, input_tomostar, output_directory, extension='*
 
     if not os.path.isdir(input_tiltstack):
         if os.path.isfile(input_tiltstack):                                                                             # A: single tilt stack
-            job = TiltSelectionJob(tiltstack=input_tiltstack, output_directory=output_directory)
+            job = TiltSelectionJob(tiltstack=input_tiltstack, output_directory=output_directory, xml_directory=input_xml)
             jobs.append(job)
         else:                                                                                                           # B: tiltstack glob pattern
             for f in glob.glob(input_tiltstack):
-                job = TiltSelectionJob(tiltstack=f, output_directory=output_directory)
+                job = TiltSelectionJob(tiltstack=f, output_directory=output_directory, xml_directory=input_xml)
                 jobs.append(job)
     elif os.path.isdir(input_tiltstack) and input_tomostar is None:                                                     # C: tiltstack directory, no tomostar
         for f in glob.glob(os.path.join(input_tiltstack, '*.st')):
-            job = TiltSelectionJob(tiltstack=f, output_directory=output_directory)
+            job = TiltSelectionJob(tiltstack=f, output_directory=output_directory, xml_directory=input_xml)
             jobs.append(job)
     else:
         if os.path.isfile(input_tomostar):                                                                              # D: tiltstack directory, single tomostar file
-            job = TiltSelectionJob(tiltstack=input_tiltstack, tomostar_file=input_tomostar, output_directory=output_directory)
+            job = TiltSelectionJob(tiltstack=input_tiltstack, tomostar_file=input_tomostar, output_directory=output_directory, xml_directory=input_xml)
             jobs.append(job)
         elif os.path.isdir(input_tomostar):                                                                             # E: tiltstack directory, tomostar directory
             for f in glob.glob(os.path.join(input_tomostar, extension)):
-                job = TiltSelectionJob(tiltstack=input_tiltstack, tomostar_file=f, output_directory=output_directory)
+                job = TiltSelectionJob(tiltstack=input_tiltstack, tomostar_file=f, output_directory=output_directory, xml_directory=input_xml)
                 jobs.append(job)
 
             # Create a backup of the original tomostar files.
@@ -201,7 +260,7 @@ def parse_inputs(input_tiltstack, input_tomostar, output_directory, extension='*
     return jobs
 
 
-def dispatch(input_tiltstack, input_tomostar, output_directory, tta=1, gpus=None, overwrite=False, extension="*.tomostar"):
+def dispatch(input_tiltstack, input_tomostar, input_xml, output_directory, tta=1, gpus=None, overwrite=False, extension="*.tomostar", threshold=0.5):
     if gpus is None:
         gpus = list(range(0, len(tf.config.list_physical_devices('GPU'))))
     else:
@@ -212,10 +271,10 @@ def dispatch(input_tiltstack, input_tomostar, output_directory, tta=1, gpus=None
 
     if input_tiltstack is None and input_tomostar is None:
         print(f'Please specify a value for either --tiltstack or --tomostar (or both). For example: --tomostar tomostar --tiltstack warp_tiltseries/tiltstack')
-    if output_directory is None and os.path.isdir(input_tomostar):
+    if output_directory is None and input_tomostar is not None and os.path.isdir(input_tomostar):
         output_directory = input_tomostar
 
-    jobs = parse_inputs(input_tiltstack, input_tomostar, output_directory, extension)
+    jobs = parse_inputs(input_tiltstack, input_tomostar, input_xml, output_directory, extension)
     if len(jobs) == 0:
         print(f'No tomostars and/or tilt stacks found with --tomostar {input_tomostar} and --tiltstack {input_tiltstack}. Exiting.')
         return
@@ -226,6 +285,16 @@ def dispatch(input_tiltstack, input_tomostar, output_directory, tta=1, gpus=None
     if model_path is None:
         print(f'Could not find model for tilt selection. Exiting.')
         return
+
+    # back up original xmls
+    if input_xml is not None and os.path.exists(input_xml):
+        backup_location = os.path.join(input_xml, 'backup_' + datetime.now().strftime("%Y%m%d%H%M"))
+        print(f'backing up original xml files to {backup_location}')
+        os.makedirs(backup_location, exist_ok=True)
+        for j in jobs:
+            if os.path.exists(j.xml_file):
+                shutil.copy(j.xml_file, os.path.join(backup_location, os.path.basename(j.xml_file)))
+
 
     multiprocessing.set_start_method("spawn", force=True)
 
@@ -238,7 +307,9 @@ def dispatch(input_tiltstack, input_tomostar, output_directory, tta=1, gpus=None
                 model_path,
                 gpu,
                 tta,
-                overwrite
+                overwrite,
+                threshold,
+                (gpu == gpus[0])
             )
         )
         processes.append(p)
