@@ -4,7 +4,7 @@ import gc
 from tensorflow.keras import mixed_precision
 import mrcfile
 import numpy as np
-from easymode.core.distribution import cache_model, load_model
+from easymode.core.distribution import get_model, load_model
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 tf.get_logger().setLevel('ERROR')
@@ -219,7 +219,7 @@ def dispatch(input_directory, output_directory, mode='splits', tta=1, batch_size
 
     print(f'Found {len(tomograms)} tomograms to denoise in {input_directory}.')
 
-    model_path = cache_model('ddw_splits' if mode=='splits' else 'ddw_direct')
+    model_path = get_model('ddw_splits' if mode=='splits' else 'ddw_direct')[0]
 
     os.makedirs(output_directory, exist_ok=True)
 

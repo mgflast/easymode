@@ -10,22 +10,35 @@ def masked_bce_loss(y_true, y_pred):
     denom = tf.reduce_sum(mask)
     return tf.reduce_sum(per_voxel) / tf.maximum(denom, 1.0)
 
-# def masked_dice_loss(y_true, y_pred, smooth=1e-6):
-#     mask = tf.cast(y_true != 2, tf.float32)
-#     y_true_masked = tf.reshape(y_true * mask, [-1])
-#     y_pred_masked = tf.reshape(y_pred * mask, [-1])
-#
-#     intersection = tf.reduce_sum(y_true_masked * y_pred_masked)
-#     union = tf.reduce_sum(y_true_masked) + tf.reduce_sum(y_pred_masked)
-#
-#     dice = (2.0 * intersection + smooth) / (union + smooth)
-#     return 1.0 - dice
+def masked_accuracy(y_true, y_pred):
+    ignore = tf.equal(y_true, 2.0)
+    y_true_bin = tf.where(ignore, 0.0, y_true)
+    y_pred_bin = tf.cast(y_pred > 0.5, y_true_bin.dtype)
+
+    valid = tf.logical_not(ignore)
+    correct = tf.equal(y_true_bin, y_pred_bin)
+    correct = tf.logical_and(correct, valid)
+
+    correct = tf.cast(correct, y_pred.dtype)
+    denom = tf.reduce_sum(tf.cast(valid, y_pred.dtype))
+    return tf.reduce_sum(correct) / tf.maximum(denom, 1.0)
+
+def masked_dice_loss(y_true, y_pred, smooth=1e-6):
+    mask = tf.cast(y_true != 2, tf.float32)
+    y_true_masked = tf.reshape(y_true * mask, [-1])
+    y_pred_masked = tf.reshape(y_pred * mask, [-1])
+
+    intersection = tf.reduce_sum(y_true_masked * y_pred_masked)
+    union = tf.reduce_sum(y_true_masked) + tf.reduce_sum(y_pred_masked)
+
+    dice = (2.0 * intersection + smooth) / (union + smooth)
+    return 1.0 - dice
 
 # def masked_dice(y_true, y_pred):
 #     return 1.0 - masked_dice_loss(y_true, y_pred)
 
 def combined_masked_bce_dice_loss(y_true, y_pred):
-    return masked_bce_loss(y_true, y_pred) # +  0.1 * masked_dice_loss(y_true, y_pred)
+    return 1.0 * masked_bce_loss(y_true, y_pred) #+  0.7 * masked_dice_loss(y_true, y_pred)
 
 
 class ResBlock3D(layers.Layer):
@@ -165,11 +178,10 @@ class UNet(Model):
         self.final_conv = layers.Conv3D(1, 1, activation='sigmoid', name='output')
 
         self.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=0.0004),
+            optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
             loss=combined_masked_bce_dice_loss,
-            metrics=['accuracy'],
-            run_eagerly=False,
-            steps_per_execution=16,
+            metrics=[masked_accuracy],
+            run_eagerly=False
         )
 
     def call(self, inputs, training=None):
