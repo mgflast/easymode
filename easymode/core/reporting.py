@@ -49,7 +49,7 @@ def put(url, data, content_type):
     resp.raise_for_status()
 
 
-def report(volume_path, feature, contact, comment):
+def report(volume_path, model, contact, comment):
     vol = os.path.abspath(volume_path)
     if not os.path.isfile(vol):
         print(f"File '{vol}' could not be found.")
@@ -74,7 +74,7 @@ def report(volume_path, feature, contact, comment):
     print(f'\033[96mUploading metadata...\033[0m')
     metadata = {
         "date": datetime.now(timezone.utc).isoformat(),
-        "feature": feature,
+        "model": model,
         "contact": contact,
         "comment": comment,
     }

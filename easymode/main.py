@@ -56,7 +56,7 @@ def main():
 
     report = subparsers.add_parser('report', help='Help improve easymode by reporting model failures and sharing the relevant volumes. All data will be kept confidential and is never released publicly.')
     report.add_argument("--tomogram", type=str, help="Path to the .mrc file to upload")
-    report.add_argument("--feature", type=str, help="Feature that was segmented incorrectly (e.g. 'ribosome').")
+    report.add_argument("--model", type=str, help="Model that gave unsatisfactory results (e.g. 'ribosome')")
     report.add_argument('--contact', type=str, required=False, default="", help="Your email address (optional).")
     report.add_argument('--comment', type=str, required=False, default="", help="Additional comments (optional).")
 
@@ -185,7 +185,7 @@ def main():
     elif args.command == 'report':
         from easymode.core.reporting import report
         report(volume_path=args.tomogram,
-               feature=args.feature,
+               model=args.feature,
                contact=args.contact,
                comment=args.comment)
     elif args.command == 'pick':
