@@ -3,12 +3,13 @@ import uuid
 import json
 import os
 from datetime import datetime, timezone
+from tqdm import tqdm
 
 WORKER_URL = "https://easymode-reporting.easymode.workers.dev"
 
 
 def get_presigned_url(filename, size, content_type):
-    resp = requests.get(WORKER_URL, params={"filename": filename, "size": str(size), "contentType": content_type,})
+    resp = requests.get(WORKER_URL, params={"filename": filename, "size": str(size), "contentType": content_type})
 
     # Handle rate limiting (429 Too Many Requests)
     if resp.status_code == 429:
@@ -30,7 +31,7 @@ def get_presigned_url(filename, size, content_type):
 
     # Handle file too large errors
     if resp.status_code == 413:
-        print(f"File is too large. Maximum allowed size is currently 1 GB. Please contact me if you would like to submit larger files: mlast@mrc-lmb.cam.ac.uk")
+        print(f"File is too large. Maximum allowed size is currently 1.5 GB. Please contact me if you would like to submit larger files: mlast@mrc-lmb.cam.ac.uk")
         exit(1)
 
     # Handle invalid file type errors
@@ -44,8 +45,40 @@ def get_presigned_url(filename, size, content_type):
     return resp.json()
 
 
-def put(url, data, content_type):
-    resp = requests.put(url, data=data, headers={"Content-Type": content_type})
+def put(url, data, content_type, show_progress=False):
+    headers = {"Content-Type": content_type}
+
+    if show_progress and len(data) > 1024 * 1024:
+        class ChunkedReader:
+            def __init__(self, data, chunk_size=10*1024*1024):
+                self.data = data
+                self.pos = 0
+                self.chunk_size = chunk_size
+                self.pbar = tqdm(total=len(data), unit='B', unit_scale=True, unit_divisor=1024)
+
+            def read(self, size=-1):
+                if size == -1 or size > self.chunk_size:
+                    size = self.chunk_size
+
+                chunk = self.data[self.pos:self.pos + size]
+                self.pos += len(chunk)
+                self.pbar.update(len(chunk))
+                return chunk
+
+            def __len__(self):
+                return len(self.data)
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                self.pbar.close()
+
+        with ChunkedReader(data) as reader:
+            resp = requests.put(url, data=reader, headers=headers)
+    else:
+        resp = requests.put(url, data=data, headers=headers)
+
     resp.raise_for_status()
 
 
@@ -69,7 +102,7 @@ def report(volume_path, model, contact, comment):
     size_mb = len(vol_bytes) / (1024 * 1024)
     print(f'\033[96mUploading volume ({size_mb:.1f} MB)...\033[0m')
     presigned = get_presigned_url(f"{base}.mrc", len(vol_bytes), "application/octet-stream")
-    put(presigned["url"], vol_bytes, "application/octet-stream")
+    put(presigned["url"], vol_bytes, "application/octet-stream", show_progress=True)
 
     print(f'\033[96mUploading metadata...\033[0m')
     metadata = {

@@ -31,8 +31,9 @@ setup(
         "tifffile",
         "psutil",
         "starfile",
-        "lxml"
-        #"Ais-cryoET"
+        "lxml",
+        "tqdm",
+        "Ais-cryoET>=1.0.44"
     ]
 )
 
