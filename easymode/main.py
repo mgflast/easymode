@@ -29,7 +29,6 @@ def main():
         package.add_argument('-c', "--checkpoint_directory", type=str, required=True, help="Path to the checkpoint directory to package from.")
         package.add_argument('-t', "--title", type=str, default=None, help="Title of the model to package. If not provided, the name of the checkpoint directory is used.")
 
-
     reconstruct = subparsers.add_parser('reconstruct', help='Reconstruct tomograms using WarpTools and AreTomo3.')
     reconstruct.add_argument('--frames', type=str, required=True, help="Directory containing raw frames.")
     reconstruct.add_argument('--mdocs', type=str, required=True, help="Directory containing mdocs.")
@@ -54,6 +53,12 @@ def main():
     segment.add_argument('--gpu', type=str, default=None, help="Comma-separated list of GPU ids to use (leave empty to use all available devices).")
     segment.add_argument('--apix', type=float, default=None, help="Override the pixel size stored in the .mrc header (in Angstrom). Use this if the pixel size is missing or incorrect. Set to 0.0 to disallow any scaling.")
     segment.add_argument('--2d', dest="use_2d", action='store_true', help='Use the alternative Ais 2D/2.5D UNet instead of easymode 3D UNets.')
+
+    report = subparsers.add_parser('report', help='Help improve easymode by reporting model failures and sharing the relevant volumes. All data will be kept confidential and is never released publicly.')
+    report.add_argument("--tomogram", type=str, help="Path to the .mrc file to upload")
+    report.add_argument("--feature", type=str, help="Feature that was segmented incorrectly (e.g. 'ribosome').")
+    report.add_argument('--contact', type=str, required=False, default="", help="Your email address (optional).")
+    report.add_argument('--comment', type=str, required=False, default="", help="Additional comments (optional).")
 
     pick = subparsers.add_parser('pick', help='Pick particles in segmented volumes.')
     pick.add_argument("feature", metavar='FEATURE', type=str, help="Feature to pick, based on segmentations.")
@@ -151,7 +156,6 @@ def main():
                                 threshold=args.threshold)
     elif args.command == 'segment':
         features = [f.lower() for f in args.features]
-
         if args.use_2d:
             from easymode.core.ais_wrapper import dispatch_segment as dispatch_segment_2d
             for feature in features:
@@ -178,6 +182,12 @@ def main():
                     data_format=args.format,
                     gpus=args.gpu
                 )
+    elif args.command == 'report':
+        from easymode.core.reporting import report
+        report(volume_path=args.tomogram,
+               feature=args.feature,
+               contact=args.contact,
+               comment=args.comment)
     elif args.command == 'pick':
         from easymode.core.ais_wrapper import pick
         pick(target=args.feature,
