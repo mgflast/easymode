@@ -2,10 +2,10 @@ import glob, os, mrcfile
 from easymode.segmentation.augmentations import *
 import tensorflow as tf
 
-AUGMENTATIONS_ROT_XZ_YZ = 0.5 #0.33 #0.333
+AUGMENTATIONS_ROT_XZ_YZ = 0.33 #0.33 #0.333
 AUGMENTATIONS_ROT_XY = 0.5 #0.33 #0.333
 AUGMENTATIONS_MISSING_WEDGE = 0.0 # 0.0
-AUGMENTATIONS_GAUSSIAN = 0.5 #0.33 #0.2
+AUGMENTATIONS_GAUSSIAN = 0.25 #0.33 #0.2
 AUGMENTATIONS_SCALE = 0.33 #0.33
 
 DEBUG = False
@@ -45,7 +45,7 @@ class DataLoader:
         print(f'Loaded {len(self.samples)} samples for {"validation" if self.validation else "training"}')
 
     def get_sample(self, datagroup, index):
-        flavours = random.sample(['even', 'odd', 'cryocare', 'cryocare', 'raw', 'cryocare'], 2) ## 251127: test training predominantly on lowest-noise flavours
+        flavours = random.sample(['even', 'odd', 'cryocare', 'cryocare', 'raw'], 2) # cryocare twice, bias towards denoised
         mixing_factor = random.uniform(0.0, 1.0)
 
         img_a = mrcfile.read(f'{ROOT}/training/3d/data/{datagroup}/{flavours[0]}/{index}.mrc')

@@ -160,9 +160,11 @@ Not all training data sources are currently listed, because a number of contribu
 | 044_JURKAT  | Mart Last                                                            | milled H. sapiens (Jurkat)                 | 177 (0)       | 1.97           |
 | 045_NPHL    | *                                                                    | *                                          | 231 (0)       | 1.56           |
 | 046_ROOF2   | CDPDS-10431                                                          | cellular preiphery H. sapiens (HEK293)     | 87 (0)        | 2.17           |
-| 047_ECPP7   | DS-10455                                                             | E. coli + PP7 virus-like particles         | 30 (0)        |                |
-| 048_ELSO    | DS-10444                                                             | human endo-/lysosomes                      | 30 (0)        |                |
+| 047_ECPP7   | CDPDS-10455                                                          | E. coli + PP7 virus-like particles         | 30 (0)        |                |
+| 048_ELSO    | CDPDS-10444                                                          | human endo-/lysosomes                      | 30 (0)        |                |
 | 049_CHR     | *                                                                    | *                                          | 30            |                |
+| 050_MHSP    | EMPIAR-13145                                                         | milled H. sapiens (HeLa)                   |             |                |
+| 051_ASSC    | EMPIAR-13145                                                         | milled H. sapiens (HeLa)                   |             |                |
 
 EMPIAR: [EM Public Image Archive](https://www.ebi.ac.uk/empiar/) dataset
 CDPDS: [CryoET Data Portal](https://cryoetdataportal.czscience.com/) dataset
