@@ -185,7 +185,7 @@ def main():
     elif args.command == 'report':
         from easymode.core.reporting import report
         report(volume_path=args.tomogram,
-               model=args.feature,
+               model=args.model,
                contact=args.contact,
                comment=args.comment)
     elif args.command == 'pick':
