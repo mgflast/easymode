@@ -306,4 +306,8 @@ def dispatch_segment( feature, data_directory, output_directory, tta=1, batch_si
     for p in processes:
         p.join()
 
+    print()
+    print(f'\033[92m✓ Segmentation finished!\033[0m')
+    print(f"\033[96mPlease note that you can help improve easymode by reporting model failures using 'easymode report --tomogram <> --model <>'\033[0m")
+    print()
 
