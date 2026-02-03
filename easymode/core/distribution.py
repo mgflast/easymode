@@ -57,11 +57,15 @@ def get_remote_metadata(model_title, _2d=False):
 
 
 def timestamps_differ(local_meta, remote_meta):
-    if not remote_meta: return False
+    if not remote_meta:
+        return False
     remote_ts = remote_meta.get("timestamp")
-    if not remote_ts: return False
+    if not remote_ts:
+        return False
     local_ts = local_meta.get("timestamp") if local_meta else None
-    return local_ts is None or local_ts != remote_ts
+    if local_ts is None:
+        return True
+    return remote_ts > local_ts
 
 
 def download_model_files(info, remote_metadata=None, silent=False):

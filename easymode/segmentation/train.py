@@ -2,10 +2,10 @@ import glob, os, mrcfile
 from easymode.segmentation.augmentations import *
 import tensorflow as tf
 
-AUGMENTATIONS_ROT_XZ_YZ = 0.33 #0.33 #0.333
+AUGMENTATIONS_ROT_XZ_YZ = 0.5 #0.33 #0.333
 AUGMENTATIONS_ROT_XY = 0.5 #0.33 #0.333
 AUGMENTATIONS_MISSING_WEDGE = 0.0 # 0.0
-AUGMENTATIONS_GAUSSIAN = 0.25 #0.33 #0.2
+AUGMENTATIONS_GAUSSIAN = 0.5 #0.33 #0.2
 AUGMENTATIONS_SCALE = 0.33 #0.33
 
 DEBUG = False
@@ -14,6 +14,71 @@ if os.name == 'nt':
     DEBUG = True
     ROOT = 'Z:/compu_projects/easymode'
     print(f'debug mode - running on Windows with root at {ROOT}')
+
+
+class Sample:
+    FLAVOURS = ['odd', 'even', 'raw', 'cryocare']
+    def __init__(self, idx, datagroup):
+        self.idx = idx
+        self.datagroup = datagroup
+        self.valid = True
+        self.is_positive = False
+        self.flavours = {}
+        self.label_path = f'{ROOT}/training/3d/data/{self.datagroup}/label/{self.idx}.mrc'
+        self.validity_path = f'{ROOT}/training/3d/data/{self.datagroup}/validity/{self.idx}.mrc'
+
+        # check existence of label volume
+        if not os.path.exists(self.label_path):
+            print(f'Missing label for sample {self.idx} in {self.datagroup}')
+            self.valid = False
+        else:
+            label_volume = mrcfile.read(self.label_path)
+            self.is_positive = np.sum(label_volume == 1) > 0
+
+        # check existence of validity volume
+        if not os.path.exists(self.validity_path):
+            print(f'Missing validity for sample {self.idx} in {self.datagroup}')
+            self.valid = False
+
+        # check existence of subtomogram flavours
+        for f in Sample.FLAVOURS:
+            volume_path = f'{ROOT}/training/3d/data/{self.datagroup}/{f}/{self.idx}.mrc'
+            if os.path.exists(volume_path):
+                self.flavours[f] = volume_path
+            else:
+                print(f'Missing flavour {f} for sample {self.idx} in {self.datagroup}')
+
+        if len(self.flavours) == 0:
+            print(f'No available flavours for sample {self.idx} in {self.datagroup}')
+            self.valid = False
+
+    def load(self):
+        available_flavours = list(self.flavours.keys())
+        if 'cryocare' in available_flavours:
+            available_flavours.append('cryocare')  # double odds of selecting cryocare
+        flavours = random.sample(available_flavours, 2)
+        mixing_factor = random.uniform(0.0, 1.0)
+
+        img_a = mrcfile.read(self.flavours[flavours[0]])
+        img_b = mrcfile.read(self.flavours[flavours[1]])
+        img = img_a * mixing_factor + img_b * (1 - mixing_factor)
+
+        label = mrcfile.read(self.label_path)
+        validity = mrcfile.read(self.validity_path)
+
+        label[validity == 0] = 2
+        label[:16, :, :] = 2
+        label[-16:, :, :] = 2
+        label[:, :16, :] = 2
+        label[:, -16:, :] = 2
+        label[:, :, :16] = 2
+        label[:, :, -16:] = 2
+
+        if self.datagroup == 'Junk3D' or self.datagroup.startswith('Not'):
+            label[label == 1] = 0
+
+        return img, label
+
 
 class DataLoader:
     def __init__(self, features, batch_size=8, validation=False):
@@ -29,49 +94,19 @@ class DataLoader:
         for f in self.features:
             available_samples = [os.path.basename(n).split('.')[0] for n in glob.glob(f'{ROOT}/training/3d/data/{f}/raw/*.mrc')]
             for n in available_samples:
-                self.samples.append((f, n))
-
-        np.random.shuffle(self.samples)
-
-        for j in range(len(self.samples)):
-            if self.check_label_positivity(j):
-                self.positive_samples.append(self.samples[j])
+                sample = Sample(idx=n, datagroup=f)
+                if sample.valid:
+                    self.samples.append(sample)
 
         if self.validation:
             self.samples = [s for i, s in enumerate(self.samples) if i % 20 == 0]
         else:
             self.samples = [s for i, s in enumerate(self.samples) if i % 20 != 0]
 
+        self.positive_samples = [s for s in self.samples if s.is_positive]
+        np.random.shuffle(self.samples)
+
         print(f'Loaded {len(self.samples)} samples for {"validation" if self.validation else "training"}')
-
-    def get_sample(self, datagroup, index):
-        flavours = random.sample(['even', 'odd', 'cryocare', 'cryocare', 'raw'], 2) # cryocare twice, bias towards denoised
-        mixing_factor = random.uniform(0.0, 1.0)
-
-        img_a = mrcfile.read(f'{ROOT}/training/3d/data/{datagroup}/{flavours[0]}/{index}.mrc')
-        img_b = mrcfile.read(f'{ROOT}/training/3d/data/{datagroup}/{flavours[1]}/{index}.mrc')
-        img = img_a * mixing_factor + img_b * (1 - mixing_factor)
-
-        label = mrcfile.read(f'{ROOT}/training/3d/data/{datagroup}/label/{index}.mrc')
-        validity = mrcfile.read(f'{ROOT}/training/3d/data/{datagroup}/validity/{index}.mrc')  # binary mask of valid regions (1 = valid, 0 = invalid)
-
-        label[validity == 0] = 2 ## training output: 0 = background, 1 = feature, 2 = ignore
-        label[:16, :, :] = 2
-        label[-16:, :, :] = 2
-        label[:, :16, :] = 2
-        label[:, -16:, :] = 2
-        label[:, :, :16] = 2
-        label[:, :, -16:] = 2
-
-        if datagroup == 'Junk3D' or 'Not' in datagroup:
-            label[label == 1] = 0
-
-        return img, label
-
-    def check_label_positivity(self, idx):
-        sample = self.samples[idx]
-        label = mrcfile.read(f'{ROOT}/training/3d/data/{sample[0]}/label/{sample[1]}.mrc')
-        return np.sum(label == 1) > 0
 
     def augment(self, img, label):
         if self.validation:
@@ -130,15 +165,13 @@ class DataLoader:
     def sample_generator(self):
         while True:
             np.random.shuffle(self.samples)
-            np.random.shuffle(self.positive_samples)
             for j in range(len(self.samples)):
                 if j % self.batch_size == 0:
-                    datagroup, index = self.positive_samples[(j // self.batch_size) % len(self.positive_samples)]
+                    sample = random.choice(self.positive_samples)
                 else:
-                    datagroup, index = self.samples[j]
+                    sample = self.samples[j]
 
-
-                img, label = self.get_sample(datagroup, index)
+                img, label = sample.load()
                 if not self.validation:
                     img, label = self.augment(img, label)
                 img, label = self.preprocess(img, label)
@@ -186,5 +219,5 @@ def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, 
     cb_lr = tf.keras.callbacks.LearningRateScheduler(lr_decay, verbose=1)
 
     cb_csv = tf.keras.callbacks.CSVLogger(f'{ROOT}/training/3d/checkpoints/{title}/training_log.csv', append=True)
-    model.fit(training_ds, steps_per_epoch=training_steps * 4, validation_data=validation_ds, validation_steps=validation_steps, epochs=epochs, validation_freq=5, callbacks=[cb_checkpoint_val, cb_checkpoint_train, cb_lr, cb_csv])
+    model.fit(training_ds, steps_per_epoch=training_steps, validation_data=validation_ds, validation_steps=validation_steps, epochs=epochs, validation_freq=5, callbacks=[cb_checkpoint_val, cb_checkpoint_train, cb_lr, cb_csv])
 

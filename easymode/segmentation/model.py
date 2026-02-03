@@ -47,7 +47,7 @@ def masked_dice_loss(y_true, y_pred, smooth=1e-6):
 #     return 1.0 - masked_dice_loss(y_true, y_pred)
 
 def combined_masked_bce_dice_loss(y_true, y_pred, w_pos=3.0, w_neg=1.0):
-    return 1.0 * masked_weighted_bce_loss(y_true, y_pred, w_pos, w_neg) #+  0.7 * masked_dice_loss(y_true, y_pred)
+    return 1.0 * masked_weighted_bce_loss(y_true, y_pred, w_pos, w_neg) +  0.2 * masked_dice_loss(y_true, y_pred)
 
 
 class ResBlock3D(layers.Layer):
