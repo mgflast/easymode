@@ -7,6 +7,11 @@ import json
 MODEL_CACHE_DIR = cfg.settings["MODEL_DIRECTORY"]
 
 def package_checkpoint(title='', checkpoint_directory='', apix=10.0):
+    # Find checkpoint files
+    checkpoint_files = [f.replace('.index', '') for f in os.listdir(checkpoint_directory) if f.endswith('.index')]
+    checkpoint_path = os.path.join(checkpoint_directory, checkpoint_files[-1])
+
+    # Determine which model architecture to use
     if 'n2n' in title:
         from easymode.n2n.model import create
     elif 'ddw' in title:
@@ -14,10 +19,22 @@ def package_checkpoint(title='', checkpoint_directory='', apix=10.0):
     elif 'tilt' in title:
         from easymode.tiltfilter.model import create
     else:
-        from easymode.segmentation.model import create
-
-    checkpoint_files = [f.replace('.index', '') for f in os.listdir(checkpoint_directory) if f.endswith('.index')]
-    checkpoint_path = os.path.join(checkpoint_directory, checkpoint_files[-1])
+        # Segmentation model: determine v1 vs v2 architecture
+        # Method 1: Check if title contains "v2"
+        if 'v2' in title.lower():
+            from easymode.segmentation.model_v2 import create
+        else:
+            # Method 2: Check checkpoint data file size to infer architecture
+            checkpoint_data_file = checkpoint_path + '.data-00000-of-00001'
+            if os.path.exists(checkpoint_data_file):
+                checkpoint_size_mb = os.path.getsize(checkpoint_data_file) / (1024 * 1024)
+                if checkpoint_size_mb > 400:
+                    from easymode.segmentation.model import create
+                else:
+                    from easymode.segmentation.model_v2 import create
+            else:
+                # Fallback: default to v1 for backwards compatibility
+                from easymode.segmentation.model import create
 
     model = create()
     if 'tilt' in title:

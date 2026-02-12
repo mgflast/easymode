@@ -126,7 +126,15 @@ def load_model_weights(weights_path):
         from easymode.tiltfilter.model import create
         dummy_input = [tf.zeros((1, 256, 256, 1)), tf.zeros((1, 256, 256, 1))]
     else:
-        from easymode.segmentation.model import create
+        # Check file size to determine architecture version
+        # Large models (>400 MB) use old architecture, smaller models use new architecture
+        file_size_mb = os.path.getsize(weights_path) / (1024 * 1024)
+
+        if file_size_mb > 400:
+            from easymode.segmentation.model import create
+        else:
+            from easymode.segmentation.model_v2 import create
+
         dummy_input = tf.zeros((1, 160, 160, 160, 1))
 
     model = create()

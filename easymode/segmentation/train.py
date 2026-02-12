@@ -81,10 +81,11 @@ class Sample:
 
 
 class DataLoader:
-    def __init__(self, features, batch_size=8, validation=False):
+    def __init__(self, features, batch_size=8, validation=False, limit_z=False):
         self.features = features
         self.batch_size = batch_size
         self.validation = validation
+        self.limit_z = limit_z
         self.samples = list()
         self.positive_samples = list()
         self.load_data()
@@ -175,28 +176,39 @@ class DataLoader:
                 if not self.validation:
                     img, label = self.augment(img, label)
                 img, label = self.preprocess(img, label)
+                if self.limit_z:
+                    img = img[40:120, :, :, :]
+                    label = label[40:120, :, :, :]
                 yield img, label
 
     def as_generator(self, batch_size):
-        dataset = tf.data.Dataset.from_generator(self.sample_generator, output_signature=(tf.TensorSpec(shape=(160, 160, 160, 1), dtype=tf.float32), tf.TensorSpec(shape=(160, 160, 160, 1), dtype=tf.float32))).batch(batch_size=batch_size, drop_remainder=True).prefetch(tf.data.AUTOTUNE)
+        z_dim = 80 if self.limit_z else 160
+        dataset = tf.data.Dataset.from_generator(self.sample_generator, output_signature=(tf.TensorSpec(shape=(z_dim, 160, 160, 1), dtype=tf.float32), tf.TensorSpec(shape=(z_dim, 160, 160, 1), dtype=tf.float32))).batch(batch_size=batch_size, drop_remainder=True).prefetch(tf.data.AUTOTUNE)
         n_steps = len(self.samples) // batch_size
         return dataset, n_steps
 
 
-def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, lr_end=1e-5):
-    from easymode.segmentation.model import create
+def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, lr_end=1e-5, architecture_version=1, limit_z=False):
+    # Import appropriate model architecture
+    if architecture_version == 2:
+        from easymode.segmentation.model_v2 import create
+        print(f'\nTraining model v2 (new architecture) with features: {features}\n')
+    else:
+        from easymode.segmentation.model import create
+        print(f'\nTraining model v1 (original architecture) with features: {features}\n')
+
+    if limit_z:
+        print('Limiting Z dimension to central 80 voxels.\n')
 
     tf.config.run_functions_eagerly(False)
-
-    print(f'\nTraining model with features: {features}\n')
 
     with tf.distribute.MirroredStrategy().scope():
         model = create()
     model.optimizer.learning_rate.assign(lr_start)
 
     # data loaders
-    training_ds, training_steps = DataLoader(features, batch_size=batch_size, validation=False).as_generator(batch_size=batch_size)
-    validation_ds, validation_steps = DataLoader(features, batch_size=batch_size, validation=True).as_generator(batch_size=batch_size)
+    training_ds, training_steps = DataLoader(features, batch_size=batch_size, validation=False, limit_z=limit_z).as_generator(batch_size=batch_size)
+    validation_ds, validation_steps = DataLoader(features, batch_size=batch_size, validation=True, limit_z=limit_z).as_generator(batch_size=batch_size)
 
     # callbacks
     os.makedirs(f'{ROOT}/training/3d/checkpoints/{title}', exist_ok=True)

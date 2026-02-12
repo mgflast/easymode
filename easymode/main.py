@@ -16,6 +16,8 @@ def main():
         train_parser.add_argument('-b', "--batch_size", type=int, help="Batch size for training (default 8).", default=8)
         train_parser.add_argument('-ls', "--lr_start", type=float, help="Initial learning rate for the optimizer (default 5e-3).", default=5e-3)
         train_parser.add_argument('-le', "--lr_end", type=float, help="Final learning rate for the optimizer (default 5e-5).", default=5e-5)
+        train_parser.add_argument('-v', "--version", type=int, choices=[1, 2], default=1, help="Model architecture version: 1 for original architecture (default), 2 for new smaller architecture with improvements.")
+        train_parser.add_argument('--limit_z', action='store_true', help="Crop training samples to the central 80 voxels along Z (first dimension). Faster training and focuses on the most accurately labelled region.")
 
     set_params = subparsers.add_parser('set', help='Set environment variables.')
     set_params.add_argument('--cache-directory', type=str, help="Path to the directory to store and search for easymode network weights in.")
@@ -115,6 +117,8 @@ def main():
                     epochs=args.epochs,
                     lr_start=args.lr_start,
                     lr_end=args.lr_end,
+                    architecture_version=args.version,
+                    limit_z=args.limit_z,
                     )
     elif args.command == 'tilt_train':
         from easymode.tiltfilter.train import train_model
