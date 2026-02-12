@@ -10,7 +10,6 @@ def _run(cmd, capture=False):
         exit()
     return ret.stdout
 
-
 def pick(data_directory, target, output_directory, threshold, spacing, size, binning=2, tomostar=True, filament=False, per_filament_star_file=False, filament_length=500, centroid=False, min_particles=0):
     if output_directory is None:
         output_directory = f'coordinates/{target}'
@@ -28,7 +27,7 @@ def pick(data_directory, target, output_directory, threshold, spacing, size, bin
           f'n_processes: {cpu_count()}\n'
           f'rename to .tomostar: {tomostar}\n'
           f'per_filament_star_file: {per_filament_star_file}\n'
-          f'filament_length: {filament_length} nm\n'
+          f'filament_length: {filament_length} Å\n'
           f'centroid: {centroid}\n')
 
     command = f'ais pick -t {target} -d {data_directory} -ou {output_directory} -threshold {threshold} -spacing {spacing} -size {size} -b {binning} -p {cpu_count()} -min-particles {min_particles}'
