@@ -212,6 +212,7 @@ def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, bat
 
             with mrcfile.new(output_file, overwrite=True) as m:
                 m.set_data(-1.0 * np.ones((10, 10, 10), dtype=np.float32))
+                m.voxel_size = 10.0
                 wrote_temporary = True
 
             segmented_volume, segmented_volume_apix = segment_tomogram(model, tomogram_path, tta, batch_size, model_apix, input_apix)
@@ -266,7 +267,7 @@ def dispatch_segment( feature, data_directory, output_directory, tta=1, batch_si
 
     tomograms = [f for f in sorted(set(tomograms)) if os.path.splitext(f)[-1] == '.mrc']
 
-    print(f'Found {len(tomograms)} tomograms to segment.\n')
+    print(f'Found {len(tomograms)} tomograms to segment. \n')
 
     if len(tomograms) == 0:
         return
@@ -276,6 +277,8 @@ def dispatch_segment( feature, data_directory, output_directory, tta=1, batch_si
         print(f'Could not find model for {feature}! Exiting.')
         return
     model_apix = metadata["apix"]
+
+    print(f'Using model: {model_path}, inference at {model_apix} Å/px. \n')
 
     os.makedirs(output_directory, exist_ok=True)
 

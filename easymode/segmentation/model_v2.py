@@ -1,58 +1,6 @@
 import tensorflow as tf
 from tensorflow.keras import layers, Model
 
-# GroupNormalization compatibility layer
-try:
-    # TensorFlow 2.11+ has GroupNormalization built-in
-    GroupNormalization = layers.GroupNormalization
-except AttributeError:
-    try:
-        # Try tensorflow_addons for older TensorFlow versions
-        import tensorflow_addons as tfa
-        GroupNormalization = tfa.layers.GroupNormalization
-    except ImportError:
-        # Fallback: implement custom GroupNormalization
-        class GroupNormalization(layers.Layer):
-            def __init__(self, groups=8, epsilon=1e-5, **kwargs):
-                super().__init__(**kwargs)
-                self.groups = groups
-                self.epsilon = epsilon
-
-            def build(self, input_shape):
-                self.gamma = self.add_weight(
-                    name='gamma',
-                    shape=(input_shape[-1],),
-                    initializer='ones',
-                    trainable=True
-                )
-                self.beta = self.add_weight(
-                    name='beta',
-                    shape=(input_shape[-1],),
-                    initializer='zeros',
-                    trainable=True
-                )
-                super().build(input_shape)
-
-            def call(self, inputs):
-                # Reshape: [N, D, H, W, C] -> [N, D, H, W, G, C//G]
-                input_shape = tf.shape(inputs)
-                batch_size = input_shape[0]
-
-                # Reshape to separate groups
-                x = tf.reshape(inputs, [batch_size, -1, self.groups, input_shape[-1] // self.groups])
-
-                # Calculate mean and variance per group
-                mean, variance = tf.nn.moments(x, axes=[1, 3], keepdims=True)
-
-                # Normalize
-                x = (x - mean) / tf.sqrt(variance + self.epsilon)
-
-                # Reshape back
-                x = tf.reshape(x, input_shape)
-
-                # Scale and shift
-                return x * self.gamma + self.beta
-
 def masked_bce_loss(y_true, y_pred):
     ignore = tf.equal(y_true, 2.0)
     y_true_bin = tf.where(ignore, 0.0, y_true)
@@ -84,31 +32,30 @@ def masked_dice_loss(y_true, y_pred, smooth=1e-6):
     union = tf.reduce_sum(y_true_masked) + tf.reduce_sum(y_pred_masked)
 
     dice = (2.0 * intersection + smooth) / (union + smooth)
-    return 1.0 - dice\
+    return 1.0 - dice
+
+# def masked_dice(y_true, y_pred):
+#     return 1.0 - masked_dice_loss(y_true, y_pred)
 
 def combined_masked_bce_dice_loss(y_true, y_pred):
-    return 1.0 * masked_bce_loss(y_true, y_pred) +  0.3 * masked_dice_loss(y_true, y_pred)
+    return 1.0 * masked_bce_loss(y_true, y_pred) #+  0.7 * masked_dice_loss(y_true, y_pred)
 
 
 class ResBlock3D(layers.Layer):
-    """3D Residual block with group normalization and ReLU activation."""
+    """3D Residual block with batch normalization and ReLU activation."""
 
-    def __init__(self, filters: int, dropout_rate: float = 0.0, **kwargs):
+    def __init__(self, filters: int, **kwargs):
         super().__init__(**kwargs)
         self.filters = filters
-        self.dropout_rate = dropout_rate
 
         # First conv layer
         self.conv1 = layers.Conv3D(filters, 3, padding='same', use_bias=False)
-        self.bn1 = GroupNormalization(groups=8)
+        self.bn1 = layers.BatchNormalization()
         self.relu1 = layers.ReLU()
-
-        # Spatial dropout for 3D regularization
-        self.dropout = layers.SpatialDropout3D(dropout_rate) if dropout_rate > 0 else None
 
         # Second conv layer
         self.conv2 = layers.Conv3D(filters, 3, padding='same', use_bias=False)
-        self.bn2 = GroupNormalization(groups=8)
+        self.bn2 = layers.BatchNormalization()
 
         # Skip connection adjustment if needed
         self.skip_conv = None
@@ -119,17 +66,13 @@ class ResBlock3D(layers.Layer):
         # Add skip connection conv if input channels != output channels
         if input_shape[-1] != self.filters:
             self.skip_conv = layers.Conv3D(self.filters, 1, padding='same', use_bias=False)
-            self.skip_bn = GroupNormalization(groups=8)
+            self.skip_bn = layers.BatchNormalization()
 
     def call(self, inputs, training=None):
         # Main path
         x = self.conv1(inputs)
         x = self.bn1(x, training=training)
         x = self.relu1(x)
-
-        # Apply spatial dropout
-        if self.dropout is not None:
-            x = self.dropout(x, training=training)
 
         x = self.conv2(x)
         x = self.bn2(x, training=training)
@@ -147,7 +90,7 @@ class ResBlock3D(layers.Layer):
 
 class EncoderBlock(layers.Layer):
 
-    def __init__(self, filters: int, stride: int = 1, dropout_rate: float = 0.0, **kwargs):
+    def __init__(self, filters: int, stride: int = 1, **kwargs):
         super().__init__(**kwargs)
         self.filters = filters
         self.stride = stride
@@ -157,12 +100,12 @@ class EncoderBlock(layers.Layer):
                 filters, kernel_size=3, strides=stride,
                 padding='same', use_bias=False
             )
-            self.downsample_bn = GroupNormalization(groups=8)
+            self.downsample_bn = layers.BatchNormalization()
             self.downsample_relu = layers.ReLU()
         else:
             self.downsample = None
 
-        self.res_block = ResBlock3D(filters, dropout_rate=dropout_rate)
+        self.res_block = ResBlock3D(filters)
 
     def call(self, inputs, training=None):
         x = inputs
@@ -178,7 +121,7 @@ class EncoderBlock(layers.Layer):
 
 class DecoderBlock(layers.Layer):
 
-    def __init__(self, filters: int, upsample_kernel_size: int = 2, dropout_rate: float = 0.0, **kwargs):
+    def __init__(self, filters: int, upsample_kernel_size: int = 2, **kwargs):
         super().__init__(**kwargs)
         self.filters = filters
         self.upsample_kernel_size = upsample_kernel_size
@@ -188,12 +131,12 @@ class DecoderBlock(layers.Layer):
                 filters, kernel_size=upsample_kernel_size,
                 strides=upsample_kernel_size, padding='same', use_bias=False
             )
-            self.upsample_bn = GroupNormalization(groups=8)
+            self.upsample_bn = layers.BatchNormalization()
             self.upsample_relu = layers.ReLU()
         else:
             self.upsample = None
 
-        self.res_block = ResBlock3D(filters, dropout_rate=dropout_rate)
+        self.res_block = ResBlock3D(filters)
 
     def call(self, inputs, skip_connection=None, training=None):
         x = inputs
@@ -214,23 +157,23 @@ class DecoderBlock(layers.Layer):
 
 
 class UNet(Model):
-    def __init__(self, dropout_rate: float = 0.1, **kwargs):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        filters = [24, 48, 96, 192, 384, 512]
+        filters = [32, 64, 128, 256, 512, 1024]
         strides = [1, 2, 2, 2, 2, 2]
         upsample_kernel_sizes = [1, 2, 2, 2, 2, 2]
 
         self.encoders = []
         for i, (f, s) in enumerate(zip(filters, strides)):
-            self.encoders.append(EncoderBlock(f, stride=s, dropout_rate=dropout_rate, name=f'encoder_{i}'))
+            self.encoders.append(EncoderBlock(f, stride=s, name=f'encoder_{i}'))
 
         self.decoders = []
         decoder_filters = filters[:-1][::-1]
         decoder_upsample = upsample_kernel_sizes[1:][::-1]
 
         for i, (f, us) in enumerate(zip(decoder_filters, decoder_upsample)):
-            self.decoders.append(DecoderBlock(f, upsample_kernel_size=us, dropout_rate=dropout_rate, name=f'decoder_{i}'))
+            self.decoders.append(DecoderBlock(f, upsample_kernel_size=us, name=f'decoder_{i}'))
 
         self.final_conv = layers.Conv3D(1, 1, activation='sigmoid', name='output')
 
@@ -256,6 +199,7 @@ class UNet(Model):
             skip = skip_connections[i] if i < len(skip_connections) else None
             x = decoder(x, skip_connection=skip, training=training)
 
+        # Final output
         output = self.final_conv(x)
         return output
 

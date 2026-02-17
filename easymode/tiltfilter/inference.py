@@ -28,8 +28,6 @@ class TiltSelectionJob:
         self.started = False
         self.report = False
 
-        print(f'job on --tiltstack {self.tiltstack} and --tomostar parsed as {self.tomostar_file}')
-
     def parse_inputs(self):
         # Find tiltstack file
         if os.path.isfile(self.tiltstack):
@@ -148,7 +146,7 @@ class TiltSelectionJob:
             if os.path.getmtime(self.output_file) > self.init_time:  # output exists, written after process started - another thread did it
                 return None
             if not overwrite:  # output exists, and we don't want to overwrite
-                return 'skipped (output already exists)' if self.report else None
+                return f'skipped (output already exists at {self.output_file})' if self.report else None
 
         with open(self.output_file, 'w') as f:
             pass # placeholder file made to signal this stack is being processed.
@@ -194,7 +192,7 @@ class TiltSelectionJob:
         # proc_stack = np.squeeze(np.array(proc_stack, dtype=np.float32))
         # mrcfile.new(self.output_file.replace('.tomostar', '.mrc'), overwrite=overwrite, data=proc_stack)
 
-        return None
+        return "done"
 
 def inference_thread(job_list, model_path, gpu, tta, overwrite, threshold=0.5, is_reporter_thread=False):
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
@@ -211,9 +209,7 @@ def inference_thread(job_list, model_path, gpu, tta, overwrite, threshold=0.5, i
         job.report = is_reporter_thread
         job_out = job.process(model, tta, overwrite, threshold=threshold)
         etc = time.strftime('%H:%M:%S', time.gmtime((time.time() - process_start_time) / j * (len(job_list) - j)))
-        if job_out is None:
-            print(f"{j}/{len(job_list)} (on GPU {gpu}) - {job.output_file} - etc {etc}")
-        else:
+        if job_out is not None:
             print(f"{j}/{len(job_list)} (on GPU {gpu}) - {job.output_file} - etc {etc}" + f" - {job_out}")
 
 

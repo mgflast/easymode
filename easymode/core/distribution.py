@@ -56,15 +56,16 @@ def get_remote_metadata(model_title, _2d=False):
     return metadata
 
 
-def timestamps_differ(local_meta, remote_meta):
-    if not remote_meta:
+def is_remote_newer(local_meta, remote_meta):
+    if not local_meta or not remote_meta:
         return False
+
+    local_ts = local_meta.get("timestamp")
     remote_ts = remote_meta.get("timestamp")
-    if not remote_ts:
+
+    if not local_ts or not remote_ts:
         return False
-    local_ts = local_meta.get("timestamp") if local_meta else None
-    if local_ts is None:
-        return True
+
     return remote_ts > local_ts
 
 
@@ -107,7 +108,7 @@ def get_model(model_title, force_download=False, silent=False, _2d=False):
         print(f"\nModel '{model_title}' not found. For an up-to-date list of available models, run 'easymode list'\n")
         return None, None
 
-    needs_update = timestamps_differ(local_meta, remote_meta)
+    needs_update = is_remote_newer(local_meta, remote_meta)
     if force_download or not weights_local or needs_update:
         if not silent:
             if not weights_local: print(f"\nThe required network weights for {model_title} are not available in the local cache.")

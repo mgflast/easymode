@@ -1,15 +1,16 @@
 import tensorflow as tf
 from tensorflow.keras import layers, Model
 
-def masked_weighted_bce_loss(y_true, y_pred, w_pos=3.0, w_neg=1.0):
+def masked_bce_loss(y_true, y_pred, fn_weight=3.0):
     ignore = tf.equal(y_true, 2.0)
-
     y_true_bin = tf.where(ignore, 0.0, y_true)
-    y_pred = tf.clip_by_value(y_pred, 1e-7, 1.0 - 1e-7)
 
-    per_voxel = (
-        - w_pos * y_true_bin * tf.math.log(y_pred)
-        - w_neg * (1.0 - y_true_bin) * tf.math.log(1.0 - y_pred)
+    eps = tf.keras.backend.epsilon()
+    y_pred = tf.clip_by_value(y_pred, eps, 1.0 - eps)
+
+    per_voxel = -(
+        fn_weight * y_true_bin * tf.math.log(y_pred) +
+        (1.0 - y_true_bin) * tf.math.log(1.0 - y_pred)
     )
 
     mask = tf.cast(tf.logical_not(ignore), y_pred.dtype)
@@ -17,7 +18,6 @@ def masked_weighted_bce_loss(y_true, y_pred, w_pos=3.0, w_neg=1.0):
 
     denom = tf.reduce_sum(mask)
     return tf.reduce_sum(per_voxel) / tf.maximum(denom, 1.0)
-
 
 def masked_accuracy(y_true, y_pred):
     ignore = tf.equal(y_true, 2.0)
@@ -46,8 +46,8 @@ def masked_dice_loss(y_true, y_pred, smooth=1e-6):
 # def masked_dice(y_true, y_pred):
 #     return 1.0 - masked_dice_loss(y_true, y_pred)
 
-def combined_masked_bce_dice_loss(y_true, y_pred, w_pos=3.0, w_neg=1.0):
-    return 1.0 * masked_weighted_bce_loss(y_true, y_pred, w_pos, w_neg) +  0.2 * masked_dice_loss(y_true, y_pred)
+def combined_masked_bce_dice_loss(y_true, y_pred):
+    return 1.0 * masked_bce_loss(y_true, y_pred) #+  0.7 * masked_dice_loss(y_true, y_pred)
 
 
 class ResBlock3D(layers.Layer):

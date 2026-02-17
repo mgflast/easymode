@@ -31,7 +31,7 @@ def get_presigned_url(filename, size, content_type):
 
     # Handle file too large errors
     if resp.status_code == 413:
-        print(f"File is too large. Maximum allowed size is currently 1.5 GB. Please contact me if you would like to submit larger files: mlast@mrc-lmb.cam.ac.uk")
+        print(f"File is too large. Maximum allowed size is currently 2.0 GB. Please contact me if you would like to submit larger files: mlast@mrc-lmb.cam.ac.uk")
         exit(1)
 
     # Handle invalid file type errors
@@ -49,33 +49,11 @@ def put(url, data, content_type, show_progress=False):
     headers = {"Content-Type": content_type}
 
     if show_progress and len(data) > 1024 * 1024:
-        class ChunkedReader:
-            def __init__(self, data, chunk_size=10*1024*1024):
-                self.data = data
-                self.pos = 0
-                self.chunk_size = chunk_size
-                self.pbar = tqdm(total=len(data), unit='B', unit_scale=True, unit_divisor=1024)
-
-            def read(self, size=-1):
-                if size == -1 or size > self.chunk_size:
-                    size = self.chunk_size
-
-                chunk = self.data[self.pos:self.pos + size]
-                self.pos += len(chunk)
-                self.pbar.update(len(chunk))
-                return chunk
-
-            def __len__(self):
-                return len(self.data)
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *args):
-                self.pbar.close()
-
-        with ChunkedReader(data) as reader:
-            resp = requests.put(url, data=reader, headers=headers)
+        from io import BytesIO
+        bio = BytesIO(data)
+        headers["Content-Length"] = str(len(data))
+        with tqdm.wrapattr(bio, "read", total=len(data), unit='B', unit_scale=True, unit_divisor=1024) as wrapped:
+            resp = requests.put(url, data=wrapped, headers=headers)
     else:
         resp = requests.put(url, data=data, headers=headers)
 
@@ -95,7 +73,7 @@ def report(volume_path, model, contact, comment):
 
     base = f"{datetime.now(timezone.utc).strftime('%y%m%d_%H%M')}_{uuid.uuid4().hex[:8]}"
 
-    print(f'\033[96mReading volume file...\033[0m')
+    print(f'\033[96mReading .mrc...\033[0m')
     with open(vol, 'rb') as f:
         vol_bytes = f.read()
 

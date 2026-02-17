@@ -2,11 +2,12 @@ import glob, os, mrcfile
 from easymode.segmentation.augmentations import *
 import tensorflow as tf
 
-AUGMENTATIONS_ROT_XZ_YZ = 0.5 #0.33 #0.333
-AUGMENTATIONS_ROT_XY = 0.5 #0.33 #0.333
-AUGMENTATIONS_MISSING_WEDGE = 0.0 # 0.0
-AUGMENTATIONS_GAUSSIAN = 0.5 #0.33 #0.2
-AUGMENTATIONS_SCALE = 0.33 #0.33
+AUGMENTATIONS_ROT_XZ_YZ = 0.5
+AUGMENTATIONS_ROT_XY = 0.5
+AUGMENTATIONS_MISSING_WEDGE = 0.25
+AUGMENTATIONS_GAUSSIAN = 0.33
+AUGMENTATIONS_SCALE = 0.33
+AUGMENTATIONS_MIXUP = 0.2
 
 DEBUG = False
 ROOT = '/cephfs/mlast/compu_projects/easymode'
@@ -88,6 +89,7 @@ class DataLoader:
         self.limit_z = limit_z
         self.samples = list()
         self.positive_samples = list()
+        self.negative_samples = list()
         self.load_data()
 
     def load_data(self):
@@ -105,9 +107,19 @@ class DataLoader:
             self.samples = [s for i, s in enumerate(self.samples) if i % 20 != 0]
 
         self.positive_samples = [s for s in self.samples if s.is_positive]
+        self.negative_samples = [s for s in self.samples if not s.is_positive]
         np.random.shuffle(self.samples)
 
         print(f'Loaded {len(self.samples)} samples for {"validation" if self.validation else "training"}')
+
+    def mixup(self, img, label):
+        negative_sample = random.choice(self.negative_samples)
+        negative_img, _ = negative_sample.load()
+        mixing_factor = random.uniform(0.0, 0.5)
+
+        img = img * (1 - mixing_factor) + negative_img * mixing_factor
+        return img, label
+
 
     def augment(self, img, label):
         if self.validation:
@@ -142,6 +154,10 @@ class DataLoader:
         if random.uniform(0.0, 1.0) < AUGMENTATIONS_SCALE:
             img, label = scale(img, label)
 
+        # AUGMENTATION 9 - mixup between the sample and a random negative sample
+        if random.uniform(0.0, 1.0) < AUGMENTATIONS_MIXUP:
+            img, label = self.mixup(img, label)
+
         label[:16, :, :] = 2
         label[-16:, :, :] = 2
         label[:, :16, :] = 2
@@ -167,7 +183,7 @@ class DataLoader:
         while True:
             np.random.shuffle(self.samples)
             for j in range(len(self.samples)):
-                if j % self.batch_size == 0:
+                if j % 4 == 0:
                     sample = random.choice(self.positive_samples)
                 else:
                     sample = self.samples[j]
@@ -177,12 +193,12 @@ class DataLoader:
                     img, label = self.augment(img, label)
                 img, label = self.preprocess(img, label)
                 if self.limit_z:
-                    img = img[40:120, :, :, :]
-                    label = label[40:120, :, :, :]
+                    img = img[32:128, :, :]
+                    label = label[32:128, :, :]
                 yield img, label
 
     def as_generator(self, batch_size):
-        z_dim = 80 if self.limit_z else 160
+        z_dim = 96 if self.limit_z else 160
         dataset = tf.data.Dataset.from_generator(self.sample_generator, output_signature=(tf.TensorSpec(shape=(z_dim, 160, 160, 1), dtype=tf.float32), tf.TensorSpec(shape=(z_dim, 160, 160, 1), dtype=tf.float32))).batch(batch_size=batch_size, drop_remainder=True).prefetch(tf.data.AUTOTUNE)
         n_steps = len(self.samples) // batch_size
         return dataset, n_steps
@@ -198,9 +214,11 @@ def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, 
         print(f'\nTraining model v1 (original architecture) with features: {features}\n')
 
     if limit_z:
-        print('Limiting Z dimension to central 80 voxels.\n')
+        print('Limiting Z dimension to central 96 voxels.\n')
 
     tf.config.run_functions_eagerly(False)
+
+    print(f'\nTraining model with features: {features}\n')
 
     with tf.distribute.MirroredStrategy().scope():
         model = create()
