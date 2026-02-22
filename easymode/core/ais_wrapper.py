@@ -10,7 +10,7 @@ def _run(cmd, capture=False):
         exit()
     return ret.stdout
 
-def pick(data_directory, target, output_directory, threshold, spacing, size, binning=2, tomostar=True, filament=False, per_filament_star_file=False, filament_length=500, centroid=False, min_particles=0):
+def pick(data_directory, target, output_directory, threshold, spacing, size, binning=2, tomostar=True, filament=False, per_filament_star_file=False, filament_length=500, centroid=False, min_particles=0, rotation_per_sample=0.0):
     if output_directory is None:
         output_directory = f'coordinates/{target}'
 
@@ -28,11 +28,12 @@ def pick(data_directory, target, output_directory, threshold, spacing, size, bin
           f'rename to .tomostar: {tomostar}\n'
           f'per_filament_star_file: {per_filament_star_file}\n'
           f'filament_length: {filament_length} Å\n'
+          f'rotation_per_sample: {rotation_per_sample} degrees\n'
           f'centroid: {centroid}\n')
 
     command = f'ais pick -t {target} -d {data_directory} -ou {output_directory} -threshold {threshold} -spacing {spacing} -size {size} -b {binning} -p {cpu_count()} -min-particles {min_particles}'
     if filament:
-        command += f' -filament -length {filament_length}'
+        command += f' -filament -length {filament_length} --twist {rotation_per_sample}'
     if centroid:
         command += ' -centroid'
     _run(command)
@@ -63,7 +64,7 @@ def pick(data_directory, target, output_directory, threshold, spacing, size, bin
 
     if filament:
         if per_filament_star_file:
-            print(f"\n\033[38;5;208m{''}found {n_particles} particles along {n_filaments} filaments. that's {n_particles * spacing / 10000.0} um of {target} :) {''}\033[0m\n")
+            print(f"\n\033[38;5;208m{''}found {n_particles} particles along {n_filaments} filaments. that's {n_particles * spacing / 10000.0:.2f} um of {target} :) {''}\033[0m\n")
         else:
             print(f"\n\033[38;5;208m{''}found {n_particles} particles in total. that's {n_particles * spacing / 10000.0} um of {target} :) {''}\033[0m\n")
     else:
@@ -79,7 +80,7 @@ def pick(data_directory, target, output_directory, threshold, spacing, size, bin
           f"--box 64 "
           f"--diameter 250 "
           f"--relative_output_paths "
-          f"--2d "
+          f"--3d "
           f"\n\n"
           f"(but make sure you adapt the parameters to your use case)\n"
           f"\033[0m")

@@ -306,8 +306,18 @@ def dispatch_segment( feature, data_directory, output_directory, tta=1, batch_si
         p.start()
         time.sleep(2)
 
-    for p in processes:
-        p.join()
+    try:
+        for p in processes:
+            p.join()
+    except KeyboardInterrupt:
+        for p in processes:
+            p.terminate()
+        for p in processes:
+            p.join()
+        for path in glob.glob(os.path.join(output_directory, f'*__{feature}.mrc')):
+            if os.path.getsize(path) < 10_000:
+                os.remove(path)
+        return
 
     print()
     print(f'\033[92mSegmentation finished!\033[0m')

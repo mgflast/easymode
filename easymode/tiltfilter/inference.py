@@ -192,7 +192,7 @@ class TiltSelectionJob:
         # proc_stack = np.squeeze(np.array(proc_stack, dtype=np.float32))
         # mrcfile.new(self.output_file.replace('.tomostar', '.mrc'), overwrite=overwrite, data=proc_stack)
 
-        return "done"
+        return f"{df['tiltInclude'].sum()} tilts discarded"
 
 def inference_thread(job_list, model_path, gpu, tta, overwrite, threshold=0.5, is_reporter_thread=False):
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)

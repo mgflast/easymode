@@ -64,7 +64,7 @@ def scale(img, label):
         remainder = box_size - zoomed_img.shape[0] - 2 * pad_width
 
         img = np.pad(zoomed_img, [(pad_width, pad_width + remainder)] * 3, mode='reflect')
-        label = np.pad(zoomed_label, [(pad_width, pad_width + remainder)] * 3, mode='reflect')
+        label = np.pad(zoomed_label, [(pad_width, pad_width + remainder)] * 3, mode='constant', constant_values=2)
     else:
         zoomed_img = zoom(img, factor, order=1)
         zoomed_label = zoom(label, factor, order=0)

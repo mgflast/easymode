@@ -72,6 +72,7 @@ def main():
     pick.add_argument('--size', required=False, type=float, default=10.0, help="Minimum particle size in cubic Angstrom.")
     pick.add_argument('--no_tomostar', dest='tomostar', action='store_false',help='Include this flag in order NOT to rename tomograms in the .star files from etc_10.00Apx.mrc to etc.tomostar.')
     pick.add_argument("--filament", action='store_true', help="Trace filaments & sample coordinates at a given spacing. If not set, will pick isolated particles. See Ais docs.")
+    pick.add_argument("--twist", type=float, default=0.0, help="For filament tracing: increment rlnAngleRot by this amount for each coordinate placed along the filament (default: 0.0)")
     pick.add_argument('--length', required=False, type=float, default=500.0, help="For filament tracing: minimum filament length to place picks along, in Angstrom (default 500).")
     pick.add_argument('--separate_filaments', action='store_true', help='For filament tracing: write one .star file per filament instead of one per tomogram.')
     pick.add_argument('--centroid', action='store_true', help='When picking globular particles, set this flag to sample coordinates at the centroid of each connected component instead of at the deepest point in the threshold level isosurface. Use only when individual particles are well separated!')
@@ -203,6 +204,7 @@ def main():
              binning=args.binning,
              tomostar=args.tomostar,
              filament=args.filament,
+             rotation_per_sample=args.twist,
              per_filament_star_file=args.separate_filaments,
              filament_length=args.length,
              centroid=args.centroid,

@@ -1,7 +1,7 @@
 import tensorflow as tf
 from tensorflow.keras import layers, Model
 
-def masked_bce_loss(y_true, y_pred, fn_weight=3.0):
+def masked_bce_loss(y_true, y_pred, fn_weight=1.0):
     ignore = tf.equal(y_true, 2.0)
     y_true_bin = tf.where(ignore, 0.0, y_true)
 
