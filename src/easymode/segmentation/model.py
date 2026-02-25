@@ -1,27 +1,43 @@
 import tensorflow as tf
 from tensorflow.keras import layers, Model
 
-def masked_bce_loss(y_true, y_pred):
+def masked_bce_loss(y_true, y_pred, fn_weight=1.0):
     ignore = tf.equal(y_true, 2.0)
     y_true_bin = tf.where(ignore, 0.0, y_true)
-    per_voxel = tf.keras.losses.binary_crossentropy(y_true_bin, y_pred)
-    mask = tf.squeeze(tf.cast(tf.logical_not(ignore), y_pred.dtype), axis=-1)
+
+    eps = tf.keras.backend.epsilon()
+    y_pred = tf.clip_by_value(y_pred, eps, 1.0 - eps)
+
+    per_voxel = -(
+        fn_weight * y_true_bin * tf.math.log(y_pred) +
+        (1.0 - y_true_bin) * tf.math.log(1.0 - y_pred)
+    )
+
+    mask = tf.cast(tf.logical_not(ignore), y_pred.dtype)
     per_voxel = per_voxel * mask
+
     denom = tf.reduce_sum(mask)
     return tf.reduce_sum(per_voxel) / tf.maximum(denom, 1.0)
 
-def masked_accuracy(y_true, y_pred):
+def masked_precision(y_true, y_pred):
     ignore = tf.equal(y_true, 2.0)
-    y_true_bin = tf.where(ignore, 0.0, y_true)
-    y_pred_bin = tf.cast(y_pred > 0.5, y_true_bin.dtype)
+    y_true_bin = tf.cast(tf.where(ignore, 0.0, y_true), tf.float32)
+    y_pred_bin = tf.cast(y_pred > 0.5, tf.float32)
+    valid = tf.cast(tf.logical_not(ignore), tf.float32)
 
-    valid = tf.logical_not(ignore)
-    correct = tf.equal(y_true_bin, y_pred_bin)
-    correct = tf.logical_and(correct, valid)
+    tp = tf.reduce_sum(y_pred_bin * y_true_bin * valid)
+    fp = tf.reduce_sum(y_pred_bin * (1.0 - y_true_bin) * valid)
+    return tp / tf.maximum(tp + fp, 1.0)
 
-    correct = tf.cast(correct, y_pred.dtype)
-    denom = tf.reduce_sum(tf.cast(valid, y_pred.dtype))
-    return tf.reduce_sum(correct) / tf.maximum(denom, 1.0)
+def masked_recall(y_true, y_pred):
+    ignore = tf.equal(y_true, 2.0)
+    y_true_bin = tf.cast(tf.where(ignore, 0.0, y_true), tf.float32)
+    y_pred_bin = tf.cast(y_pred > 0.5, tf.float32)
+    valid = tf.cast(tf.logical_not(ignore), tf.float32)
+
+    tp = tf.reduce_sum(y_pred_bin * y_true_bin * valid)
+    fn = tf.reduce_sum((1.0 - y_pred_bin) * y_true_bin * valid)
+    return tp / tf.maximum(tp + fn, 1.0)
 
 def masked_dice_loss(y_true, y_pred, smooth=1e-6):
     mask = tf.cast(y_true != 2, tf.float32)
@@ -34,11 +50,11 @@ def masked_dice_loss(y_true, y_pred, smooth=1e-6):
     dice = (2.0 * intersection + smooth) / (union + smooth)
     return 1.0 - dice
 
-# def masked_dice(y_true, y_pred):
-#     return 1.0 - masked_dice_loss(y_true, y_pred)
+def masked_dice(y_true, y_pred):
+    return 1.0 - masked_dice_loss(y_true, y_pred)
 
 def combined_masked_bce_dice_loss(y_true, y_pred):
-    return 0.3 * masked_bce_loss(y_true, y_pred) +  0.7 * masked_dice_loss(y_true, y_pred)
+    return masked_bce_loss(y_true, y_pred) + masked_dice_loss(y_true, y_pred)
 
 
 class ResBlock3D(layers.Layer):
@@ -180,9 +196,8 @@ class UNet(Model):
         self.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
             loss=combined_masked_bce_dice_loss,
-            metrics=[masked_accuracy],
-            run_eagerly=False,
-            steps_per_execution=16,
+            metrics=[masked_precision, masked_recall, masked_bce_loss, masked_dice],
+            run_eagerly=False
         )
 
     def call(self, inputs, training=None):

@@ -115,7 +115,7 @@ def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, model_apix=10.0,
         volume = m.data.astype(np.float32)
         volume_apix = m.voxel_size.x
         oj, ok, ol = volume.shape
-        if volume_apix == 1.0 and input_apix is not None and input_apix != 0.0:
+        if volume_apix <= 1.0 and input_apix is None:
             print(f'warning: {tomogram_path} header lists voxel size as 1.0 A/px, which is probably incorrect. We assume it is really 10.0 Å/px.')
             volume_apix = 10.0
 
@@ -130,6 +130,7 @@ def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, model_apix=10.0,
     if abs(scale - 1.0) > 0.05:
         from scipy.ndimage import zoom
         volume = zoom(volume, scale, order=1)
+
 
     # preprocess: normalize & pad
     _j, _k, _l = volume.shape
@@ -211,6 +212,7 @@ def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, bat
 
             with mrcfile.new(output_file, overwrite=True) as m:
                 m.set_data(-1.0 * np.ones((10, 10, 10), dtype=np.float32))
+                m.voxel_size = 10.0
                 wrote_temporary = True
 
             segmented_volume, segmented_volume_apix = segment_tomogram(model, tomogram_path, tta, batch_size, model_apix, input_apix)
@@ -224,10 +226,14 @@ def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, bat
                 os.remove(output_file)
             print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {feature} - {os.path.basename(tomogram_path)} - ERROR: {e}")
 
+def dispatch_segment( feature, data_directory, output_directory, tta=1, batch_size=8, overwrite=False, data_format='int8', gpus=None, data_apix=None ):
+    if isinstance(data_directory, (list, tuple)):
+        patterns = list(data_directory)
+    else:
+        patterns = [data_directory]
 
-def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_size=8, overwrite=False, data_format='int8', gpus=None, data_apix=None):
     if output_directory is None:
-        output_directory = data_directory
+        output_directory = 'segmented'
 
     if gpus is None:
         gpus = list(range(0, len(tf.config.list_physical_devices('GPU'))))
@@ -236,20 +242,32 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
 
     if len(gpus) == 0:
         print("\033[93m" + "warning: no GPUs detected. processing will continue, but using CPUs only!" + "\033[0m")
+        gpus = [-1]
 
-    print(f'easymode segment\n'
-          f'feature: {feature}\n'
-          f'data_directory: {data_directory}\n'
-          f'output_directory: {output_directory}\n'
-          f'output_format: {data_format}\n'
-          f'gpus: {gpus}\n'
-          f'tta: {tta}\n'
-          f'overwrite: {overwrite}\n'
-          f'batch_size: {batch_size}\n')
+    print(
+        f'easymode segment\n'
+        f'feature: {feature}\n'
+        f'data_patterns: {patterns}\n'
+        f'output_directory: {output_directory}\n'
+        f'output_format: {data_format}\n'
+        f'gpus: {gpus}\n'
+        f'tta: {tta}\n'
+        f'overwrite: {overwrite}\n'
+        f'batch_size: {batch_size}\n'
+    )
 
-    tomograms = sorted(glob.glob(os.path.join(data_directory, '*.mrc')))
+    # Collect tomograms from all patterns / paths
+    tomograms = []
+    for p in patterns:
+        if os.path.isdir(p):
+            matches = glob.glob(os.path.join(p, '*.mrc'))
+        else:
+            matches = glob.glob(p)
+        tomograms.extend(matches)
 
-    print(f'Found {len(tomograms)} tomograms to segment in {data_directory}.\n')
+    tomograms = [f for f in sorted(set(tomograms)) if os.path.splitext(f)[-1] == '.mrc']
+
+    print(f'Found {len(tomograms)} tomograms to segment. \n')
 
     if len(tomograms) == 0:
         return
@@ -257,9 +275,10 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
     model_path, metadata = get_model(feature)
     if model_path is None:
         print(f'Could not find model for {feature}! Exiting.')
-        exit()
+        return
     model_apix = metadata["apix"]
 
+    print(f'Using model: {model_path}, inference at {model_apix} Å/px. \n')
 
     os.makedirs(output_directory, exist_ok=True)
 
@@ -267,14 +286,41 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
 
     processes = []
     for gpu in gpus:
-        p = multiprocessing.Process(target=segmentation_thread,
-                                    args=(tomograms, model_path, feature, output_directory, gpu, batch_size, tta, overwrite, data_format, model_apix, data_apix))
+        p = multiprocessing.Process(
+            target=segmentation_thread,
+            args=(
+                tomograms,
+                model_path,
+                feature,
+                output_directory,
+                gpu,
+                batch_size,
+                tta,
+                overwrite,
+                data_format,
+                model_apix,
+                data_apix
+            )
+        )
         processes.append(p)
         p.start()
         time.sleep(2)
 
-    for p in processes:
-        p.join()
+    try:
+        for p in processes:
+            p.join()
+    except KeyboardInterrupt:
+        for p in processes:
+            p.terminate()
+        for p in processes:
+            p.join()
+        for path in glob.glob(os.path.join(output_directory, f'*__{feature}.mrc')):
+            if os.path.getsize(path) < 10_000:
+                os.remove(path)
+        return
 
-
+    print()
+    print(f'\033[92mSegmentation finished!\033[0m')
+    print(f"\033[96mPlease note that you can help improve easymode by reporting model failures with 'easymode report'\033[0m")
+    print()
 

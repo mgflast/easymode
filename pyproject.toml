@@ -1,19 +1,14 @@
-# https://peps.python.org/pep-0517/
 [build-system]
 requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
-# https://hatch.pypa.io/latest/config/metadata/
 [tool.hatch.version]
 source = "vcs"
 
-# read more about configuring hatch at:
-# https://hatch.pypa.io/latest/config/build/
 [tool.hatch.build.targets.wheel]
 only-include = ["src"]
 sources = ["src"]
 
-# Include non-Python files as package data
 [tool.hatch.build]
 artifacts = [
     "*.txt",
@@ -22,7 +17,6 @@ artifacts = [
     "*.pdf",
 ]
 
-# https://peps.python.org/pep-0621/
 [project]
 name = "easymode"
 dynamic = ["version"]
@@ -41,7 +35,6 @@ keywords = [
     "neural networks",
     "structural biology",
 ]
-# https://pypi.org/classifiers/
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
@@ -66,93 +59,33 @@ dependencies = [
     "tifffile",
     "psutil",
     "starfile",
+    "lxml",
+    "tqdm",
 ]
 
 [project.urls]
 homepage = "https://github.com/mgflast/easymode"
 repository = "https://github.com/mgflast/easymode"
 
-# Entry points
-# https://peps.python.org/pep-0621/#entry-points
 [project.scripts]
 easymode = "easymode.main:main"
 
-# https://peps.python.org/pep-0735/
-# Development dependencies using PEP 735 dependency groups
 [dependency-groups]
 test = ["pytest>=7.0", "pytest-cov"]
 dev = [
     { include-group = "test" },
     "ipython",
-    "mypy",
-    "pre-commit-uv",
-    "ruff",
 ]
 
-# https://docs.astral.sh/ruff
-[tool.ruff]
-line-length = 88
-target-version = "py310"
-src = ["src"]
-fix = true
-
-[tool.ruff.lint]
-pydocstyle = { convention = "numpy" }
-select = [
-    "E",    # style errors
-    "W",    # style warnings
-    "F",    # flakes
-    "I",    # isort
-    "UP",   # pyupgrade
-    "C4",   # flake8-comprehensions
-    "B",    # flake8-bugbear
-    "A001", # flake8-builtins
-    "RUF",  # ruff-specific rules
-]
-ignore = [
-    "D",    # Ignore all pydocstyle for now (existing code not documented)
-]
-
-[tool.ruff.lint.per-file-ignores]
-"tests/*.py" = ["D", "S"]
-
-# https://docs.astral.sh/ruff/formatter/
-[tool.ruff.format]
-docstring-code-format = true
-skip-magic-trailing-comma = false
-
-# https://docs.pytest.org/
 [tool.pytest.ini_options]
 minversion = "7.0"
 addopts = ["--color=yes"]
 testpaths = ["tests"]
-# Don't treat warnings as errors due to TensorFlow warnings
 filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::UserWarning",
 ]
 
-# https://mypy.readthedocs.io/en/stable/config_file.html
-[tool.mypy]
-files = "src/**/"
-# Start with less strict settings for ML code
-warn_return_any = false
-warn_unused_configs = true
-disallow_untyped_defs = false
-
-# Ignore missing imports for scientific packages
-[[tool.mypy.overrides]]
-module = [
-    "tensorflow.*",
-    "mrcfile.*",
-    "scipy.*",
-    "huggingface_hub.*",
-    "tifffile.*",
-    "starfile.*",
-]
-ignore_missing_imports = true
-
-# https://coverage.readthedocs.io/
 [tool.coverage.report]
 show_missing = true
 exclude_lines = [
@@ -169,14 +102,3 @@ exclude_lines = [
 
 [tool.coverage.run]
 source = ["easymode"]
-
-# https://github.com/mgedmin/check-manifest#configuration
-[tool.check-manifest]
-ignore = [
-    ".pre-commit-config.yaml",
-    ".ruff_cache/**/*",
-    "tests/**/*",
-    ".github/**/*",
-    "*.yml",
-    "*.yaml",
-]

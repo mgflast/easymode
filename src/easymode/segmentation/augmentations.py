@@ -4,17 +4,17 @@ from scipy.ndimage import rotate, gaussian_filter, zoom
 
 from easymode.segmentation.membrain_fourier_augmentations.fourier_augmentations import MissingWedgeMaskAndFourierAmplitudeMatchingCombined
 
-ROT_XZ_YZ_MAX_ANGLE = 25.0
-ROT_XY_MAX_ANGLE = 10.0
+ROT_XZ_YZ_MAX_ANGLE = 10.0
+ROT_XY_MAX_ANGLE = 45.0
 
 def rotate_90_xy(img, label):
-    k = random.randint(0, 3)
+    k = random.randint(0, 4)
     img = np.rot90(img, k=k, axes=(1, 2))
     label = np.rot90(label, k=k, axes=(1, 2))
     return img, label
 
 def rotate_90_xz(img, label):
-    k = random.randint(0, 1) * 2
+    k = random.randint(0, 2) * 2
     img = np.rot90(img, k=k, axes=(0, 2))
     label = np.rot90(label, k=k, axes=(0, 2))
     return img, label
@@ -64,7 +64,7 @@ def scale(img, label):
         remainder = box_size - zoomed_img.shape[0] - 2 * pad_width
 
         img = np.pad(zoomed_img, [(pad_width, pad_width + remainder)] * 3, mode='reflect')
-        label = np.pad(zoomed_label, [(pad_width, pad_width + remainder)] * 3, mode='reflect')
+        label = np.pad(zoomed_label, [(pad_width, pad_width + remainder)] * 3, mode='constant', constant_values=2)
     else:
         zoomed_img = zoom(img, factor, order=1)
         zoomed_label = zoom(label, factor, order=0)
