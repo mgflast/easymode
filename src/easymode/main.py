@@ -17,7 +17,7 @@ def main():
         train_parser.add_argument('-ls', "--lr_start", type=float, help="Initial learning rate for the optimizer (default 5e-3).", default=5e-3)
         train_parser.add_argument('-le', "--lr_end", type=float, help="Final learning rate for the optimizer (default 5e-5).", default=5e-5)
         train_parser.add_argument('--limit_z', action='store_true', help="Crop training samples to the central 80 voxels along Z (first dimension). Faster training and focuses on the most accurately labelled region.")
-        train_parser.add_argument('-w', '--weights', type=str, default=None, help="Path to a .h5 weights file to initialize training from.")
+        train_parser.add_argument('--weights', type=str, default=None, help="Path to a .h5 weights file to initialize training from.")
 
     set_params = subparsers.add_parser('set', help='Set environment variables.')
     set_params.add_argument('--cache-directory', type=str, help="Path to the directory to store and search for easymode network weights in.")
