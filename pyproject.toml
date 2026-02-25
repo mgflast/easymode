@@ -1,0 +1,104 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.targets.wheel]
+only-include = ["src"]
+sources = ["src"]
+
+[tool.hatch.build]
+artifacts = [
+    "*.txt",
+    "*.png",
+    "*.glsl",
+    "*.pdf",
+]
+
+[project]
+name = "easymode"
+dynamic = ["version"]
+description = "Easymode - a collection of pretrained general networks for segmenting common eukaryotic features in cryoET"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "GPL-3.0-or-later" }
+authors = [
+    { name = "Mart Last", email = "mgflast@gmail.com" }
+]
+keywords = [
+    "cryo-electron tomography",
+    "cryoET",
+    "deep learning",
+    "segmentation",
+    "neural networks",
+    "structural biology",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+]
+
+dependencies = [
+    "tensorflow>=2.8.0,<3.0.0",
+    "mrcfile",
+    "numpy",
+    "scipy",
+    "huggingface_hub",
+    "requests",
+    "tifffile",
+    "psutil",
+    "starfile",
+    "lxml",
+    "tqdm",
+]
+
+[project.urls]
+homepage = "https://github.com/mgflast/easymode"
+repository = "https://github.com/mgflast/easymode"
+
+[project.scripts]
+easymode = "easymode.main:main"
+
+[dependency-groups]
+test = ["pytest>=7.0", "pytest-cov"]
+dev = [
+    { include-group = "test" },
+    "ipython",
+]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = ["--color=yes"]
+testpaths = ["tests"]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::UserWarning",
+]
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "@overload",
+    "except ImportError",
+    "raise AssertionError",
+    "\\.\\.\\.",
+    "raise NotImplementedError()",
+    "pass",
+    "if __name__ == .__main__.:",
+]
+
+[tool.coverage.run]
+source = ["easymode"]
