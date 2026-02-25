@@ -1,6 +1,6 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/mgflast/easymode/LICENSE.txt)
 [![Downloads](https://img.shields.io/pypi/dm/easymode)](https://pypi.org/project/easymode/)
-[![Documentation Status](mgflast.github.io/easymode](https://easymode.readthedocs.io/en/latest/?badge=latest)
+[![Documentation Status](https://img.shields.io/website?url=https%3A%2F%2Fmgflast.github.io%2Feasymode)](https://mgflast.github.io/easymode)
 ![Last Commit](https://img.shields.io/github/last-commit/mgflast/easymode)
 
 ## easymode
