@@ -19,22 +19,7 @@ def package_checkpoint(title='', checkpoint_directory='', apix=10.0):
     elif 'tilt' in title:
         from easymode.tiltfilter.model import create
     else:
-        # Segmentation model: determine v1 vs v2 architecture
-        # Method 1: Check if title contains "v2"
-        if 'v2' in title.lower():
-            from easymode.segmentation.model_v2 import create
-        else:
-            # Method 2: Check checkpoint data file size to infer architecture
-            checkpoint_data_file = checkpoint_path + '.data-00000-of-00001'
-            if os.path.exists(checkpoint_data_file):
-                checkpoint_size_mb = os.path.getsize(checkpoint_data_file) / (1024 * 1024)
-                if checkpoint_size_mb > 400:
-                    from easymode.segmentation.model import create
-                else:
-                    from easymode.segmentation.model_v2 import create
-            else:
-                # Fallback: default to v1 for backwards compatibility
-                from easymode.segmentation.model import create
+        from easymode.segmentation.model import create
 
     model = create()
     if 'tilt' in title:

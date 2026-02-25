@@ -19,18 +19,25 @@ def masked_bce_loss(y_true, y_pred, fn_weight=1.0):
     denom = tf.reduce_sum(mask)
     return tf.reduce_sum(per_voxel) / tf.maximum(denom, 1.0)
 
-def masked_accuracy(y_true, y_pred):
+def masked_precision(y_true, y_pred):
     ignore = tf.equal(y_true, 2.0)
-    y_true_bin = tf.where(ignore, 0.0, y_true)
-    y_pred_bin = tf.cast(y_pred > 0.5, y_true_bin.dtype)
+    y_true_bin = tf.cast(tf.where(ignore, 0.0, y_true), tf.float32)
+    y_pred_bin = tf.cast(y_pred > 0.5, tf.float32)
+    valid = tf.cast(tf.logical_not(ignore), tf.float32)
 
-    valid = tf.logical_not(ignore)
-    correct = tf.equal(y_true_bin, y_pred_bin)
-    correct = tf.logical_and(correct, valid)
+    tp = tf.reduce_sum(y_pred_bin * y_true_bin * valid)
+    fp = tf.reduce_sum(y_pred_bin * (1.0 - y_true_bin) * valid)
+    return tp / tf.maximum(tp + fp, 1.0)
 
-    correct = tf.cast(correct, y_pred.dtype)
-    denom = tf.reduce_sum(tf.cast(valid, y_pred.dtype))
-    return tf.reduce_sum(correct) / tf.maximum(denom, 1.0)
+def masked_recall(y_true, y_pred):
+    ignore = tf.equal(y_true, 2.0)
+    y_true_bin = tf.cast(tf.where(ignore, 0.0, y_true), tf.float32)
+    y_pred_bin = tf.cast(y_pred > 0.5, tf.float32)
+    valid = tf.cast(tf.logical_not(ignore), tf.float32)
+
+    tp = tf.reduce_sum(y_pred_bin * y_true_bin * valid)
+    fn = tf.reduce_sum((1.0 - y_pred_bin) * y_true_bin * valid)
+    return tp / tf.maximum(tp + fn, 1.0)
 
 def masked_dice_loss(y_true, y_pred, smooth=1e-6):
     mask = tf.cast(y_true != 2, tf.float32)
@@ -43,11 +50,11 @@ def masked_dice_loss(y_true, y_pred, smooth=1e-6):
     dice = (2.0 * intersection + smooth) / (union + smooth)
     return 1.0 - dice
 
-# def masked_dice(y_true, y_pred):
-#     return 1.0 - masked_dice_loss(y_true, y_pred)
+def masked_dice(y_true, y_pred):
+    return 1.0 - masked_dice_loss(y_true, y_pred)
 
 def combined_masked_bce_dice_loss(y_true, y_pred):
-    return 1.0 * masked_bce_loss(y_true, y_pred) #+  0.7 * masked_dice_loss(y_true, y_pred)
+    return masked_bce_loss(y_true, y_pred) + masked_dice_loss(y_true, y_pred)
 
 
 class ResBlock3D(layers.Layer):
@@ -189,7 +196,7 @@ class UNet(Model):
         self.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
             loss=combined_masked_bce_dice_loss,
-            metrics=[masked_accuracy],
+            metrics=[masked_precision, masked_recall, masked_bce_loss, masked_dice],
             run_eagerly=False
         )
 

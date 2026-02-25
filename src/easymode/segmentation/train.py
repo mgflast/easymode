@@ -204,14 +204,8 @@ class DataLoader:
         return dataset, n_steps
 
 
-def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, lr_end=1e-5, architecture_version=1, limit_z=False):
-    # Import appropriate model architecture
-    if architecture_version == 2:
-        from easymode.segmentation.model_v2 import create
-        print(f'\nTraining model v2 (new architecture) with features: {features}\n')
-    else:
-        from easymode.segmentation.model import create
-        print(f'\nTraining model v1 (original architecture) with features: {features}\n')
+def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, lr_end=1e-5, limit_z=False, weights_path=None):
+    from easymode.segmentation.model import create
 
     if limit_z:
         print('Limiting Z dimension to central 96 voxels.\n')
@@ -222,6 +216,9 @@ def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, 
 
     with tf.distribute.MirroredStrategy().scope():
         model = create()
+        if weights_path is not None:
+            model.load_weights(weights_path)
+            print(f'Loaded starting weights from {weights_path}\n')
     model.optimizer.learning_rate.assign(lr_start)
 
     # data loaders
