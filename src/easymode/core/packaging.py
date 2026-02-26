@@ -19,8 +19,17 @@ def package_checkpoint(title='', checkpoint_directory='', apix=10.0):
     elif 'tilt' in title:
         from easymode.tiltfilter.model import create
     else:
-        from easymode.segmentation.model import create
-
+        # Check checkpoint size to decide lite vs full
+        ckpt_size_mb = sum(            os.path.getsize(os.path.join(checkpoint_directory, f))
+            for f in os.listdir(checkpoint_directory)
+            if f.startswith(os.path.basename(checkpoint_path))
+        ) / (1024 * 1024)
+        if ckpt_size_mb < 1500:
+            print(f'Packaging weights as lite segmentation model.')
+            from easymode.segmentation.model_lite import create
+        else:
+            print(f'Packaging weights as default segmentation model.')
+            from easymode.segmentation.model import create
     model = create()
     if 'tilt' in title:
         _ = model([tf.zeros((1, 256, 256, 1)), tf.zeros((1, 256, 256, 1))])

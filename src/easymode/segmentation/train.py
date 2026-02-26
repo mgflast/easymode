@@ -1,13 +1,15 @@
 import glob, os, mrcfile
 from easymode.segmentation.augmentations import *
 import tensorflow as tf
+import numpy as np
+
 
 AUGMENTATIONS_ROT_XZ_YZ = 0.25
 AUGMENTATIONS_ROT_XY = 0.33
 AUGMENTATIONS_MISSING_WEDGE = 0.0
-AUGMENTATIONS_GAUSSIAN = 0.33
+AUGMENTATIONS_GAUSSIAN = 0.25
 AUGMENTATIONS_SCALE = 0.33
-AUGMENTATIONS_MIXUP = 0.2
+AUGMENTATIONS_MIXUP = 0.0
 
 DEBUG = False
 ROOT = '/cephfs/mlast/compu_projects/easymode'
@@ -18,7 +20,8 @@ if os.name == 'nt':
 
 
 class Sample:
-    FLAVOURS = ['odd', 'even', 'raw', 'cryocare']
+    #FLAVOURS = ['odd', 'even', 'raw', 'cryocare']
+    FLAVOURS = ['cryocare']
     def __init__(self, idx, datagroup):
         self.idx = idx
         self.datagroup = datagroup
@@ -115,7 +118,7 @@ class DataLoader:
     def mixup(self, img, label):
         negative_sample = random.choice(self.negative_samples)
         negative_img, _ = negative_sample.load()
-        mixing_factor = random.uniform(0.0, 0.5)
+        mixing_factor = random.uniform(0.0, 0.2)
 
         img = img * (1 - mixing_factor) + negative_img * mixing_factor
         return img, label
@@ -204,8 +207,13 @@ class DataLoader:
         return dataset, n_steps
 
 
-def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, lr_end=1e-5, limit_z=False, weights_path=None):
-    from easymode.segmentation.model import create
+def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, lr_end=1e-5, limit_z=False, weights_path=None, lightweight=False):
+    if lightweight:
+        print('importing lightweight model')
+        from easymode.segmentation.model_lite import create
+    else:
+        print('importing default model')
+        from easymode.segmentation.model import create
 
     if limit_z:
         print('Limiting Z dimension to central 96 voxels.\n')
@@ -217,8 +225,10 @@ def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, 
     with tf.distribute.MirroredStrategy().scope():
         model = create()
         if weights_path is not None:
+            z_dim = 96 if limit_z else 160
+            dummy = tf.zeros((1, z_dim, 160, 160, 1))
+            model(dummy)
             model.load_weights(weights_path)
-            print(f'Loaded starting weights from {weights_path}\n')
     model.optimizer.learning_rate.assign(lr_start)
 
     # data loaders
@@ -246,5 +256,5 @@ def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, 
     cb_lr = tf.keras.callbacks.LearningRateScheduler(lr_decay, verbose=1)
 
     cb_csv = tf.keras.callbacks.CSVLogger(f'{ROOT}/training/3d/checkpoints/{title}/training_log.csv', append=True)
-    model.fit(training_ds, steps_per_epoch=training_steps, validation_data=validation_ds, validation_steps=validation_steps, epochs=epochs, validation_freq=5, callbacks=[cb_checkpoint_val, cb_checkpoint_train, cb_lr, cb_csv])
+    model.fit(training_ds, steps_per_epoch=training_steps, validation_data=validation_ds, validation_steps=validation_steps, epochs=epochs, validation_freq=1, callbacks=[cb_checkpoint_val, cb_checkpoint_train, cb_lr, cb_csv])
 

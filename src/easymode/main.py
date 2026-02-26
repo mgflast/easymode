@@ -17,7 +17,8 @@ def main():
         train_parser.add_argument('-ls', "--lr_start", type=float, help="Initial learning rate for the optimizer (default 5e-3).", default=5e-3)
         train_parser.add_argument('-le', "--lr_end", type=float, help="Final learning rate for the optimizer (default 5e-5).", default=5e-5)
         train_parser.add_argument('--limit_z', action='store_true', help="Crop training samples to the central 80 voxels along Z (first dimension). Faster training and focuses on the most accurately labelled region.")
-        train_parser.add_argument('-w', '--weights', type=str, default=None, help="Path to a .h5 weights file to initialize training from.")
+        train_parser.add_argument('--weights', type=str, default=None, help="Path to a .h5 weights file to initialize training from.")
+        train_parser.add_argument('--lite', action='store_true', help="Lightweight model version.")
 
     set_params = subparsers.add_parser('set', help='Set environment variables.')
     set_params.add_argument('--cache-directory', type=str, help="Path to the directory to store and search for easymode network weights in.")
@@ -30,6 +31,7 @@ def main():
         package = subparsers.add_parser('package', description='Package model and weights. Note that this is used for 3D models only; 2D models are packaged and distributed with Ais.')
         package.add_argument('-c', "--checkpoint_directory", type=str, required=True, help="Path to the checkpoint directory to package from.")
         package.add_argument('-t', "--title", type=str, default=None, help="Title of the model to package. If not provided, the name of the checkpoint directory is used.")
+        package.add_argument('--apix', type=float, default=10.0, help="Pixel size of the training data in Angstrom (default: 10.0). This is used to rescale the model to the correct physical pixel size during inference.")
 
     reconstruct = subparsers.add_parser('reconstruct', help='Reconstruct tomograms using WarpTools and AreTomo3.')
     reconstruct.add_argument('--frames', type=str, required=True, help="Directory containing raw frames.")
@@ -120,6 +122,7 @@ def main():
                     lr_end=args.lr_end,
                     limit_z=args.limit_z,
                     weights_path=args.weights,
+                    lightweight=args.lite
                     )
     elif args.command == 'tilt_train':
         from easymode.tiltfilter.train import train_model
@@ -240,7 +243,7 @@ def main():
             print(f'Set AreTomo3 environment command to {args.aretomo3_env}.')
     elif args.command == 'package':
         from easymode.core.packaging import package_checkpoint
-        package_checkpoint(title=args.checkpoint_directory.strip() if args.title is None else args.title, checkpoint_directory=args.checkpoint_directory)
+        package_checkpoint(title=args.checkpoint_directory.strip() if args.title is None else args.title, checkpoint_directory=args.checkpoint_directory, apix=args.apix)
     elif args.command == 'list':
         from easymode.core.distribution import list_remote_models
         list_remote_models()

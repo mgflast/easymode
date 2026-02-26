@@ -136,9 +136,11 @@ def load_model_weights(weights_path):
         file_size_mb = os.path.getsize(weights_path) / (1024 * 1024)
 
         if file_size_mb > 400:
+            print('importing segmentation model with default architecture')
             from easymode.segmentation.model import create
         else:
-            from easymode.segmentation.model_v2 import create
+            print('importing segmentation model with lightweight architecture')
+            from easymode.segmentation.model_lite import create
 
         dummy_input = tf.zeros((1, 160, 160, 160, 1))
 

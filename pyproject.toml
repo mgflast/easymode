@@ -1,9 +1,6 @@
 [build-system]
-requires = ["hatchling", "hatch-vcs"]
+requires = ["hatchling"]
 build-backend = "hatchling.build"
-
-[tool.hatch.version]
-source = "vcs"
 
 [tool.hatch.build.targets.wheel]
 only-include = ["src"]
@@ -19,10 +16,10 @@ artifacts = [
 
 [project]
 name = "easymode"
-dynamic = ["version"]
+version = "0.0.3"
 description = "Easymode - a collection of pretrained general networks for segmenting common eukaryotic features in cryoET"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 license = { text = "GPL-3.0-or-later" }
 authors = [
     { name = "Mart Last", email = "mgflast@gmail.com" }
@@ -44,9 +41,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    "Topic :: Scientific/Engineering",
-    "Topic :: Scientific/Engineering :: Bio-Informatics",
-    "Topic :: Scientific/Engineering :: Image Recognition",
+    "Topic :: Scientific/Engineering"
 ]
 
 dependencies = [

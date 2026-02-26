@@ -54,12 +54,11 @@ def masked_dice(y_true, y_pred):
     return 1.0 - masked_dice_loss(y_true, y_pred)
 
 def combined_masked_bce_dice_loss(y_true, y_pred):
-    return masked_bce_loss(y_true, y_pred) + masked_dice_loss(y_true, y_pred)
+    return 0.3 * masked_bce_loss(y_true, y_pred) + 0.7 * masked_dice_loss(y_true, y_pred)
+
 
 
 class ResBlock3D(layers.Layer):
-    """3D Residual block with batch normalization and ReLU activation."""
-
     def __init__(self, filters: int, **kwargs):
         super().__init__(**kwargs)
         self.filters = filters
