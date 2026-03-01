@@ -1,11 +1,12 @@
 import numpy as np
 import random
-from scipy.ndimage import rotate, gaussian_filter, zoom
+from scipy.ndimage import rotate, gaussian_filter
+from skimage.transform import resize
 
 from easymode.segmentation.membrain_fourier_augmentations.fourier_augmentations import MissingWedgeMaskAndFourierAmplitudeMatchingCombined
 
-ROT_XZ_YZ_MAX_ANGLE = 10.0
-ROT_XY_MAX_ANGLE = 10.0
+ROT_XZ_YZ_MAX_ANGLE = 15.0
+ROT_XY_MAX_ANGLE = 22.5
 
 def rotate_90_xy(img, label):
     k = random.randint(0, 4)
@@ -49,30 +50,34 @@ def remove_wedge(img, label):
     return img, label
 
 def filter_gaussian(img, label):
-    img = gaussian_filter(img, sigma=random.uniform(0.3, 1.5))
+    img = gaussian_filter(img, sigma=random.uniform(0.5, 1.0))
     return img, label
 
-
 def scale(img, label):
-    factor = np.random.uniform(0.9, 1.1)
+    factor = np.random.uniform(0.85, 1.15)
     box_size = img.shape[0]
-    if factor < 1:
-        zoomed_img = zoom(img, factor, order=1)
-        zoomed_label = zoom(label, factor, order=0)
 
+    new_size = int(round(box_size * factor))
+    zoomed_img = resize(img, (new_size,) * 3, order=3, anti_aliasing=True).astype(np.float32)
+    zoomed_label = resize(label, (new_size,) * 3, order=0, anti_aliasing=True).astype(np.float32)
+
+    if factor < 1:
         pad_width = (box_size - zoomed_img.shape[0]) // 2
         remainder = box_size - zoomed_img.shape[0] - 2 * pad_width
 
         img = np.pad(zoomed_img, [(pad_width, pad_width + remainder)] * 3, mode='reflect')
         label = np.pad(zoomed_label, [(pad_width, pad_width + remainder)] * 3, mode='constant', constant_values=2)
     else:
-        zoomed_img = zoom(img, factor, order=1)
-        zoomed_label = zoom(label, factor, order=0)
-
         center = zoomed_img.shape[0] // 2
         start = center - 80
         end = center + 80
 
         img = zoomed_img[start:end, start:end, start:end]
         label = zoomed_label[start:end, start:end, start:end]
+
+
+    return img, label
+
+def contrast_jitter(img, label):
+    img *= np.random.uniform(0.9, 1.1)
     return img, label

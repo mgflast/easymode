@@ -203,6 +203,10 @@ def dispatch(input_directory, output_directory, mode='splits', tta=1, batch_size
 
     if len(gpus) == 0:
         print("\033[93m" + "warning: no GPUs detected. processing will continue, but using CPUs only!" + "\033[0m")
+        gpus = [-1]
+
+    if len(gpus) == 0:
+        print("\033[93m" + "warning: no GPUs detected. processing will continue, but using CPUs only!" + "\033[0m")
 
     print(f'easymode denoise\n'
           f'mode: {mode}\n'

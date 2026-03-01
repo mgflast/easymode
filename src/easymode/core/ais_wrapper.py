@@ -108,7 +108,7 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
           f'gpus: {gpus}\n'
           f'tta: {tta}\n'
           f'overwrite: {overwrite}\n'
-          f'ais_2d_nets: True')
+          f'ais_2d_nets: True\n')
 
     patterns = data_directory if isinstance(data_directory, (list, tuple)) else [data_directory]
 
@@ -135,6 +135,9 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
 
     data_arg = " ".join(patterns)
     command = f'ais segment -m {model_path} -apix {model_apix} -d {data_arg} -ou {output_directory} -tta {tta} -p 1 --overwrite {"1" if overwrite else "0"} -gpu {gpus}'
+    if model_apix > 20.0:
+        command += f' -sigma {model_apix} {model_apix / 2.0} {model_apix / 2.0}'
+
 
     _run(command)
 

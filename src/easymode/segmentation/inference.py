@@ -36,7 +36,6 @@ def tile_volume(volume, patch_size, overlap):
                 tile = np.zeros((pz, py, px), dtype=volume.dtype)
                 tz0 = vz0 - z_start; ty0 = vy0 - y_start; tx0 = vx0 - x_start
                 tile[tz0:tz0+extracted.shape[0], ty0:ty0+extracted.shape[1], tx0:tx0+extracted.shape[2]] = extracted
-
                 tiles.append(tile)
                 positions.append((zi*sz, yi*sy, xi*sx))
 
@@ -127,9 +126,11 @@ def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, model_apix=10.0,
     else:
         scale = float(input_apix) / float(model_apix)
 
+    rescaled = False
     if abs(scale - 1.0) > 0.05:
         from scipy.ndimage import zoom
         volume = zoom(volume, scale, order=1)
+        rescaled = True
 
 
     # preprocess: normalize & pad
@@ -140,12 +141,12 @@ def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, model_apix=10.0,
     volume /= np.std(volume[:, _k_margin:-_k_margin, _l_margin:-_l_margin]) + 1e-7
 
     volume, padding = _pad_volume(volume)
-    segmented_volume = np.zeros_like(volume)
+    segmented_volume = np.zeros((oj, ok, ol), dtype=np.float32)
 
-    TILE_SIZE = (min(256, segmented_volume.shape[0]), min(256, segmented_volume.shape[1]), min(256, segmented_volume.shape[2]))
-    OVERLAP[0] = 0 if TILE_SIZE[0] == segmented_volume.shape[0] else 48
-    OVERLAP[1] = 0 if TILE_SIZE[1] == segmented_volume.shape[1] else 48
-    OVERLAP[2] = 0 if TILE_SIZE[2] == segmented_volume.shape[2] else 48
+    TILE_SIZE = (min(256, volume.shape[0]), min(256, volume.shape[1]), min(256, volume.shape[2]))
+    OVERLAP[0] = 0 if TILE_SIZE[0] == volume.shape[0] else 48
+    OVERLAP[1] = 0 if TILE_SIZE[1] == volume.shape[1] else 48
+    OVERLAP[2] = 0 if TILE_SIZE[2] == volume.shape[2] else 48
 
     # Below: all 16 combinations of 90-degree rotations and flips that respect the anisotropy of the data.
     k_xy = [0, 2, 2, 0, 1, 3, 0, 1, 2, 3, 0, 1, 2, 3, 1, 3]
@@ -162,18 +163,19 @@ def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, model_apix=10.0,
         segmented_tta_vol = np.rot90(segmented_tta_vol, k=-2 * k_yz[j], axes=(0, 1))
         segmented_tta_vol = segmented_tta_vol if not k_fx[j] else np.flip(segmented_tta_vol, axis=1)
         segmented_tta_vol = np.rot90(segmented_tta_vol, k=-k_xy[j], axes=(1, 2))
+
+        # remove padding per-tta instance
+        (j0, j1), (k0, k1), (l0, l1) = padding
+        segmented_tta_vol = segmented_tta_vol[j0:segmented_tta_vol.shape[0] - j1, k0:segmented_tta_vol.shape[1] - k1, l0:segmented_tta_vol.shape[2] - l1]
+
+        if rescaled:
+            from scipy.ndimage import zoom
+            sj, sk, sl = segmented_tta_vol.shape
+            segmented_tta_vol = zoom(segmented_tta_vol, (oj / sj, ok / sk, ol / sl), order=1)
+            segmented_tta_vol = segmented_tta_vol[:oj, :ok, :ol]
+
         segmented_volume += segmented_tta_vol
     segmented_volume /= tta
-
-    # remove padding
-    (j0, j1), (k0, k1), (l0, l1) = padding
-    segmented_volume = segmented_volume[j0:segmented_volume.shape[0]-j1, k0:segmented_volume.shape[1]-k1, l0:segmented_volume.shape[2]-l1]
-
-    # rescale
-    if abs(scale - 1.0) > 0.05:
-        from scipy.ndimage import zoom
-        sj, sk, sl = segmented_volume.shape
-        segmented_volume = zoom(segmented_volume, (oj / sj, ok / sk, ol / sl), order=1)
 
     return segmented_volume, volume_apix
 

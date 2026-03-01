@@ -2,14 +2,15 @@ import glob, os, mrcfile
 from easymode.segmentation.augmentations import *
 import tensorflow as tf
 import numpy as np
+from scipy.ndimage import gaussian_filter
 
-
-AUGMENTATIONS_ROT_XZ_YZ = 0.25
-AUGMENTATIONS_ROT_XY = 0.33
+AUGMENTATIONS_ROT_XZ_YZ = 0.5
+AUGMENTATIONS_ROT_XY = 0.5
 AUGMENTATIONS_MISSING_WEDGE = 0.0
 AUGMENTATIONS_GAUSSIAN = 0.25
-AUGMENTATIONS_SCALE = 0.33
+AUGMENTATIONS_SCALE = 0.5
 AUGMENTATIONS_MIXUP = 0.0
+AUGMENTATIONS_CONTRAST = 0.0 # to fix - currently would have no effect as augment is done before preprocess (normalization)
 
 DEBUG = False
 ROOT = '/cephfs/mlast/compu_projects/easymode'
@@ -20,8 +21,7 @@ if os.name == 'nt':
 
 
 class Sample:
-    #FLAVOURS = ['odd', 'even', 'raw', 'cryocare']
-    FLAVOURS = ['cryocare']
+    FLAVOURS = ['odd', 'even', 'raw', 'cryocare']
     def __init__(self, idx, datagroup):
         self.idx = idx
         self.datagroup = datagroup
@@ -71,17 +71,11 @@ class Sample:
         validity = mrcfile.read(self.validity_path)
 
         label[validity == 0] = 2
-        label[:16, :, :] = 2
-        label[-16:, :, :] = 2
-        label[:, :16, :] = 2
-        label[:, -16:, :] = 2
-        label[:, :, :16] = 2
-        label[:, :, -16:] = 2
 
         if self.datagroup == 'Junk3D' or self.datagroup.startswith('Not'):
             label[label == 1] = 0
 
-        return img, label
+        return img, label, validity
 
 
 class DataLoader:
@@ -93,6 +87,7 @@ class DataLoader:
         self.samples = list()
         self.positive_samples = list()
         self.negative_samples = list()
+        self.pixel_size = 10.0
         self.load_data()
 
     def load_data(self):
@@ -105,15 +100,17 @@ class DataLoader:
                     self.samples.append(sample)
 
         if self.validation:
-            self.samples = [s for i, s in enumerate(self.samples) if i % 20 == 0]
+            self.samples = [s for i, s in enumerate(self.samples) if i % 8 == 0]
         else:
-            self.samples = [s for i, s in enumerate(self.samples) if i % 20 != 0]
+            self.samples = [s for i, s in enumerate(self.samples) if i % 8 != 0]
 
         self.positive_samples = [s for s in self.samples if s.is_positive]
         self.negative_samples = [s for s in self.samples if not s.is_positive]
         np.random.shuffle(self.samples)
 
-        print(f'Loaded {len(self.samples)} samples for {"validation" if self.validation else "training"}')
+        with mrcfile.open(self.positive_samples[0].validity_path, header_only=True) as m:
+            self.pixel_size = m.voxel_size.x
+        print(f'Loaded {len(self.samples)} samples for {"validation" if self.validation else "training"} ({self.pixel_size:.2f} A/px)')
 
     def mixup(self, img, label):
         negative_sample = random.choice(self.negative_samples)
@@ -161,24 +158,25 @@ class DataLoader:
         if random.uniform(0.0, 1.0) < AUGMENTATIONS_MIXUP:
             img, label = self.mixup(img, label)
 
-        label[:16, :, :] = 2
-        label[-16:, :, :] = 2
-        label[:, :16, :] = 2
-        label[:, -16:, :] = 2
-        label[:, :, :16] = 2
-        label[:, :, -16:] = 2
+        if random.uniform(0.0, 1.0) < AUGMENTATIONS_CONTRAST:
+            img, label = contrast_jitter(img, label)
+
 
         return img, label
 
-    def preprocess(self, img, label):
+    def preprocess(self, img, label, validity):
         img = img.astype(np.float32)
-        img = img - np.mean(img)
-        img /= np.std(img) + 1e-8
+
+        img_mu = np.mean(img[label < 2])  # normalization factors for real data only (not for out of bounds ignored areas)
+        img_std = np.std(img[label < 2]) # normalization factors for real data only (not for out of bounds ignored areas)
+
+        invalid_voxels_mask = validity == 0
+        img[invalid_voxels_mask] = np.random.normal(img_mu, img_std, int(np.sum(invalid_voxels_mask)))  # 260227: for data sampled at large A/px, much of box has label == 2, where img == 0, throwing off batch normalization. try replacing these voxel values with noise matching valid image statistics
+
+        img = img - img_mu
+        img /= img_std + 1e-7
 
         label = label.astype(np.float32)
-
-        img = np.expand_dims(img, axis=-1)
-        label = np.expand_dims(label, axis=-1)
 
         return img, label
 
@@ -191,17 +189,32 @@ class DataLoader:
                 else:
                     sample = self.samples[j]
 
-                img, label = sample.load()
-                if not self.validation:
-                    img, label = self.augment(img, label)
-                img, label = self.preprocess(img, label)
+                img, label, validity = sample.load()
+                img, label = self.preprocess(img, label, validity)
+                img, label = self.augment(img, label)
+
+                label[:16, :, :] = 2
+                label[-16:, :, :] = 2
+
                 if self.limit_z:
+                    img = img[48:112, :, :]
+                    label = label[48:112, :, :]
+                else:
                     img = img[32:128, :, :]
                     label = label[32:128, :, :]
+
+                label[:, :16, :] = 2
+                label[:, -16:, :] = 2
+                label[:, :, :16] = 2
+                label[:, :, -16:] = 2
+
+                img = np.expand_dims(img, axis=-1)
+                label = np.expand_dims(label, axis=-1)
+
                 yield img, label
 
     def as_generator(self, batch_size):
-        z_dim = 96 if self.limit_z else 160
+        z_dim = 64 if self.limit_z else 96
         dataset = tf.data.Dataset.from_generator(self.sample_generator, output_signature=(tf.TensorSpec(shape=(z_dim, 160, 160, 1), dtype=tf.float32), tf.TensorSpec(shape=(z_dim, 160, 160, 1), dtype=tf.float32))).batch(batch_size=batch_size, drop_remainder=True).prefetch(tf.data.AUTOTUNE)
         n_steps = len(self.samples) // batch_size
         return dataset, n_steps
@@ -216,7 +229,7 @@ def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, 
         from easymode.segmentation.model import create
 
     if limit_z:
-        print('Limiting Z dimension to central 96 voxels.\n')
+        print('Limiting Z dimension to central 64 voxels.\n')
 
     tf.config.run_functions_eagerly(False)
 
@@ -225,7 +238,7 @@ def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, 
     with tf.distribute.MirroredStrategy().scope():
         model = create()
         if weights_path is not None:
-            z_dim = 96 if limit_z else 160
+            z_dim = 64 if limit_z else 96
             dummy = tf.zeros((1, z_dim, 160, 160, 1))
             model(dummy)
             model.load_weights(weights_path)
@@ -258,3 +271,32 @@ def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, 
     cb_csv = tf.keras.callbacks.CSVLogger(f'{ROOT}/training/3d/checkpoints/{title}/training_log.csv', append=True)
     model.fit(training_ds, steps_per_epoch=training_steps, validation_data=validation_ds, validation_steps=validation_steps, epochs=epochs, validation_freq=1, callbacks=[cb_checkpoint_val, cb_checkpoint_train, cb_lr, cb_csv])
 
+def test_dataloader(features, limit_z=False):
+    import uuid, shutil
+    out_dir = '/cephfs/mlast/compu_projects/easymode/training/3d/dataloader_test_outputs/'
+    for sub in ['subtomo', 'label']:
+        d = os.path.join(out_dir, sub)
+        if os.path.exists(d):
+            shutil.rmtree(d)
+        os.makedirs(d)
+
+    loader = DataLoader(features, validation=False, limit_z=limit_z)
+    gen = loader.sample_generator()
+
+    for i in range(30):
+        img, label = next(gen)
+        img = np.squeeze(img, axis=-1)
+        label = np.squeeze(label, axis=-1)
+        print(f'unique labels in label_ndarray: ', np.unique(label))
+
+        h = uuid.uuid4().hex[:12]
+
+        with mrcfile.new(os.path.join(out_dir, 'subtomo', f'{h}.mrc'), overwrite=True) as mrc:
+            mrc.set_data(img)
+        with mrcfile.new(os.path.join(out_dir, 'label', f'{h}__label.mrc'), overwrite=True) as mrc:
+            mrc.set_data(label)
+
+        print(f'Saved {i + 1}/{30}')
+
+    print('Done.')
+    exit()

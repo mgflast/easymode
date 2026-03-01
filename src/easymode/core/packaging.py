@@ -24,7 +24,7 @@ def package_checkpoint(title='', checkpoint_directory='', apix=10.0):
             for f in os.listdir(checkpoint_directory)
             if f.startswith(os.path.basename(checkpoint_path))
         ) / (1024 * 1024)
-        if ckpt_size_mb < 1500:
+        if ckpt_size_mb < 1000:
             print(f'Packaging weights as lite segmentation model.')
             from easymode.segmentation.model_lite import create
         else:

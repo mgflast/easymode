@@ -18,6 +18,8 @@ def main():
         train_parser.add_argument('-le', "--lr_end", type=float, help="Final learning rate for the optimizer (default 5e-5).", default=5e-5)
         train_parser.add_argument('--limit_z', action='store_true', help="Crop training samples to the central 80 voxels along Z (first dimension). Faster training and focuses on the most accurately labelled region.")
         train_parser.add_argument('--weights', type=str, default=None, help="Path to a .h5 weights file to initialize training from.")
+        train_parser.add_argument('--lite', action='store_true', help="Train a lightweight version (40 Mb) instead of the default model (500 Mb).")
+        train_parser.add_argument('--test', action='store_true', help="(debug) test augmentations and save to .../training/3d/test_samples/")
 
     set_params = subparsers.add_parser('set', help='Set environment variables.')
     set_params.add_argument('--cache-directory', type=str, help="Path to the directory to store and search for easymode network weights in.")
@@ -88,7 +90,7 @@ def main():
     denoise.add_argument('--overwrite', action='store_true', help='If set, overwrite existing segmentations in the output directory.')
     denoise.add_argument('--batch', type=int, default=1,help='Batch size for segmentation (default 1). Volumes are processed in batches of 128x128x128 shaped tiles. In/decrease batch size depending on available GPU memory.')
     denoise.add_argument('--iter', type=int, default=1, help="Only valid in direct mode: number of denoising iterations to perform (default 1). If you are really starved for contrast, try increasing this - but beware of artifacts.")
-    denoise.add_argument('--gpu', type=str, default='0,', help="Comma-separated list of GPU ids to use (default '0').")
+    denoise.add_argument('--gpu', type=str, default=None, help="Comma-separated list of GPU ids to use (default '0').")
 
     select_tilts = subparsers.add_parser('select_tilts', help='Automatic marking of tilt images to be excluded from tomogram reconstruction')
     select_tilts.add_argument('--tiltstack', type=str, required=False, default="warp_tiltseries/tiltstack", help="Directory containing tilt stacks OR path to a single tilt stack OR glob pattern for multiple tilt stack files.")
@@ -113,16 +115,20 @@ def main():
 
     if args.command == 'train':
         from easymode.segmentation.train import train_model
-        train_model(title=args.title,
-                    features=args.features,
-                    batch_size=args.batch_size,
-                    epochs=args.epochs,
-                    lr_start=args.lr_start,
-                    lr_end=args.lr_end,
-                    limit_z=args.limit_z,
-                    weights_path=args.weights,
-                    lightweight=args.lite
-                    )
+        if args.test:
+            from easymode.segmentation.train import test_dataloader
+            test_dataloader(args.features, args.limit_z)
+        else:
+            train_model(title=args.title,
+                        features=args.features,
+                        batch_size=args.batch_size,
+                        epochs=args.epochs,
+                        lr_start=args.lr_start,
+                        lr_end=args.lr_end,
+                        limit_z=args.limit_z,
+                        weights_path=args.weights,
+                        lightweight=args.lite
+                        )
     elif args.command == 'tilt_train':
         from easymode.tiltfilter.train import train_model
         train_model(batch_size=args.batch_size,
