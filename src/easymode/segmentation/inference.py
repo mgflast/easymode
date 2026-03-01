@@ -105,9 +105,12 @@ def _pad_volume(volume, min_pad=16, div=32):
     return padded, tuple(pads)
 
 
-def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, model_apix=10.0, input_apix=None):
+def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, model_apix=10.0, input_apix=None, model_apix_z=None):
     global TILE_SIZE, OVERLAP
-    volume = mrcfile.read(tomogram_path).astype(np.float32)
+
+    # model_apix_z=None means isotropic model (apix_z == apix_xy)
+    if model_apix_z is None:
+        model_apix_z = model_apix
 
     # load tomo & read pixel size
     with mrcfile.open(tomogram_path) as m:
@@ -118,18 +121,21 @@ def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, model_apix=10.0,
             print(f'warning: {tomogram_path} header lists voxel size as 1.0 A/px, which is probably incorrect. We assume it is really 10.0 Å/px.')
             volume_apix = 10.0
 
-    # rescale tomo
+    # compute per-axis scale factors (model may have been trained with XY binning but no Z binning)
     if input_apix is None:
-        scale = float(volume_apix) / float(model_apix)
+        scale_xy = float(volume_apix) / float(model_apix)
+        scale_z = float(volume_apix) / float(model_apix_z)
     elif input_apix == 0.0:
-        scale = 1.0
+        scale_xy = 1.0
+        scale_z = 1.0
     else:
-        scale = float(input_apix) / float(model_apix)
+        scale_xy = float(input_apix) / float(model_apix)
+        scale_z = float(input_apix) / float(model_apix_z)
 
     rescaled = False
-    if abs(scale - 1.0) > 0.05:
+    if abs(scale_xy - 1.0) > 0.05 or abs(scale_z - 1.0) > 0.05:
         from scipy.ndimage import zoom
-        volume = zoom(volume, scale, order=1)
+        volume = zoom(volume, (scale_z, scale_xy, scale_xy), order=1)
         rescaled = True
 
 
@@ -191,7 +197,7 @@ def save_mrc(pxd, path, data_format, voxel_size=10.0):
         m.set_data(pxd)
         m.voxel_size = voxel_size
 
-def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, batch_size, tta, overwrite, data_format, model_apix, input_apix=None):
+def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, batch_size, tta, overwrite, data_format, model_apix, model_apix_z=None, input_apix=None):
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
 
     for device in tf.config.list_physical_devices('GPU'):
@@ -217,7 +223,7 @@ def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, bat
                 m.voxel_size = 10.0
                 wrote_temporary = True
 
-            segmented_volume, segmented_volume_apix = segment_tomogram(model, tomogram_path, tta, batch_size, model_apix, input_apix)
+            segmented_volume, segmented_volume_apix = segment_tomogram(model, tomogram_path, tta, batch_size, model_apix, input_apix, model_apix_z)
 
             save_mrc(segmented_volume, output_file, data_format, segmented_volume_apix)
 
@@ -279,8 +285,12 @@ def dispatch_segment( feature, data_directory, output_directory, tta=1, batch_si
         print(f'Could not find model for {feature}! Exiting.')
         return
     model_apix = metadata["apix"]
+    model_apix_z = metadata.get("apix_z", None)  # None means isotropic
 
-    print(f'Using model: {model_path}, inference at {model_apix} Å/px. \n')
+    if model_apix_z is not None:
+        print(f'Using model: {model_path}, inference at {model_apix} Å/px (XY) / {model_apix_z} Å/px (Z). \n')
+    else:
+        print(f'Using model: {model_path}, inference at {model_apix} Å/px. \n')
 
     os.makedirs(output_directory, exist_ok=True)
 
@@ -301,6 +311,7 @@ def dispatch_segment( feature, data_directory, output_directory, tta=1, batch_si
                 overwrite,
                 data_format,
                 model_apix,
+                model_apix_z,
                 data_apix
             )
         )

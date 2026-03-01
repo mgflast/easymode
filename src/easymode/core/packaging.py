@@ -44,6 +44,7 @@ def package_checkpoint(title='', checkpoint_directory='', apix=10.0):
 
     metadata = {
         'apix': apix,
+        'apix_z': 10.0,
         'timestamp':  datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
     }
 

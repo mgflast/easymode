@@ -34,6 +34,11 @@ def main():
         package.add_argument('-t', "--title", type=str, default=None, help="Title of the model to package. If not provided, the name of the checkpoint directory is used.")
         package.add_argument('--apix', type=float, default=10.0, help="Pixel size of the training data in Angstrom (default: 10.0). This is used to rescale the model to the correct physical pixel size during inference.")
 
+    if os.path.exists('/lmb/home/mlast/easymode_dev'):
+        extract_parser = subparsers.add_parser('extract', description='Extract subtomogram training data from annotated tomograms.')
+        extract_parser.add_argument('-f', '--features', nargs='+', required=True, help="One or more feature names to extract, e.g. 'Mitochondrion3D NotMitochondrion3D'.")
+        extract_parser.add_argument('--apix', type=float, required=True, help="Target XY pixel size in Angstrom. Z is always left at the native collection pixel size (10.0 A/px). XY binning factor is computed as apix / 10.0.")
+
     reconstruct = subparsers.add_parser('reconstruct', help='Reconstruct tomograms using WarpTools and AreTomo3.')
     reconstruct.add_argument('--frames', type=str, required=True, help="Directory containing raw frames.")
     reconstruct.add_argument('--mdocs', type=str, required=True, help="Directory containing mdocs.")
@@ -246,6 +251,9 @@ def main():
         if args.aretomo3_env:
             cfg.edit_setting("ARETOMO3_ENV", args.aretomo3_env)
             print(f'Set AreTomo3 environment command to {args.aretomo3_env}.')
+    elif args.command == 'extract':
+        from easymode.segmentation.extract import extract_training_data
+        extract_training_data(features=args.features, apix=args.apix)
     elif args.command == 'package':
         from easymode.core.packaging import package_checkpoint
         package_checkpoint(title=args.checkpoint_directory.strip() if args.title is None else args.title, checkpoint_directory=args.checkpoint_directory, apix=args.apix)
