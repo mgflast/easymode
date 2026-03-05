@@ -28,6 +28,10 @@ def main():
 
     subparsers.add_parser('list', help='List the features for which pretrained general segmentation networks are available.')
 
+    download = subparsers.add_parser('download', help='Download model weights for offline use. With no arguments, download all models; otherwise download only the listed models (e.g. ribosome, n2n_direct). Use "easymode list" to see segment feature names. Requires internet.')
+    download.add_argument('model_titles', metavar='MODEL', nargs='*', type=str, help='One or more model names to download (default: all).')
+    download.add_argument('--quiet', action='store_true', help='Suppress per-model download messages.')
+
     if os.path.exists('/lmb/home/mlast/easymode_dev'):
         package = subparsers.add_parser('package', description='Package model and weights. Note that this is used for 3D models only; 2D models are packaged and distributed with Ais.')
         package.add_argument('-c', "--checkpoint_directory", type=str, required=True, help="Path to the checkpoint directory to package from.")
@@ -260,6 +264,9 @@ def main():
     elif args.command == 'list':
         from easymode.core.distribution import list_remote_models
         list_remote_models()
+    elif args.command == 'download':
+        from easymode.core.distribution import download_models
+        download_models(model_titles=args.model_titles if args.model_titles else None, silent=args.quiet)
 
 if __name__ == "__main__":
     main()
