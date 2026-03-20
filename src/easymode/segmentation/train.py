@@ -2,15 +2,14 @@ import glob, os, mrcfile
 from easymode.segmentation.augmentations import *
 import tensorflow as tf
 import numpy as np
-from scipy.ndimage import gaussian_filter
 
-AUGMENTATIONS_ROT_XZ_YZ = 0.5
-AUGMENTATIONS_ROT_XY = 0.5
+AUGMENTATIONS_ROT_XZ_YZ = 0.3
+AUGMENTATIONS_ROT_XY = 0.33
 AUGMENTATIONS_MISSING_WEDGE = 0.0
-AUGMENTATIONS_GAUSSIAN = 0.25
-AUGMENTATIONS_SCALE = 0.5
+AUGMENTATIONS_GAUSSIAN = 0.33
+AUGMENTATIONS_SCALE = 0.33
 AUGMENTATIONS_MIXUP = 0.0
-AUGMENTATIONS_CONTRAST = 0.0 # to fix - currently would have no effect as augment is done before preprocess (normalization)
+AUGMENTATIONS_CONTRAST = 0.33
 
 DEBUG = False
 ROOT = '/cephfs/mlast/compu_projects/easymode'
@@ -21,7 +20,7 @@ if os.name == 'nt':
 
 
 class Sample:
-    FLAVOURS = ['odd', 'even', 'raw', 'cryocare']
+    FLAVOURS = ['cryocare', 'odd', 'even', 'raw', 'cryocare']
     def __init__(self, idx, datagroup):
         self.idx = idx
         self.datagroup = datagroup
@@ -56,34 +55,38 @@ class Sample:
             print(f'No available flavours for sample {self.idx} in {self.datagroup}')
             self.valid = False
 
-    def load(self):
-        available_flavours = list(self.flavours.keys())
-        if 'cryocare' in available_flavours:
-            available_flavours.append('cryocare')  # double odds of selecting cryocare
-        flavours = random.sample(available_flavours, 2)
-        mixing_factor = random.uniform(0.0, 1.0)
+    def load(self, validation=False):
+        if validation:
+            img = mrcfile.read(self.flavours['cryocare'])
+            label = mrcfile.read(self.label_path)
+            validity = mrcfile.read(self.validity_path)
+        else:
+            available_flavours = list(self.flavours.keys())
+            if 'cryocare' in available_flavours:
+                available_flavours.append('cryocare')  # double odds of selecting denoised tomo
+            flavours = random.sample(available_flavours, 2)
+            mixing_factor = random.uniform(0.0, 1.0)
 
-        img_a = mrcfile.read(self.flavours[flavours[0]])
-        img_b = mrcfile.read(self.flavours[flavours[1]])
-        img = img_a * mixing_factor + img_b * (1 - mixing_factor)
+            img_a = mrcfile.read(self.flavours[flavours[0]])
+            img_b = mrcfile.read(self.flavours[flavours[1]])
+            img = img_a * mixing_factor + img_b * (1 - mixing_factor)
 
-        label = mrcfile.read(self.label_path)
-        validity = mrcfile.read(self.validity_path)
+            label = mrcfile.read(self.label_path)
+            validity = mrcfile.read(self.validity_path)
 
-        label[validity == 0] = 2
+            label[validity == 0] = 2
 
-        if self.datagroup == 'Junk3D' or self.datagroup.startswith('Not'):
-            label[label == 1] = 0
+            if self.datagroup == 'Junk3D' or self.datagroup.startswith('Not'):
+                label[label == 1] = 0
 
         return img, label, validity
 
 
 class DataLoader:
-    def __init__(self, features, batch_size=8, validation=False, limit_z=False):
+    def __init__(self, features, batch_size=8, validation=False):
         self.features = features
         self.batch_size = batch_size
         self.validation = validation
-        self.limit_z = limit_z
         self.samples = list()
         self.positive_samples = list()
         self.negative_samples = list()
@@ -181,46 +184,42 @@ class DataLoader:
         return img, label
 
     def sample_generator(self):
-        while True:
-            np.random.shuffle(self.samples)
-            for j in range(len(self.samples)):
-                if j % 4 == 0:
-                    sample = random.choice(self.positive_samples)
-                else:
-                    sample = self.samples[j]
-
-                img, label, validity = sample.load()
+        if self.validation:
+            for sample in self.samples:
+                img, label, validity = sample.load(validation=True)
                 img, label = self.preprocess(img, label, validity)
-                img, label = self.augment(img, label)
+                label[:16, :, :] = 2; label[-16:, :, :] = 2
+                label[:, :16, :] = 2; label[:, -16:, :] = 2
+                label[:, :, :16] = 2; label[:, :, -16:] = 2
+                yield np.expand_dims(img, axis=-1), np.expand_dims(label, axis=-1)
+        else:
+            while True:
+                np.random.shuffle(self.samples)
+                for j in range(len(self.samples)):
+                    if j % 4 == 0:
+                        sample = random.choice(self.positive_samples)
+                    else:
+                        sample = self.samples[j]
 
-                label[:16, :, :] = 2
-                label[-16:, :, :] = 2
+                    img, label, validity = sample.load()
+                    img, label = self.preprocess(img, label, validity)
+                    img, label = self.augment(img, label)
 
-                if self.limit_z:
-                    img = img[48:112, :, :]
-                    label = label[48:112, :, :]
-                else:
-                    img = img[32:128, :, :]
-                    label = label[32:128, :, :]
+                    label[:16, :, :] = 2; label[-16:, :, :] = 2
+                    label[:, :16, :] = 2; label[:, -16:, :] = 2
+                    label[:, :, :16] = 2; label[:, :, -16:] = 2
 
-                label[:, :16, :] = 2
-                label[:, -16:, :] = 2
-                label[:, :, :16] = 2
-                label[:, :, -16:] = 2
-
-                img = np.expand_dims(img, axis=-1)
-                label = np.expand_dims(label, axis=-1)
-
-                yield img, label
+                    yield np.expand_dims(img, axis=-1), np.expand_dims(label, axis=-1)
 
     def as_generator(self, batch_size):
-        z_dim = 64 if self.limit_z else 96
-        dataset = tf.data.Dataset.from_generator(self.sample_generator, output_signature=(tf.TensorSpec(shape=(z_dim, 160, 160, 1), dtype=tf.float32), tf.TensorSpec(shape=(z_dim, 160, 160, 1), dtype=tf.float32))).batch(batch_size=batch_size, drop_remainder=True).prefetch(tf.data.AUTOTUNE)
+        dataset = tf.data.Dataset.from_generator(self.sample_generator, output_signature=(tf.TensorSpec(shape=(160, 160, 160, 1), dtype=tf.float32), tf.TensorSpec(shape=(160, 160, 160, 1), dtype=tf.float32))).batch(batch_size=batch_size, drop_remainder=True).prefetch(tf.data.AUTOTUNE)
+        if self.validation:
+            return dataset, None  # finite dataset — Keras runs until exhausted
         n_steps = len(self.samples) // batch_size
         return dataset, n_steps
 
 
-def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, lr_end=1e-5, limit_z=False, weights_path=None, lightweight=False):
+def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, lr_end=1e-5, weights_path=None, lightweight=False):
     if lightweight:
         print('importing lightweight model')
         from easymode.segmentation.model_lite import create
@@ -228,8 +227,6 @@ def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, 
         print('importing default model')
         from easymode.segmentation.model import create
 
-    if limit_z:
-        print('Limiting Z dimension to central 64 voxels.\n')
 
     tf.config.run_functions_eagerly(False)
 
@@ -238,15 +235,18 @@ def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, 
     with tf.distribute.MirroredStrategy().scope():
         model = create()
         if weights_path is not None:
-            z_dim = 64 if limit_z else 96
-            dummy = tf.zeros((1, z_dim, 160, 160, 1))
+            dummy = tf.zeros((1, 160, 160, 160, 1))
             model(dummy)
+            if os.path.isdir(weights_path):
+                weights_path = tf.train.latest_checkpoint(weights_path)
+                if weights_path is None:
+                    raise ValueError(f'No checkpoint found in {weights_path}')
             model.load_weights(weights_path)
     model.optimizer.learning_rate.assign(lr_start)
 
     # data loaders
-    training_ds, training_steps = DataLoader(features, batch_size=batch_size, validation=False, limit_z=limit_z).as_generator(batch_size=batch_size)
-    validation_ds, validation_steps = DataLoader(features, batch_size=batch_size, validation=True, limit_z=limit_z).as_generator(batch_size=batch_size)
+    training_ds, training_steps = DataLoader(features, batch_size=batch_size, validation=False).as_generator(batch_size=batch_size)
+    validation_ds, validation_steps = DataLoader(features, batch_size=batch_size, validation=True).as_generator(batch_size=batch_size)
 
     # callbacks
     os.makedirs(f'{ROOT}/training/3d/checkpoints/{title}', exist_ok=True)
@@ -271,7 +271,7 @@ def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, 
     cb_csv = tf.keras.callbacks.CSVLogger(f'{ROOT}/training/3d/checkpoints/{title}/training_log.csv', append=True)
     model.fit(training_ds, steps_per_epoch=training_steps, validation_data=validation_ds, validation_steps=validation_steps, epochs=epochs, validation_freq=1, callbacks=[cb_checkpoint_val, cb_checkpoint_train, cb_lr, cb_csv])
 
-def test_dataloader(features, limit_z=False):
+def test_dataloader(features):
     import uuid, shutil
     out_dir = '/cephfs/mlast/compu_projects/easymode/training/3d/dataloader_test_outputs/'
     for sub in ['subtomo', 'label']:
@@ -280,7 +280,7 @@ def test_dataloader(features, limit_z=False):
             shutil.rmtree(d)
         os.makedirs(d)
 
-    loader = DataLoader(features, validation=False, limit_z=limit_z)
+    loader = DataLoader(features, validation=False)
     gen = loader.sample_generator()
 
     for i in range(30):

@@ -194,5 +194,5 @@ This work relies upon & was inspired by:
 6 - Buchholz et al., 'Content-aware image restoration for electron microscopy', IEEE (2019): https://dor.org/10.1109/ISBI.2019.8759519 https://github.com/juglab/cryoCARE_pip
 
 7 - Wiedemann & Heckel, 'A deep learning method for simultaneous denoising and missing wedge reconstruction in cryogenic electron tomography', Nature Communications (2024): https://doi.org/10.1038/s41467-024-51438-y https://github.com/MLI-lab/DeepDeWedge  
-
+    
 8 - Last et al., 'Streamlining segmentation of cryo-electron tomography datasets with Ais', eLife (2024): https://doi.org/10.7554/eLife.98552.3 https://www.github.com/bionanopatterning/Ais

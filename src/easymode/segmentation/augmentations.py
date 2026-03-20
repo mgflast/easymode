@@ -59,7 +59,7 @@ def scale(img, label):
 
     new_size = int(round(box_size * factor))
     zoomed_img = resize(img, (new_size,) * 3, order=3, anti_aliasing=True).astype(np.float32)
-    zoomed_label = resize(label, (new_size,) * 3, order=0, anti_aliasing=True).astype(np.float32)
+    zoomed_label = resize(label, (new_size,) * 3, order=0, anti_aliasing=False).astype(np.float32)
 
     if factor < 1:
         pad_width = (box_size - zoomed_img.shape[0]) // 2

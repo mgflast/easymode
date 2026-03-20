@@ -1,17 +1,18 @@
 import os, glob, time, multiprocessing, psutil
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # suppress TF C++ INFO and WARNING before import
 import tensorflow as tf
 import gc
 from tensorflow.keras import mixed_precision
 import mrcfile
 import numpy as np
 from easymode.core.distribution import get_model, load_model
+from skimage.transform import resize
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 tf.get_logger().setLevel('ERROR')
 tf.config.optimizer.set_experimental_options({'layout_optimizer': False})
 
-TILE_SIZE = [128, 256, 256]
-OVERLAP = [32, 32, 32]
+TILE_SIZE = [160, 256, 256]
+OVERLAP = [48, 32, 32]
 MAX_CHUNK_SIZE = 1
 
 
@@ -61,36 +62,34 @@ def detile_volume(segmented_tiles, positions, original_shape, patch_size, overla
     wgt[wgt == 0] = 1.0
     return out / wgt
 
-def _segment_tile_list(tiles, model, batch_size=8, max_chunk_size=MAX_CHUNK_SIZE):
+def _segment_tile_list(tiles, model, batch_size=MAX_CHUNK_SIZE):
     num_tiles = len(tiles)
     segmented_tiles = []
-    for i in range(0, num_tiles, max_chunk_size):
-        chunk_end = min(i + max_chunk_size, num_tiles)
-        chunk = tiles[i:chunk_end]
+    for i in range(0, num_tiles, batch_size):
+        chunk = tiles[i:i + batch_size]
 
         try:
-            chunk_result = model.predict(chunk, verbose=0, batch_size=batch_size)
+            chunk_result = model(chunk, training=False).numpy()
             segmented_tiles.extend(chunk_result)
 
         except tf.errors.ResourceExhaustedError:
-            print(f"Memory error with chunk size {len(chunk)}, falling back to smaller chunks")
-            fallback_chunk_size = max(1, len(chunk) // 4)
-            for j in range(i, chunk_end, fallback_chunk_size):
-                small_chunk = tiles[j:min(j + fallback_chunk_size, chunk_end)]
-                small_result = model.predict(small_chunk, verbose=0, batch_size=batch_size)
-                segmented_tiles.extend(small_result)
+            if batch_size == 1:
+                raise
+            print(f"Memory error with batch size {len(chunk)}, falling back to single tiles")
+            for j in range(len(chunk)):
+                single = chunk[j:j + 1]
+                single_result = model(single, training=False).numpy()
+                segmented_tiles.extend(single_result)
 
     return segmented_tiles
 
 
 def _segment_tomogram_instance(volume, model, batch_size, tile_size, overlap):
     tiles, positions, original_shape = tile_volume(volume, tile_size, overlap)
-    segmented_tiles = _segment_tile_list(tiles, model, batch_size=batch_size, max_chunk_size=MAX_CHUNK_SIZE)
+    segmented_tiles = _segment_tile_list(tiles, model, batch_size=1)
     segmented_tiles = np.array(segmented_tiles)
     segmented_volume = detile_volume(segmented_tiles, positions, original_shape, tile_size, overlap)
 
-    tf.keras.backend.clear_session()
-    gc.collect()
     return segmented_volume.astype(np.float32)
 
 def _pad_volume(volume, min_pad=16, div=32):
@@ -105,7 +104,7 @@ def _pad_volume(volume, min_pad=16, div=32):
     return padded, tuple(pads)
 
 
-def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, model_apix=10.0, input_apix=None, model_apix_z=None):
+def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, model_apix=10.0, input_apix=None, model_apix_z=None, use_depth=1.0, xy_margin=0):
     global TILE_SIZE, OVERLAP
 
     # model_apix_z=None means isotropic model (apix_z == apix_xy)
@@ -132,12 +131,12 @@ def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, model_apix=10.0,
         scale_xy = float(input_apix) / float(model_apix)
         scale_z = float(input_apix) / float(model_apix_z)
 
+    # preprocess: scale to model apix.
     rescaled = False
     if abs(scale_xy - 1.0) > 0.05 or abs(scale_z - 1.0) > 0.05:
-        from scipy.ndimage import zoom
-        volume = zoom(volume, (scale_z, scale_xy, scale_xy), order=1)
+        new_size = [int(np.round(scale_z * oj)), int(np.round(scale_xy * ok)), int(np.round(scale_xy * ol))]
+        volume = resize(volume, new_size, order=3, anti_aliasing=True).astype(np.float32)
         rescaled = True
-
 
     # preprocess: normalize & pad
     _j, _k, _l = volume.shape
@@ -145,6 +144,22 @@ def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, model_apix=10.0,
     _l_margin = min(int(0.2*_l), 64)
     volume -= np.mean(volume[:, _k_margin:-_k_margin, _l_margin:-_l_margin])
     volume /= np.std(volume[:, _k_margin:-_k_margin, _l_margin:-_l_margin]) + 1e-7
+
+    # Compute active Z range (in current/possibly-rescaled volume coords and in original coords)
+    # Skip Z cropping if the active region would be too small (fewer than 32 slices)
+    n_z = volume.shape[0]
+    z_margin = int(n_z * (1.0 - use_depth) / 2) if n_z * use_depth >= 32 else 0
+    z_start_r, z_end_r = z_margin, n_z - z_margin
+    z_start = int(oj * (1.0 - use_depth) / 2) if z_margin > 0 else 0
+    z_end = oj - z_start
+
+    # Compute XY margin in current (possibly-rescaled) coords; skip if the tomogram is too small
+    xy_margin_r = int(xy_margin * (volume.shape[1] / ok)) if xy_margin > 0 and ok >= xy_margin * 5 and ol >= xy_margin * 5 else 0
+    xy_margin = xy_margin if xy_margin_r > 0 else 0
+
+    volume = volume[z_start_r:z_end_r,
+                    xy_margin_r:volume.shape[1] - xy_margin_r if xy_margin_r else volume.shape[1],
+                    xy_margin_r:volume.shape[2] - xy_margin_r if xy_margin_r else volume.shape[2]]
 
     volume, padding = _pad_volume(volume)
     segmented_volume = np.zeros((oj, ok, ol), dtype=np.float32)
@@ -177,10 +192,10 @@ def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, model_apix=10.0,
         if rescaled:
             from scipy.ndimage import zoom
             sj, sk, sl = segmented_tta_vol.shape
-            segmented_tta_vol = zoom(segmented_tta_vol, (oj / sj, ok / sk, ol / sl), order=1)
-            segmented_tta_vol = segmented_tta_vol[:oj, :ok, :ol]
+            segmented_tta_vol = resize(segmented_tta_vol, (z_end - z_start, ok - 2 * xy_margin, ol - 2 * xy_margin), order=1)
+            segmented_tta_vol = segmented_tta_vol[:z_end - z_start, :ok - 2 * xy_margin, :ol - 2 * xy_margin]
 
-        segmented_volume += segmented_tta_vol
+        segmented_volume[z_start:z_end, xy_margin:ok - xy_margin if xy_margin else ok, xy_margin:ol - xy_margin if xy_margin else ol] += segmented_tta_vol
     segmented_volume /= tta
 
     return segmented_volume, volume_apix
@@ -197,7 +212,7 @@ def save_mrc(pxd, path, data_format, voxel_size=10.0):
         m.set_data(pxd)
         m.voxel_size = voxel_size
 
-def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, batch_size, tta, overwrite, data_format, model_apix, model_apix_z=None, input_apix=None):
+def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, batch_size, tta, overwrite, data_format, model_apix, model_apix_z=None, input_apix=None, use_depth=1.0, xy_margin=0):
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
 
     for device in tf.config.list_physical_devices('GPU'):
@@ -223,18 +238,21 @@ def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, bat
                 m.voxel_size = 10.0
                 wrote_temporary = True
 
-            segmented_volume, segmented_volume_apix = segment_tomogram(model, tomogram_path, tta, batch_size, model_apix, input_apix, model_apix_z)
+            segmented_volume, segmented_volume_apix = segment_tomogram(model, tomogram_path, tta, batch_size, model_apix, input_apix, model_apix_z, use_depth, xy_margin)
 
             save_mrc(segmented_volume, output_file, data_format, segmented_volume_apix)
 
-            etc = time.strftime('%H:%M:%S', time.gmtime((time.time() - process_start_time) / j * (len(tomogram_list) - j)))
-            print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {feature} - {os.path.basename(tomogram_path)} - etc {etc}")
+            elapsed = time.time() - process_start_time
+            eta = time.strftime('%H:%M:%S', time.gmtime(elapsed / j * (len(tomogram_list) - j)))
+            avg_secs = int(elapsed / j)
+            per_tomo = f"{avg_secs // 60:02d}:{avg_secs % 60:02d}"
+            print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {feature} - {os.path.basename(tomogram_path)} - eta {eta} ({per_tomo} per tomo)")
         except Exception as e:
             if wrote_temporary:
                 os.remove(output_file)
             print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {feature} - {os.path.basename(tomogram_path)} - ERROR: {e}")
 
-def dispatch_segment( feature, data_directory, output_directory, tta=1, batch_size=8, overwrite=False, data_format='int8', gpus=None, data_apix=None ):
+def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_size=8, overwrite=False, data_format='int8', gpus=None, data_apix=None, use_depth=1.0, xy_margin=0):
     if isinstance(data_directory, (list, tuple)):
         patterns = list(data_directory)
     else:
@@ -312,7 +330,9 @@ def dispatch_segment( feature, data_directory, output_directory, tta=1, batch_si
                 data_format,
                 model_apix,
                 model_apix_z,
-                data_apix
+                data_apix,
+                use_depth,
+                xy_margin
             )
         )
         processes.append(p)

@@ -2,6 +2,105 @@ import os
 
 TRAINING_COLLECTION_APIX = 10.0
 
+_ctx = {}
+
+
+def _init_worker(ctx):
+    global _ctx
+    _ctx = ctx
+
+
+def _get_box(j, k, l, tomo, flavour):
+    import mrcfile
+    import numpy as np
+    binning_xy = _ctx['binning_xy']
+    BOX_Z = _ctx['BOX_Z']
+    BOX_XY = _ctx['BOX_XY']
+    tomo_dataset_map = _ctx['tomo_dataset_map']
+
+    dataset = tomo_dataset_map[tomo]
+    if flavour == 'even':
+        path = f'/cephfs/mlast/compu_projects/easymode/datasets/{dataset}/warp_tiltseries/reconstruction/even/{tomo}'
+    elif flavour == 'odd':
+        path = f'/cephfs/mlast/compu_projects/easymode/datasets/{dataset}/warp_tiltseries/reconstruction/odd/{tomo}'
+    elif flavour == 'raw':
+        path = f'/cephfs/mlast/compu_projects/easymode/datasets/{dataset}/warp_tiltseries/reconstruction/{tomo}'
+    elif flavour == 'cryocare':
+        path = f'/cephfs/mlast/compu_projects/easymode/volumes_cryocare/{tomo}'
+    else:
+        path = f'/cephfs/mlast/compu_projects/easymode/volumes_ddw/{tomo}'
+
+    if not os.path.exists(path):
+        return False, None, None
+
+    hz, hxy = BOX_Z // 2, BOX_XY // 2
+    with mrcfile.mmap(path, permissive=True) as m:
+        v = m.data
+        Z, Y, X = v.shape
+        out = np.zeros((BOX_Z, BOX_XY, BOX_XY), dtype=v.dtype)
+        msk = np.zeros((BOX_Z, BOX_XY, BOX_XY), dtype=np.uint8)
+
+        z0, z1 = j - hz, j + (BOX_Z - hz)
+        y0, y1 = k - hxy, k + (BOX_XY - hxy)
+        x0, x1 = l - hxy, l + (BOX_XY - hxy)
+
+        zs0, zs1 = max(0, z0), min(Z, z1)
+        ys0, ys1 = max(0, y0), min(Y, y1)
+        xs0, xs1 = max(0, x0), min(X, x1)
+
+        zd0, yd0, xd0 = zs0 - z0, ys0 - y0, xs0 - x0
+        dz, dy, dx = zs1 - zs0, ys1 - ys0, xs1 - xs0
+
+        if dz > 0 and dy > 0 and dx > 0:
+            out[zd0:zd0 + dz, yd0:yd0 + dy, xd0:xd0 + dx] = v[zs0:zs1, ys0:ys1, xs0:xs1]
+            msk[zd0:zd0 + dz, yd0:yd0 + dy, xd0:xd0 + dx] = 1
+
+        # Bin XY only, leave Z unbinned
+        if binning_xy > 1:
+            from skimage.transform import resize
+            out = resize(out, (160, 160, 160), anti_aliasing=True).astype(out.dtype)
+            msk = resize(msk.astype(np.float32), (160, 160, 160), anti_aliasing=False, order=0, preserve_range=True) > 0
+
+    return True, out, msk
+
+
+def _get_box_save_box(j, k, l, tomo, flavour, sample_id, feature):
+    import mrcfile
+    import numpy as np
+    apix = _ctx['apix']
+
+    if flavour == 'cryocare':
+        with open(f'/cephfs/mlast/compu_projects/easymode/training/3d/data/{feature}/cryocare/{sample_id}.aislink', 'w') as lf:
+            lf.write(f'{tomo}')
+    valid, vol, msk = _get_box(j, k, l, tomo, flavour)
+    if not valid:
+        return
+    with mrcfile.new(f'/cephfs/mlast/compu_projects/easymode/training/3d/data/{feature}/{flavour}/{sample_id}.mrc', overwrite=True) as m:
+        m.set_data(vol.astype(np.float32))
+        m.voxel_size = (apix, apix, TRAINING_COLLECTION_APIX)
+    if flavour == 'cryocare':
+        with mrcfile.new(f'/cephfs/mlast/compu_projects/easymode/training/3d/data/{feature}/validity/{sample_id}.mrc', overwrite=True) as m:
+            m.set_data(msk.astype(np.uint8))
+            m.voxel_size = (apix, apix, TRAINING_COLLECTION_APIX)
+
+
+def _process_particle(args):
+    import mrcfile
+    import numpy as np
+    j, k, l, tomo, feature, particle_id = args
+    apix = _ctx['apix']
+    tomo_dataset_map = _ctx['tomo_dataset_map']
+
+    _get_box_save_box(j, l, k, tomo, 'raw', particle_id, feature)
+    _get_box_save_box(j, l, k, tomo, 'even', particle_id, feature)
+    _get_box_save_box(j, l, k, tomo, 'odd', particle_id, feature)
+    _get_box_save_box(j, l, k, tomo, 'cryocare', particle_id, feature)
+    if 'Junk' in feature or 'Not' in feature:
+        with mrcfile.new(f'/cephfs/mlast/compu_projects/easymode/training/3d/data/{feature}/label/{particle_id}.mrc', overwrite=True) as m:
+            m.set_data(np.zeros((160, 160, 160), dtype=np.float32))
+            m.voxel_size = (apix, apix, TRAINING_COLLECTION_APIX)
+    return feature, tomo_dataset_map[tomo]
+
 
 def extract_training_data(features, apix):
     import glob, mrcfile
@@ -49,77 +148,13 @@ def extract_training_data(features, apix):
         key = f"{tomo}_{feature}_{j}_{k}_{l}"
         return hashlib.md5(key.encode()).hexdigest()[:8]
 
-    def get_box(j, k, l, tomo, flavour):
-        dataset = tomo_dataset_map[tomo]
-        if flavour == 'even':
-            path = f'/cephfs/mlast/compu_projects/easymode/datasets/{dataset}/warp_tiltseries/reconstruction/even/{tomo}'
-        elif flavour == 'odd':
-            path = f'/cephfs/mlast/compu_projects/easymode/datasets/{dataset}/warp_tiltseries/reconstruction/odd/{tomo}'
-        elif flavour == 'raw':
-            path = f'/cephfs/mlast/compu_projects/easymode/datasets/{dataset}/warp_tiltseries/reconstruction/{tomo}'
-        elif flavour == 'cryocare':
-            path = f'/cephfs/mlast/compu_projects/easymode/volumes_cryocare/{tomo}'
-        else:
-            path = f'/cephfs/mlast/compu_projects/easymode/volumes_ddw/{tomo}'
-
-        if not os.path.exists(path):
-            return False, None, None
-
-        hz, hxy = BOX_Z // 2, BOX_XY // 2
-        with mrcfile.mmap(path, permissive=True) as m:
-            v = m.data
-            Z, Y, X = v.shape
-            out = np.zeros((BOX_Z, BOX_XY, BOX_XY), dtype=v.dtype)
-            msk = np.zeros((BOX_Z, BOX_XY, BOX_XY), dtype=np.uint8)
-
-            z0, z1 = j - hz, j + (BOX_Z - hz)
-            y0, y1 = k - hxy, k + (BOX_XY - hxy)
-            x0, x1 = l - hxy, l + (BOX_XY - hxy)
-
-            zs0, zs1 = max(0, z0), min(Z, z1)
-            ys0, ys1 = max(0, y0), min(Y, y1)
-            xs0, xs1 = max(0, x0), min(X, x1)
-
-            zd0, yd0, xd0 = zs0 - z0, ys0 - y0, xs0 - x0
-            dz, dy, dx = zs1 - zs0, ys1 - ys0, xs1 - xs0
-
-            if dz > 0 and dy > 0 and dx > 0:
-                out[zd0:zd0+dz, yd0:yd0+dy, xd0:xd0+dx] = v[zs0:zs1, ys0:ys1, xs0:xs1]
-                msk[zd0:zd0+dz, yd0:yd0+dy, xd0:xd0+dx] = 1
-
-            # Bin XY only, leave Z unbinned
-            if binning_xy > 1:
-                out = out.reshape((BOX_Z, 160, binning_xy, 160, binning_xy)).mean(axis=(2, 4))
-                msk = msk.reshape((BOX_Z, 160, binning_xy, 160, binning_xy)).min(axis=(2, 4))
-
-        return True, out, msk
-
-    def get_box_save_box(j, k, l, tomo, flavour, sample_id, feature):
-        if flavour == 'cryocare':
-            with open(f'/cephfs/mlast/compu_projects/easymode/training/3d/data/{feature}/cryocare/{sample_id}.aislink', 'w') as lf:
-                lf.write(f'{tomo}')
-        valid, vol, msk = get_box(j, k, l, tomo, flavour)
-        if not valid:
-            return
-        with mrcfile.new(f'/cephfs/mlast/compu_projects/easymode/training/3d/data/{feature}/{flavour}/{sample_id}.mrc', overwrite=True) as m:
-            m.set_data(vol.astype(np.float32))
-            m.voxel_size = (apix, apix, TRAINING_COLLECTION_APIX)
-        if flavour == 'cryocare':
-            with mrcfile.new(f'/cephfs/mlast/compu_projects/easymode/training/3d/data/{feature}/validity/{sample_id}.mrc', overwrite=True) as m:
-                m.set_data(msk.astype(np.uint8))
-                m.voxel_size = (apix, apix, TRAINING_COLLECTION_APIX)
-
-    def process_particle(args):
-        j, k, l, tomo, feature, particle_id = args
-        get_box_save_box(j, l, k, tomo, 'raw', particle_id, feature)
-        get_box_save_box(j, l, k, tomo, 'even', particle_id, feature)
-        get_box_save_box(j, l, k, tomo, 'odd', particle_id, feature)
-        get_box_save_box(j, l, k, tomo, 'cryocare', particle_id, feature)
-        if 'Junk' in feature or 'Not' in feature:
-            with mrcfile.new(f'/cephfs/mlast/compu_projects/easymode/training/3d/data/{feature}/label/{particle_id}.mrc', overwrite=True) as m:
-                m.set_data(np.zeros((160, 160, 160), dtype=np.float32))
-                m.voxel_size = (apix, apix, TRAINING_COLLECTION_APIX)
-        return feature, tomo_dataset_map[tomo]
+    ctx = {
+        'binning_xy': binning_xy,
+        'BOX_Z': BOX_Z,
+        'BOX_XY': BOX_XY,
+        'apix': apix,
+        'tomo_dataset_map': tomo_dataset_map,
+    }
 
     tasks = []
     print(f"Scanning {len(annotated_tomograms)} annotated tomograms...")
@@ -148,8 +183,8 @@ def extract_training_data(features, apix):
                 tasks.append((j, k, l, tomo, f.title, particle_id))
 
     print(f"Processing {len(tasks)} particles across {os.cpu_count()} cores")
-    with Pool() as pool:
-        results = pool.map(process_particle, tasks)
+    with Pool(initializer=_init_worker, initargs=(ctx,)) as pool:
+        results = pool.map(_process_particle, tasks)
 
     for feature, dataset in results:
         feature_dataset_count_map[feature][dataset] += 1

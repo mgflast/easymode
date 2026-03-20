@@ -2,7 +2,6 @@ import argparse
 import easymode.core.config as cfg
 import os
 
-# TODO: clear cache command
 
 def main():
     parser = argparse.ArgumentParser(description="easymode: pretrained general networks for cellular cryoET.")
@@ -16,7 +15,6 @@ def main():
         train_parser.add_argument('-b', "--batch_size", type=int, help="Batch size for training (default 8).", default=8)
         train_parser.add_argument('-ls', "--lr_start", type=float, help="Initial learning rate for the optimizer (default 5e-3).", default=5e-3)
         train_parser.add_argument('-le', "--lr_end", type=float, help="Final learning rate for the optimizer (default 5e-5).", default=5e-5)
-        train_parser.add_argument('--limit_z', action='store_true', help="Crop training samples to the central 80 voxels along Z (first dimension). Faster training and focuses on the most accurately labelled region.")
         train_parser.add_argument('--weights', type=str, default=None, help="Path to a .h5 weights file to initialize training from.")
         train_parser.add_argument('--lite', action='store_true', help="Train a lightweight version (40 Mb) instead of the default model (500 Mb).")
         train_parser.add_argument('--test', action='store_true', help="(debug) test augmentations and save to .../training/3d/test_samples/")
@@ -122,7 +120,7 @@ def main():
         from easymode.segmentation.train import train_model
         if args.test:
             from easymode.segmentation.train import test_dataloader
-            test_dataloader(args.features, args.limit_z)
+            test_dataloader(args.features)
         else:
             train_model(title=args.title,
                         features=args.features,
@@ -130,7 +128,6 @@ def main():
                         epochs=args.epochs,
                         lr_start=args.lr_start,
                         lr_end=args.lr_end,
-                        limit_z=args.limit_z,
                         weights_path=args.weights,
                         lightweight=args.lite
                         )
@@ -179,26 +176,26 @@ def main():
             for feature in features:
                 dispatch_segment_2d(
                     feature=feature,
-                    data_directory=args.data,  # now a list of patterns/paths
+                    data_directory=args.data,
                     output_directory=args.output,
                     tta=args.tta,
                     batch_size=args.batch,
                     overwrite=args.overwrite,
                     data_format=args.format,
-                    gpus=args.gpu
+                    gpus=args.gpu,
                 )
         else:
             from easymode.segmentation.inference import dispatch_segment as dispatch_segment_3d
             for feature in features:
                 dispatch_segment_3d(
                     feature=feature,
-                    data_directory=args.data,  # now a list of patterns/paths
+                    data_directory=args.data,
                     output_directory=args.output,
                     tta=args.tta,
                     batch_size=args.batch,
                     overwrite=args.overwrite,
                     data_format=args.format,
-                    gpus=args.gpu
+                    gpus=args.gpu,
                 )
     elif args.command == 'report':
         from easymode.core.reporting import report

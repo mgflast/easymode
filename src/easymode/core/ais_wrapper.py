@@ -86,8 +86,11 @@ def pick(data_directory, target, output_directory, threshold, spacing, size, bin
           f"\033[0m")
 
 
-def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_size=8, overwrite=False, data_format='int8', gpus=None):
+def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_size=8, overwrite=False, data_format='int8', gpus=None, stride=1, use_depth=1.0):
     import tensorflow as tf
+
+    tta_force_str = "" if tta >= 4 else "(forced)"
+    tta = max(tta, 4)
 
     if output_directory is None:
         output_directory = 'segmented'
@@ -106,7 +109,7 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
           f'input_data: {data_directory}\n'
           f'output_directory: {output_directory}\n'
           f'gpus: {gpus}\n'
-          f'tta: {tta}\n'
+          f'tta: {tta} {tta_force_str}\n'
           f'overwrite: {overwrite}\n'
           f'ais_2d_nets: True\n')
 
@@ -134,7 +137,7 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
     model_apix = metadata['apix']
 
     data_arg = " ".join(patterns)
-    command = f'ais segment -m {model_path} -apix {model_apix} -d {data_arg} -ou {output_directory} -tta {tta} -p 1 --overwrite {"1" if overwrite else "0"} -gpu {gpus}'
+    command = f'ais segment -m {model_path} -apix {model_apix} -d {data_arg} -ou {output_directory} -tta {tta} -p 1 --overwrite {"1" if overwrite else "0"} -gpu {gpus} --stride {stride} --use-depth {use_depth}'
     if model_apix > 20.0:
         command += f' -sigma {model_apix} {model_apix / 2.0} {model_apix / 2.0}'
 
