@@ -63,7 +63,7 @@ jobs:
           update_existing: true
 
       - name: Coverage
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         # with:
         #   token: ${{ secrets.CODECOV_TOKEN }}
 
