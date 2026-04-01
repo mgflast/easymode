@@ -45,7 +45,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "tensorflow>=2.8.0,<3.0.0",
+    "tensorflow>=2.11.0,<2.12",
     "mrcfile",
     "numpy",
     "scipy",
