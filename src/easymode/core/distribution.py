@@ -131,16 +131,19 @@ def load_model_weights(weights_path):
         from easymode.tiltfilter.model import create
         dummy_input = [tf.zeros((1, 256, 256, 1)), tf.zeros((1, 256, 256, 1))]
     else:
-        # Check file size to determine architecture version
-        # Large models (>400 MB) use old architecture, smaller models use new architecture
-        file_size_mb = os.path.getsize(weights_path) / (1024 * 1024)
+        arch = 'old'
+        metadata_path = os.path.splitext(weights_path)[0] + '.json'
+        if os.path.exists(metadata_path):
+            try:
+                with open(metadata_path) as f:
+                    arch = json.load(f).get('arch', 'old')
+            except Exception:
+                pass
 
-        if file_size_mb > 400:
-            print('importing segmentation model with default architecture')
-            from easymode.segmentation.model import create
+        if arch == 'current':
+            from easymode.segmentation.model_current import create
         else:
-            print('importing segmentation model with lightweight architecture')
-            from easymode.segmentation.model_lite import create
+            from easymode.segmentation.model_old import create
 
         dummy_input = tf.zeros((1, 160, 160, 160, 1))
 

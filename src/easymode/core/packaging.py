@@ -14,22 +14,26 @@ def package_checkpoint(title='', checkpoint_directory='', apix=10.0):
     # Determine which model architecture to use
     if 'n2n' in title:
         from easymode.n2n.model import create
+        arch = 'n2n'
     elif 'ddw' in title:
         from easymode.ddw.model import create
+        arch = 'ddw'
     elif 'tilt' in title:
         from easymode.tiltfilter.model import create
+        arch = 'tilt'
     else:
-        # Check checkpoint size to decide lite vs full
-        ckpt_size_mb = sum(            os.path.getsize(os.path.join(checkpoint_directory, f))
-            for f in os.listdir(checkpoint_directory)
-            if f.startswith(os.path.basename(checkpoint_path))
-        ) / (1024 * 1024)
-        if ckpt_size_mb < 1000:
-            print(f'Packaging weights as lite segmentation model.')
-            from easymode.segmentation.model_lite import create
+        arch_file = os.path.join(checkpoint_directory, 'arch.json')
+        if os.path.exists(arch_file):
+            with open(arch_file) as f:
+                arch = json.load(f).get('arch', 'old')
         else:
-            print(f'Packaging weights as default segmentation model.')
-            from easymode.segmentation.model import create
+            arch = 'old'
+        if arch == 'current':
+            print('Packaging weights as current segmentation model (GroupNorm).')
+            from easymode.segmentation.model_current import create
+        else:
+            print('Packaging weights as old segmentation model (BatchNorm).')
+            from easymode.segmentation.model_old import create
     model = create()
     if 'tilt' in title:
         _ = model([tf.zeros((1, 256, 256, 1)), tf.zeros((1, 256, 256, 1))])
@@ -45,6 +49,7 @@ def package_checkpoint(title='', checkpoint_directory='', apix=10.0):
     metadata = {
         'apix': apix,
         'apix_z': 10.0,
+        'arch': arch,
         'timestamp':  datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
     }
 

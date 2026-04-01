@@ -16,7 +16,8 @@ def main():
         train_parser.add_argument('-ls', "--lr_start", type=float, help="Initial learning rate for the optimizer (default 5e-3).", default=5e-3)
         train_parser.add_argument('-le', "--lr_end", type=float, help="Final learning rate for the optimizer (default 5e-5).", default=5e-5)
         train_parser.add_argument('--weights', type=str, default=None, help="Path to a .h5 weights file to initialize training from.")
-        train_parser.add_argument('--lite', action='store_true', help="Train a lightweight version (40 Mb) instead of the default model (500 Mb).")
+        train_parser.add_argument('--bce', type=float, default=0.3, help="Weight of the BCE component of the loss (default 0.3). Set to 1.0 and --dice 0.0 for BCE-only training.")
+        train_parser.add_argument('--dice', type=float, default=0.7, help="Weight of the dice component of the loss (default 0.7). Set to 0.0 for BCE-only training.")
         train_parser.add_argument('--test', action='store_true', help="(debug) test augmentations and save to .../training/3d/test_samples/")
 
     set_params = subparsers.add_parser('set', help='Set environment variables.')
@@ -52,7 +53,7 @@ def main():
 
     segment = subparsers.add_parser('segment', help='Segment data using pretrained easymode networks.')
     segment.add_argument( "features", metavar='FEATURE', nargs="+", type=str, help="One or more features to segment (e.g. 'ribosome membrane microtubule'). Use 'easymode list' to see available features.")
-    segment.add_argument("--data", nargs="+", type=str, required=True, help="One or more directories, file paths, or glob patterns. Examples: 'volumes', 'volumes/035*.mrc volumes/036*.mrc'.")
+    segment.add_argument("--data", nargs="+", type=str, required=True, help="One or more directories, file paths, glob patterns, or .txt files containing one tomogram path per line. Examples: 'volumes', 'volumes/035*.mrc volumes/036*.mrc', 'pom/subsets/good.txt'.")
     segment.add_argument('--tta', required=False, type=int, default=4, help="Integer between 1 and 16. For values > 1, test-time augmentation is performed by averaging the predictions of several transformed versions of the input. Higher values can yield better results but increase computation time. (default: 4)")
     segment.add_argument('--output', required=False, type=str, default="segmented", help="Directory to save the output (default: ./segmented/)")
     segment.add_argument('--overwrite', action='store_true', help='If set, overwrite existing segmentations in the output directory.')
@@ -129,7 +130,8 @@ def main():
                         lr_start=args.lr_start,
                         lr_end=args.lr_end,
                         weights_path=args.weights,
-                        lightweight=args.lite
+                        bce_weight=args.bce,
+                        dice_weight=args.dice,
                         )
     elif args.command == 'tilt_train':
         from easymode.tiltfilter.train import train_model

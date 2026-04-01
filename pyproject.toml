@@ -16,7 +16,7 @@ artifacts = [
 
 [project]
 name = "easymode"
-version = "0.0.3"
+version = "0.0.4"
 description = "Easymode - a collection of pretrained general networks for segmenting common eukaryotic features in cryoET"
 readme = "README.md"
 requires-python = ">=3.9"

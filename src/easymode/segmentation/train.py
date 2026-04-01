@@ -8,7 +8,7 @@ AUGMENTATIONS_ROT_XY = 0.33
 AUGMENTATIONS_MISSING_WEDGE = 0.0
 AUGMENTATIONS_GAUSSIAN = 0.33
 AUGMENTATIONS_SCALE = 0.33
-AUGMENTATIONS_MIXUP = 0.0
+AUGMENTATIONS_MIXUP = 0.2
 AUGMENTATIONS_CONTRAST = 0.33
 
 DEBUG = False
@@ -96,7 +96,7 @@ class DataLoader:
     def load_data(self):
         self.samples = list()
         for f in self.features:
-            available_samples = [os.path.basename(n).split('.')[0] for n in glob.glob(f'{ROOT}/training/3d/data/{f}/raw/*.mrc')]
+            available_samples = sorted([os.path.basename(n).split('.')[0] for n in glob.glob(f'{ROOT}/training/3d/data/{f}/raw/*.mrc')])
             for n in available_samples:
                 sample = Sample(idx=n, datagroup=f)
                 if sample.valid:
@@ -117,7 +117,7 @@ class DataLoader:
 
     def mixup(self, img, label):
         negative_sample = random.choice(self.negative_samples)
-        negative_img, _ = negative_sample.load()
+        negative_img, _, _ = negative_sample.load()
         mixing_factor = random.uniform(0.0, 0.2)
 
         img = img * (1 - mixing_factor) + negative_img * mixing_factor
@@ -219,21 +219,21 @@ class DataLoader:
         return dataset, n_steps
 
 
-def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, lr_end=1e-5, weights_path=None, lightweight=False):
-    if lightweight:
-        print('importing lightweight model')
-        from easymode.segmentation.model_lite import create
-    else:
-        print('importing default model')
-        from easymode.segmentation.model import create
-
+def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, lr_end=1e-5, weights_path=None, bce_weight=0.3, dice_weight=0.7):
+    import json
+    from easymode.segmentation.model_current import create, masked_bce_loss, masked_dice_loss, masked_precision, masked_recall, masked_dice
 
     tf.config.run_functions_eagerly(False)
 
     print(f'\nTraining model with features: {features}\n')
+    print(f'Loss weights: BCE={bce_weight}, dice={dice_weight}\n')
+
+    def combined_loss(y_true, y_pred):
+        return bce_weight * masked_bce_loss(y_true, y_pred) + dice_weight * masked_dice_loss(y_true, y_pred)
 
     with tf.distribute.MirroredStrategy().scope():
         model = create()
+        model.compile(optimizer=model.optimizer, loss=combined_loss, metrics=[masked_precision, masked_recall, masked_bce_loss, masked_dice], run_eagerly=False)
         if weights_path is not None:
             dummy = tf.zeros((1, 160, 160, 160, 1))
             model(dummy)
@@ -250,6 +250,8 @@ def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, 
 
     # callbacks
     os.makedirs(f'{ROOT}/training/3d/checkpoints/{title}', exist_ok=True)
+    with open(f'{ROOT}/training/3d/checkpoints/{title}/arch.json', 'w') as _f:
+        json.dump({'arch': 'current'}, _f)
     cb_checkpoint_val = tf.keras.callbacks.ModelCheckpoint(filepath=f'{ROOT}/training/3d/checkpoints/{title}/' + "validation_loss",
                                                            monitor=f'val_loss',
                                                            save_best_only=True,

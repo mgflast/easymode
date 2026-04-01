@@ -144,7 +144,7 @@ def reconstruct(frames, mdocs, apix=None, dose=None, extension=None, tomo_apix=1
 
     if dose is None:
         dose = find_dose(mdoc_path)
-        print(f'inferred dose per frame: {dose} e-/A^2')
+        print(f'inferred dose per tilt: {dose} e-/A^2')
     if apix is None:
         apix = find_apix(mdoc_path)
         print(f'inferred pixel size: {apix} A/pixel')

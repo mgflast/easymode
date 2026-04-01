@@ -285,11 +285,21 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
     # Collect tomograms from all patterns / paths
     tomograms = []
     for p in patterns:
-        if os.path.isdir(p):
+        if p.endswith('.txt') and os.path.isfile(p):
+            # .txt file with one tomogram path per line (e.g. a pom subset) (260331)
+            with open(p) as f:
+                for line in f:
+                    entry = line.strip()
+                    if entry and not entry.endswith('.mrc'):
+                        entry += '.mrc'
+                    if entry:
+                        tomograms.append(entry)
+        elif os.path.isdir(p):
             matches = glob.glob(os.path.join(p, '*.mrc'))
+            tomograms.extend(matches)
         else:
             matches = glob.glob(p)
-        tomograms.extend(matches)
+            tomograms.extend(matches)
 
     tomograms = [f for f in sorted(set(tomograms)) if os.path.splitext(f)[-1] == '.mrc']
 
