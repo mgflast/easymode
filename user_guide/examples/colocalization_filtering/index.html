@@ -2247,7 +2247,7 @@ We used 4 NVIDIA RTX 4090 GPUs for most processing steps.</p>
 easymode denoise --data warp_tiltseries/reconstruction --output denoised
 </code></pre></div>
 <h3 id="step-2-template-preparation">Step 2: template preparation</h3>
-<p>We used <a href="https://www.ebi.ac.uk/emdb/EMD-9195">EMD-9195</a> to generate the template. Since easymode reconstructs tomograms without contrast inversion (dark signal on a light background, same as in raw micrographs — <code>WarpTools ts_reconstruct --dont_invert</code> by default), make sure to invert the template to match this convention:</p>
+<p>We used <a href="https://www.ebi.ac.uk/emdb/EMD-9195">EMD-9195</a> to generate the template. Since we reconstruct tomograms without contrast inversion (dark signal on a light background, same as in raw micrographs — <code>WarpTools ts_reconstruct --dont_invert</code> by default), make sure to invert the template to match this convention:</p>
 <div class="highlight"><pre><span></span><code>mkdir tm
 pytom_create_template.py -i tm/emd_9195.mrc -o tm/template.mrc --input-voxel 1.070 --output-voxel 10.0 --center --box-size 40 --invert
 pytom_create_mask.py -b 40 -o tm/mask.mrc --voxel-size 10.00 --radius 15 --sigma 1
