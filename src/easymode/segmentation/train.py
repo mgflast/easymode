@@ -74,10 +74,10 @@ class Sample:
             label = mrcfile.read(self.label_path)
             validity = mrcfile.read(self.validity_path)
 
-            label[validity == 0] = 2
+        if self.datagroup == 'Junk3D' or self.datagroup.startswith('Not'):
+            label[label == 1] = 0
 
-            if self.datagroup == 'Junk3D' or self.datagroup.startswith('Not'):
-                label[label == 1] = 0
+        label[validity == 0] = 2
 
         return img, label, validity
 

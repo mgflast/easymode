@@ -10,7 +10,7 @@ def _run(cmd, capture=False):
         exit()
     return ret.stdout
 
-def pick(data_directory, target, output_directory, threshold, spacing, size, binning=2, tomostar=True, filament=False, per_filament_star_file=False, filament_length=500, centroid=False, min_particles=0, rotation_per_sample=0.0):
+def pick(data_directory, target, output_directory, threshold, spacing, size, binning=2, tomostar=True, filament=False, per_filament_star_file=False, filament_length=500, centroid=False, min_particles=0, rotation_per_sample=0.0, subset=None):
     if output_directory is None:
         output_directory = f'coordinates/{target}'
 
@@ -36,6 +36,8 @@ def pick(data_directory, target, output_directory, threshold, spacing, size, bin
         command += f' -filament -length {filament_length} --twist {rotation_per_sample}'
     if centroid:
         command += ' -centroid'
+    if subset:
+        command += f' --subset {subset}'
     _run(command)
 
     if tomostar:  # rename the rlnMicrograph name to account for the Warp(Tools) .tomostar / _10.00Apx.mrc discrepancy

@@ -84,6 +84,7 @@ def main():
     pick.add_argument('--separate_filaments', action='store_true', help='For filament tracing: write one .star file per filament instead of one per tomogram.')
     pick.add_argument('--centroid', action='store_true', help='When picking globular particles, set this flag to sample coordinates at the centroid of each connected component instead of at the deepest point in the threshold level isosurface. Use only when individual particles are well separated!')
     pick.add_argument('--min_particles', type=int, default=0, help="Minimum number of particles per tomogram to output a .star file (default 0). If fewer particles are found, no .star file is written for that tomogram.")
+    pick.add_argument('--subset', type=str, default=None, help="Path to a .txt file listing tomogram names (one per line), e.g. a Pom subset file. Only segmented volumes matching these tomograms will be picked.")
 
     denoise = subparsers.add_parser('denoise', help='Denoise or enhance contrast of tomograms.')
     denoise.add_argument('--data', type=str, required=True, help="Directory containing tomograms to denoise. In mode 'splits', this directory is expected to contain two subdirectories 'even' and 'odd' with the respective tomogram splits.")
@@ -220,7 +221,8 @@ def main():
              per_filament_star_file=args.separate_filaments,
              filament_length=args.length,
              centroid=args.centroid,
-             min_particles=args.min_particles)
+             min_particles=args.min_particles,
+             subset=args.subset)
     elif args.command == 'reconstruct':
         from easymode.core.warp_wrapper import reconstruct
         reconstruct(frames=args.frames,
