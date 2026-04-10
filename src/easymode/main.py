@@ -18,6 +18,8 @@ def main():
         train_parser.add_argument('--weights', type=str, default=None, help="Path to a .h5 weights file to initialize training from.")
         train_parser.add_argument('--bce', type=float, default=0.3, help="Weight of the BCE component of the loss (default 0.3). Set to 1.0 and --dice 0.0 for BCE-only training.")
         train_parser.add_argument('--dice', type=float, default=0.7, help="Weight of the dice component of the loss (default 0.7). Set to 0.0 for BCE-only training.")
+        train_parser.add_argument('--arch', type=str, default='current', choices=['current', 'lite'], help="Network architecture: 'current' (6-level UNet) or 'lite' (4-level shallow UNet, ~20x fewer parameters). Default: current.")
+        train_parser.add_argument('--crop', type=int, default=None, help="Training crop size (must be divisible by 8). Default: 160 for 'current', 96 for 'lite'.")
         train_parser.add_argument('--test', action='store_true', help="(debug) test augmentations and save to .../training/3d/test_samples/")
 
     set_params = subparsers.add_parser('set', help='Set environment variables.')
@@ -87,14 +89,12 @@ def main():
     pick.add_argument('--subset', type=str, default=None, help="Path to a .txt file listing tomogram names (one per line), e.g. a Pom subset file. Only segmented volumes matching these tomograms will be picked.")
 
     denoise = subparsers.add_parser('denoise', help='Denoise or enhance contrast of tomograms.')
-    denoise.add_argument('--data', type=str, required=True, help="Directory containing tomograms to denoise. In mode 'splits', this directory is expected to contain two subdirectories 'even' and 'odd' with the respective tomogram splits.")
+    denoise.add_argument('--data', type=str, required=True, help="Directory containing tomograms to denoise.")
     denoise.add_argument('--output', type=str, required=True, help="Directory to save denoised tomograms to.")
-    denoise.add_argument('--mode', type=str, choices=['splits', 'direct'], help="Denoising mode. splits: statistically sound denoising of independent even/odd splits. direct: denoise the complete tomogram using a network that was trained on even/odd split denoised data. This last option helps avoid having to generate even/odd frame and volume splits.", default='direct')
-    denoise.add_argument('--method', type=str, choices=['n2n', 'ddw'], help="Choose between denoising methods: 'n2n' for Noise2Noise (e.g. cryoCARE), or 'ddw' for DeepDeWedge. See github.com/juglab/cryocare_pip and github.com/mli-lab/deepdewedge and corresponding publications. In easymode we use custom tensorflow implementations.", default='n2n')
-    denoise.add_argument('--tta', type=int, default=1, help="Test-time augmentation factor (default 1). Input volumes can be processed multiple times in different orientations and the results averaged to yield a (potentially) better result. Higher values increase computation time. Maximum is 16, default is 1.")
-    denoise.add_argument('--overwrite', action='store_true', help='If set, overwrite existing segmentations in the output directory.')
-    denoise.add_argument('--batch', type=int, default=1,help='Batch size for segmentation (default 1). Volumes are processed in batches of 128x128x128 shaped tiles. In/decrease batch size depending on available GPU memory.')
-    denoise.add_argument('--iter', type=int, default=1, help="Only valid in direct mode: number of denoising iterations to perform (default 1). If you are really starved for contrast, try increasing this - but beware of artifacts.")
+    denoise.add_argument('--tta', type=int, default=1, help="Test-time augmentation factor (default 1). Higher values increase computation time. Maximum is 16.")
+    denoise.add_argument('--overwrite', action='store_true', help='If set, overwrite existing denoised tomograms in the output directory.')
+    denoise.add_argument('--batch', type=int, default=1, help='Batch size (default 1). Volumes are processed in batches of 128x128x128 shaped tiles.')
+    denoise.add_argument('--iter', type=int, default=1, help="Number of denoising iterations (default 1). Increasing may help contrast but beware of artifacts.")
     denoise.add_argument('--gpu', type=str, default=None, help="Comma-separated list of GPU ids to use (default '0').")
 
     select_tilts = subparsers.add_parser('select_tilts', help='Automatic marking of tilt images to be excluded from tomogram reconstruction')
@@ -124,6 +124,7 @@ def main():
             from easymode.segmentation.train import test_dataloader
             test_dataloader(args.features)
         else:
+            crop_size = args.crop if args.crop else (96 if args.arch == 'lite' else 160)
             train_model(title=args.title,
                         features=args.features,
                         batch_size=args.batch_size,
@@ -133,6 +134,8 @@ def main():
                         weights_path=args.weights,
                         bce_weight=args.bce,
                         dice_weight=args.dice,
+                        arch=args.arch,
+                        crop_size=crop_size,
                         )
     elif args.command == 'tilt_train':
         from easymode.tiltfilter.train import train_model
@@ -141,19 +144,8 @@ def main():
                     lr_start=args.lr_start,
                     lr_end=args.lr_end, )
     elif args.command == 'denoise':
-        if args.method == 'n2n':
-            import easymode.n2n.inference as n2n
-            n2n.dispatch(mode=args.mode,
-                     input_directory=args.data,
-                     output_directory=args.output,
-                     tta=args.tta,
-                     batch_size=args.batch,
-                     overwrite=args.overwrite,
-                     iter=args.iter,
-                     gpus=args.gpu)
-        elif args.method == 'ddw':
-            import easymode.ddw.inference as ddw
-            ddw.dispatch(mode=args.mode,
+        import easymode.n2n.inference as n2n
+        n2n.dispatch(mode='direct',
                      input_directory=args.data,
                      output_directory=args.output,
                      tta=args.tta,

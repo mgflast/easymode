@@ -3,13 +3,13 @@ from easymode.segmentation.augmentations import *
 import tensorflow as tf
 import numpy as np
 
-AUGMENTATIONS_ROT_XZ_YZ = 0.3
-AUGMENTATIONS_ROT_XY = 0.33
+AUGMENTATIONS_ROT_XZ_YZ = 0.2
+AUGMENTATIONS_ROT_XY = 0.2
 AUGMENTATIONS_MISSING_WEDGE = 0.0
-AUGMENTATIONS_GAUSSIAN = 0.33
-AUGMENTATIONS_SCALE = 0.33
-AUGMENTATIONS_MIXUP = 0.2
-AUGMENTATIONS_CONTRAST = 0.33
+AUGMENTATIONS_GAUSSIAN = 0.2
+AUGMENTATIONS_SCALE = 0.2
+AUGMENTATIONS_MIXUP = 0.0
+AUGMENTATIONS_CONTRAST = 0.0
 
 DEBUG = False
 ROOT = '/cephfs/mlast/compu_projects/easymode'
@@ -36,7 +36,11 @@ class Sample:
             self.valid = False
         else:
             label_volume = mrcfile.read(self.label_path)
-            self.is_positive = np.sum(label_volume == 1) > 0
+            if label_volume.shape[0] < 32:
+                print(f'Corrupt/stub label for sample {self.idx} in {self.datagroup} (shape {label_volume.shape})')
+                self.valid = False
+            else:
+                self.is_positive = np.sum(label_volume == 1) > 0
 
         # check existence of validity volume
         if not os.path.exists(self.validity_path):
@@ -83,10 +87,11 @@ class Sample:
 
 
 class DataLoader:
-    def __init__(self, features, batch_size=8, validation=False):
+    def __init__(self, features, batch_size=8, validation=False, crop_size=160):
         self.features = features
         self.batch_size = batch_size
         self.validation = validation
+        self.crop_size = crop_size
         self.samples = list()
         self.positive_samples = list()
         self.negative_samples = list()
@@ -103,9 +108,9 @@ class DataLoader:
                     self.samples.append(sample)
 
         if self.validation:
-            self.samples = [s for i, s in enumerate(self.samples) if i % 8 == 0]
+            self.samples = [s for i, s in enumerate(self.samples) if i % 20 == 0]
         else:
-            self.samples = [s for i, s in enumerate(self.samples) if i % 8 != 0]
+            self.samples = [s for i, s in enumerate(self.samples) if i % 20 != 0]
 
         self.positive_samples = [s for s in self.samples if s.is_positive]
         self.negative_samples = [s for s in self.samples if not s.is_positive]
@@ -167,6 +172,16 @@ class DataLoader:
 
         return img, label
 
+    def random_crop(self, img, label):
+        """Random crop from 160^3 to self.crop_size^3."""
+        c = self.crop_size
+        if c >= img.shape[0]:
+            return img, label
+        z = random.randint(0, img.shape[0] - c)
+        y = random.randint(0, img.shape[1] - c)
+        x = random.randint(0, img.shape[2] - c)
+        return img[z:z+c, y:y+c, x:x+c], label[z:z+c, y:y+c, x:x+c]
+
     def preprocess(self, img, label, validity):
         img = img.astype(np.float32)
 
@@ -184,19 +199,21 @@ class DataLoader:
         return img, label
 
     def sample_generator(self):
+        e = 16
         if self.validation:
             for sample in self.samples:
                 img, label, validity = sample.load(validation=True)
                 img, label = self.preprocess(img, label, validity)
-                label[:16, :, :] = 2; label[-16:, :, :] = 2
-                label[:, :16, :] = 2; label[:, -16:, :] = 2
-                label[:, :, :16] = 2; label[:, :, -16:] = 2
+                img, label = self.random_crop(img, label)
+                label[:e, :, :] = 2; label[-e:, :, :] = 2
+                label[:, :e, :] = 2; label[:, -e:, :] = 2
+                label[:, :, :e] = 2; label[:, :, -e:] = 2
                 yield np.expand_dims(img, axis=-1), np.expand_dims(label, axis=-1)
         else:
             while True:
                 np.random.shuffle(self.samples)
                 for j in range(len(self.samples)):
-                    if j % 4 == 0:
+                    if j % 2 == 0:
                         sample = random.choice(self.positive_samples)
                     else:
                         sample = self.samples[j]
@@ -204,28 +221,34 @@ class DataLoader:
                     img, label, validity = sample.load()
                     img, label = self.preprocess(img, label, validity)
                     img, label = self.augment(img, label)
+                    img, label = self.random_crop(img, label)
 
-                    label[:16, :, :] = 2; label[-16:, :, :] = 2
-                    label[:, :16, :] = 2; label[:, -16:, :] = 2
-                    label[:, :, :16] = 2; label[:, :, -16:] = 2
+                    label[:e, :, :] = 2; label[-e:, :, :] = 2
+                    label[:, :e, :] = 2; label[:, -e:, :] = 2
+                    label[:, :, :e] = 2; label[:, :, -e:] = 2
 
                     yield np.expand_dims(img, axis=-1), np.expand_dims(label, axis=-1)
 
     def as_generator(self, batch_size):
-        dataset = tf.data.Dataset.from_generator(self.sample_generator, output_signature=(tf.TensorSpec(shape=(160, 160, 160, 1), dtype=tf.float32), tf.TensorSpec(shape=(160, 160, 160, 1), dtype=tf.float32))).batch(batch_size=batch_size, drop_remainder=True).prefetch(tf.data.AUTOTUNE)
+        c = self.crop_size
+        dataset = tf.data.Dataset.from_generator(self.sample_generator, output_signature=(tf.TensorSpec(shape=(c, c, c, 1), dtype=tf.float32), tf.TensorSpec(shape=(c, c, c, 1), dtype=tf.float32))).batch(batch_size=batch_size, drop_remainder=True).prefetch(tf.data.AUTOTUNE)
         if self.validation:
             return dataset, None  # finite dataset — Keras runs until exhausted
         n_steps = len(self.samples) // batch_size
         return dataset, n_steps
 
 
-def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, lr_end=1e-5, weights_path=None, bce_weight=0.3, dice_weight=0.7):
+def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, lr_end=1e-5, weights_path=None, bce_weight=0.3, dice_weight=0.7, arch='current', crop_size=160):
     import json
-    from easymode.segmentation.model_current import create, masked_bce_loss, masked_dice_loss, masked_precision, masked_recall, masked_dice
+
+    if arch == 'lite':
+        from easymode.segmentation.model_lite import create, masked_bce_loss, masked_dice_loss, masked_precision, masked_recall, masked_dice
+    else:
+        from easymode.segmentation.model_current import create, masked_bce_loss, masked_dice_loss, masked_precision, masked_recall, masked_dice
 
     tf.config.run_functions_eagerly(False)
 
-    print(f'\nTraining model with features: {features}\n')
+    print(f'\nTraining model with features: {features} (arch: {arch}, crop: {crop_size})\n')
     print(f'Loss weights: BCE={bce_weight}, dice={dice_weight}\n')
 
     def combined_loss(y_true, y_pred):
@@ -235,7 +258,7 @@ def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, 
         model = create()
         model.compile(optimizer=model.optimizer, loss=combined_loss, metrics=[masked_precision, masked_recall, masked_bce_loss, masked_dice], run_eagerly=False)
         if weights_path is not None:
-            dummy = tf.zeros((1, 160, 160, 160, 1))
+            dummy = tf.zeros((1, crop_size, crop_size, crop_size, 1))
             model(dummy)
             if os.path.isdir(weights_path):
                 weights_path = tf.train.latest_checkpoint(weights_path)
@@ -245,13 +268,13 @@ def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, 
     model.optimizer.learning_rate.assign(lr_start)
 
     # data loaders
-    training_ds, training_steps = DataLoader(features, batch_size=batch_size, validation=False).as_generator(batch_size=batch_size)
-    validation_ds, validation_steps = DataLoader(features, batch_size=batch_size, validation=True).as_generator(batch_size=batch_size)
+    training_ds, training_steps = DataLoader(features, batch_size=batch_size, validation=False, crop_size=crop_size).as_generator(batch_size=batch_size)
+    validation_ds, validation_steps = DataLoader(features, batch_size=batch_size, validation=True, crop_size=crop_size).as_generator(batch_size=batch_size)
 
     # callbacks
     os.makedirs(f'{ROOT}/training/3d/checkpoints/{title}', exist_ok=True)
     with open(f'{ROOT}/training/3d/checkpoints/{title}/arch.json', 'w') as _f:
-        json.dump({'arch': 'current'}, _f)
+        json.dump({'arch': arch}, _f)
     cb_checkpoint_val = tf.keras.callbacks.ModelCheckpoint(filepath=f'{ROOT}/training/3d/checkpoints/{title}/' + "validation_loss",
                                                            monitor=f'val_loss',
                                                            save_best_only=True,

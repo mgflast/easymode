@@ -139,13 +139,14 @@ def load_model_weights(weights_path):
                     arch = json.load(f).get('arch', 'old')
             except Exception:
                 pass
-
         if arch == 'current':
             from easymode.segmentation.model_current import create
+        elif arch == 'lite':
+            from easymode.segmentation.model_lite import create
         else:
             from easymode.segmentation.model_old import create
 
-        dummy_input = tf.zeros((1, 160, 160, 160, 1))
+        dummy_input = tf.zeros((1, 96, 96, 96, 1)) if arch == 'lite' else tf.zeros((1, 160, 160, 160, 1))
 
     model = create()
     _ = model(dummy_input)

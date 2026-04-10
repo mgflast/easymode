@@ -49,7 +49,18 @@ def masked_dice_loss(y_true, y_pred, smooth=1e-6):
     union = tf.reduce_sum(y_true_masked, axis=spatial_axes) + tf.reduce_sum(y_pred_masked, axis=spatial_axes)
 
     dice = (2.0 * intersection + smooth) / (union + smooth)
-    return tf.reduce_mean(1.0 - dice)
+    per_sample_loss = 1.0 - dice
+
+    # Only average dice over samples that have foreground labels.
+    # Negative samples (no fg) always give loss=0, diluting the gradient
+    # and creating a local minimum at all-zeros prediction.
+    has_fg = tf.reduce_sum(y_true_masked, axis=spatial_axes) > 0
+    has_fg = tf.reshape(has_fg, [-1])
+    per_sample_loss = tf.reshape(per_sample_loss, [-1])
+    fg_losses = tf.boolean_mask(per_sample_loss, has_fg)
+    return tf.cond(tf.size(fg_losses) > 0,
+                   lambda: tf.reduce_mean(fg_losses),
+                   lambda: tf.constant(0.0))
 
 def masked_dice(y_true, y_pred):
     return 1.0 - masked_dice_loss(y_true, y_pred)

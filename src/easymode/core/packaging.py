@@ -28,7 +28,10 @@ def package_checkpoint(title='', checkpoint_directory='', apix=10.0):
                 arch = json.load(f).get('arch', 'old')
         else:
             arch = 'old'
-        if arch == 'current':
+        if arch == 'lite':
+            print('Packaging weights as lite segmentation model (shallow GroupNorm).')
+            from easymode.segmentation.model_lite import create
+        elif arch == 'current':
             print('Packaging weights as current segmentation model (GroupNorm).')
             from easymode.segmentation.model_current import create
         else:
@@ -37,6 +40,8 @@ def package_checkpoint(title='', checkpoint_directory='', apix=10.0):
     model = create()
     if 'tilt' in title:
         _ = model([tf.zeros((1, 256, 256, 1)), tf.zeros((1, 256, 256, 1))])
+    elif arch == 'lite':
+        _ = model(tf.zeros((1, 96, 96, 96, 1)))
     else:
         _ = model(tf.zeros((1, 160, 160, 160, 1)))
 

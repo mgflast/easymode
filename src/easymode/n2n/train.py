@@ -5,12 +5,11 @@ import tensorflow as tf
 ROOT = '/cephfs/mlast/compu_projects/easymode'
 
 class N2NDatasetGenerator:
-    def __init__(self, mode='splits', samples_per_tomogram=10, box_size=96):
+    def __init__(self, mode='splits', samples_per_dataset=200, box_size=96):
         self.mode = mode
-        self.samples_per_tomogram = samples_per_tomogram
+        self.samples_per_dataset = samples_per_dataset
         self.box_size = box_size
-        self.vols_one = []
-        self.vols_two = []
+        self.datasets = {}  # dataset_name -> [(even_path, odd_path), ...]
         self.box_counter = {'training': 0, 'validation': 0}
         self.tomo_counter = 0
 
@@ -40,10 +39,10 @@ class N2NDatasetGenerator:
 
         return coordinates[:n_samples]
 
-    def sample_tomogram_pair(self, vol_a_path, vol_b_path):
+    def sample_tomogram_pair(self, vol_a_path, vol_b_path, n_samples):
         vol_a = mrcfile.read(vol_a_path)
         vol_b = mrcfile.read(vol_b_path)
-        coordinates = self.get_sample_coordinates(vol_a.data.shape, self.box_size, self.samples_per_tomogram)
+        coordinates = self.get_sample_coordinates(vol_a.data.shape, self.box_size, n_samples)
         self.tomo_counter += 1
         split = 'validation' if self.tomo_counter % 10 == 0 else 'training'
 
@@ -82,7 +81,7 @@ class N2NDatasetGenerator:
 
     def generate(self):
         print(
-            f'Preparing to generate training data for n2n mode {self.mode} with {self.samples_per_tomogram} samples per tomogram.\n')
+            f'Preparing to generate training data for n2n mode {self.mode} with {self.samples_per_dataset} samples per dataset.\n')
 
         if self.mode == 'splits':
             base_path = f'{ROOT}/training/n2n/splits'
@@ -109,31 +108,43 @@ class N2NDatasetGenerator:
 
         self.load_splits()
 
-        for j, (vol_a, vol_b) in enumerate(zip(self.vols_one, self.vols_two)):
-            print(f'{j + 1}/{len(self.vols_one)}: {vol_a}')
-            self.sample_tomogram_pair(vol_a, vol_b)
+        total_tomos = sum(len(pairs) for pairs in self.datasets.values())
+        for dataset_name, pairs in self.datasets.items():
+            n_tomos = len(pairs)
+            # Distribute samples_per_dataset evenly across this dataset's tomograms
+            base = self.samples_per_dataset // n_tomos
+            remainder = self.samples_per_dataset % n_tomos
+            np.random.shuffle(pairs)
+            print(f'Dataset {dataset_name}: {n_tomos} tomograms, {self.samples_per_dataset} samples ({base}-{base+1} per tomo)')
+            for j, (vol_a, vol_b) in enumerate(pairs):
+                n_samples = base + (1 if j < remainder else 0)
+                if n_samples == 0:
+                    continue
+                print(f'  {j + 1}/{n_tomos}: {os.path.basename(vol_a)} ({n_samples} samples)')
+                self.sample_tomogram_pair(vol_a, vol_b, n_samples)
+
+        print(f'\nTotal: {self.box_counter["training"]} training + {self.box_counter["validation"]} validation boxes from {total_tomos} tomograms across {len(self.datasets)} datasets.')
 
         if self.mode == 'direct':
             self.generate_direct_mode_outputs()
 
     def load_splits(self):
-        datasets = [os.path.basename(os.path.dirname(f)) for f in glob.glob(f'{ROOT}/datasets/*/')]
+        dataset_dirs = sorted(glob.glob(f'{ROOT}/datasets/*/'))
+        datasets = [os.path.basename(os.path.dirname(f)) for f in dataset_dirs]
 
         print(f'Found {len(datasets)} datasets to sample.')
 
-        np.random.shuffle(datasets)
-        self.vols_one = list()
-        self.vols_two = list()
-
+        self.datasets = {}
         for d in datasets:
             tomograms = [os.path.basename(f) for f in glob.glob(f'{ROOT}/datasets/{d}/warp_tiltseries/reconstruction/even/*.mrc')]
-            np.random.shuffle(tomograms)
+            pairs = []
             for t in tomograms:
                 path_evn = f'{ROOT}/datasets/{d}/warp_tiltseries/reconstruction/even/{t}'
                 path_odd = f'{ROOT}/datasets/{d}/warp_tiltseries/reconstruction/odd/{t}'
                 if os.path.exists(path_evn) and os.path.exists(path_odd):
-                    self.vols_one.append(path_evn)
-                    self.vols_two.append(path_odd)
+                    pairs.append((path_evn, path_odd))
+            if pairs:
+                self.datasets[d] = pairs
 
 
 
