@@ -12,7 +12,7 @@
         <link rel="prev" href="../colocalization_filtering/">
       
       
-        <link rel="next" href="../easymode_and_pom/">
+        <link rel="next" href="../picking_yturc/">
       
       
       <link rel="icon" href="../../../assets/favicon.png">
@@ -1100,6 +1100,29 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../picking_yturc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    8. Picking γTuRC
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1165,7 +1188,7 @@
   
   
   <span class="md-ellipsis">
-    8. easymode + Pom
+    9. easymode + Pom
     
   </span>
   
@@ -2201,7 +2224,11 @@ Save the script below as <code>starutil.py</code> and use it as <code>python sta
 <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 
+<span class="n">WIDTH</span> <span class="o">=</span> <span class="mi">80</span>
+<span class="n">HEIGHT</span> <span class="o">=</span> <span class="mi">20</span>
+
 <span class="k">def</span><span class="w"> </span><span class="nf">read_star</span><span class="p">(</span><span class="n">star_path</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return (full_dict, particle_key).&quot;&quot;&quot;</span>
     <span class="n">data</span> <span class="o">=</span> <span class="n">starfile</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">star_path</span><span class="p">,</span> <span class="n">always_dict</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="k">if</span> <span class="s1">&#39;particles&#39;</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">data</span><span class="p">,</span> <span class="s1">&#39;particles&#39;</span>
@@ -2217,7 +2244,7 @@ Save the script below as <code>starutil.py</code> and use it as <code>python sta
         <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Bad filter: </span><span class="si">{</span><span class="n">f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
     <span class="n">col</span><span class="p">,</span> <span class="n">op_str</span><span class="p">,</span> <span class="n">val</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">groups</span><span class="p">()</span>
     <span class="n">ops</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;=&#39;</span><span class="p">:</span> <span class="n">operator</span><span class="o">.</span><span class="n">eq</span><span class="p">,</span> <span class="s1">&#39;!=&#39;</span><span class="p">:</span> <span class="n">operator</span><span class="o">.</span><span class="n">ne</span><span class="p">,</span> <span class="s1">&#39;&gt;&#39;</span><span class="p">:</span> <span class="n">operator</span><span class="o">.</span><span class="n">gt</span><span class="p">,</span>
-           <span class="s1">&#39;&lt;&#39;</span><span class="p">:</span> <span class="n">operator</span><span class="o">.</span><span class="n">lt</span><span class="p">,</span> <span class="s1">&#39;&gt;=&#39;</span><span class="p">:</span> <span class="n">operator</span><span class="o">.</span><span class="n">ge</span><span class="p">,</span> <span class="s1">&#39;&lt;=&#39;</span><span class="p">:</span> <span class="n">operator</span><span class="o">.</span><span class="n">le</span><span class="p">}</span>
+            <span class="s1">&#39;&lt;&#39;</span><span class="p">:</span> <span class="n">operator</span><span class="o">.</span><span class="n">lt</span><span class="p">,</span> <span class="s1">&#39;&gt;=&#39;</span><span class="p">:</span> <span class="n">operator</span><span class="o">.</span><span class="n">ge</span><span class="p">,</span> <span class="s1">&#39;&lt;=&#39;</span><span class="p">:</span> <span class="n">operator</span><span class="o">.</span><span class="n">le</span><span class="p">}</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">val</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">val</span> <span class="o">==</span> <span class="nb">int</span><span class="p">(</span><span class="n">val</span><span class="p">):</span>
@@ -2226,11 +2253,103 @@ Save the script below as <code>starutil.py</code> and use it as <code>python sta
         <span class="k">pass</span>
     <span class="k">return</span> <span class="n">col</span><span class="p">,</span> <span class="n">ops</span><span class="p">[</span><span class="n">op_str</span><span class="p">],</span> <span class="n">val</span>
 
+<span class="k">def</span><span class="w"> </span><span class="nf">parse_substitute</span><span class="p">(</span><span class="n">s</span><span class="p">):</span>
+    <span class="n">parts</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;:&#39;</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Bad substitution (need col:search:replace): </span><span class="si">{</span><span class="n">s</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">parts</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">parse_scale</span><span class="p">(</span><span class="n">s</span><span class="p">):</span>
+    <span class="n">parts</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;:&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Bad scale (need col:factor): </span><span class="si">{</span><span class="n">s</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">col</span><span class="p">,</span> <span class="n">factor</span> <span class="o">=</span> <span class="n">parts</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">factor</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">factor</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Bad scale factor: </span><span class="si">{</span><span class="n">factor</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">col</span><span class="p">,</span> <span class="n">factor</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">print_histogram</span><span class="p">(</span><span class="n">series</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="si">{</span><span class="s1">&#39;─&#39;</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">WIDTH</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">  (n=</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">series</span><span class="p">)</span><span class="si">}</span><span class="s2">, non-null=</span><span class="si">{</span><span class="n">series</span><span class="o">.</span><span class="n">notna</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="s1">&#39;─&#39;</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">WIDTH</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="n">s</span> <span class="o">=</span> <span class="n">series</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  (all NaN)&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="k">if</span> <span class="n">pd</span><span class="o">.</span><span class="n">api</span><span class="o">.</span><span class="n">types</span><span class="o">.</span><span class="n">is_numeric_dtype</span><span class="p">(</span><span class="n">s</span><span class="p">):</span>
+        <span class="n">_numeric_histogram</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">_categorical_histogram</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_numeric_histogram</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+    <span class="n">lo</span><span class="p">,</span> <span class="n">hi</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">min</span><span class="p">(),</span> <span class="n">s</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+    <span class="n">mean</span><span class="p">,</span> <span class="n">std</span><span class="p">,</span> <span class="n">med</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">mean</span><span class="p">(),</span> <span class="n">s</span><span class="o">.</span><span class="n">std</span><span class="p">(),</span> <span class="n">s</span><span class="o">.</span><span class="n">median</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  min=</span><span class="si">{</span><span class="n">lo</span><span class="si">:</span><span class="s2">.4g</span><span class="si">}</span><span class="s2">  max=</span><span class="si">{</span><span class="n">hi</span><span class="si">:</span><span class="s2">.4g</span><span class="si">}</span><span class="s2">  mean=</span><span class="si">{</span><span class="n">mean</span><span class="si">:</span><span class="s2">.4g</span><span class="si">}</span><span class="s2">  std=</span><span class="si">{</span><span class="n">std</span><span class="si">:</span><span class="s2">.4g</span><span class="si">}</span><span class="s2">  median=</span><span class="si">{</span><span class="n">med</span><span class="si">:</span><span class="s2">.4g</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">lo</span> <span class="o">==</span> <span class="n">hi</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  all values = </span><span class="si">{</span><span class="n">lo</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="n">is_int</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">api</span><span class="o">.</span><span class="n">types</span><span class="o">.</span><span class="n">is_integer_dtype</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">s</span> <span class="o">==</span> <span class="n">s</span><span class="o">.</span><span class="n">round</span><span class="p">())</span><span class="o">.</span><span class="n">all</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">is_int</span><span class="p">:</span>
+        <span class="n">lo_i</span><span class="p">,</span> <span class="n">hi_i</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">lo</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">hi</span><span class="p">)</span>
+        <span class="n">bins</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">lo_i</span> <span class="o">-</span> <span class="mf">0.5</span><span class="p">,</span> <span class="n">hi_i</span> <span class="o">+</span> <span class="mf">1.5</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+        <span class="n">counts</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">histogram</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="n">bins</span><span class="p">)</span>
+        <span class="n">labels</span> <span class="o">=</span> <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">lo_i</span><span class="p">,</span> <span class="n">hi_i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">nbins</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">HEIGHT</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">unique</span><span class="p">()))</span>
+        <span class="n">counts</span><span class="p">,</span> <span class="n">edges</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">histogram</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="n">nbins</span><span class="p">)</span>
+        <span class="n">labels</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">edges</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="si">:</span><span class="s2">.3g</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">counts</span><span class="p">))]</span>
+
+    <span class="n">max_count</span> <span class="o">=</span> <span class="n">counts</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">max_count</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span>
+
+    <span class="n">label_w</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">l</span><span class="p">)</span> <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">labels</span><span class="p">)</span>
+    <span class="n">bar_w</span> <span class="o">=</span> <span class="n">WIDTH</span> <span class="o">-</span> <span class="n">label_w</span> <span class="o">-</span> <span class="mi">10</span>
+
+    <span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">labels</span><span class="p">,</span> <span class="n">counts</span><span class="p">):</span>
+        <span class="n">bar_len</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">c</span> <span class="o">/</span> <span class="n">max_count</span> <span class="o">*</span> <span class="n">bar_w</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">label</span><span class="o">.</span><span class="n">rjust</span><span class="p">(</span><span class="n">label_w</span><span class="p">)</span><span class="si">}</span><span class="s2"> │</span><span class="si">{</span><span class="s1">&#39;█&#39;</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">bar_len</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">c</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_categorical_histogram</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+    <span class="n">vc</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span>
+    <span class="n">n_show</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">HEIGHT</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">vc</span><span class="p">))</span>
+    <span class="n">vc</span> <span class="o">=</span> <span class="n">vc</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="n">n_show</span><span class="p">)</span>
+    <span class="n">max_count</span> <span class="o">=</span> <span class="n">vc</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="n">label_w</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="mi">30</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">v</span><span class="p">))</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">vc</span><span class="o">.</span><span class="n">index</span><span class="p">))</span>
+    <span class="n">bar_w</span> <span class="o">=</span> <span class="n">WIDTH</span> <span class="o">-</span> <span class="n">label_w</span> <span class="o">-</span> <span class="mi">10</span>
+
+    <span class="k">for</span> <span class="n">val</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">vc</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">lbl</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">val</span><span class="p">)[:</span><span class="n">label_w</span><span class="p">]</span><span class="o">.</span><span class="n">ljust</span><span class="p">(</span><span class="n">label_w</span><span class="p">)</span>
+        <span class="n">bar_len</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">c</span> <span class="o">/</span> <span class="n">max_count</span> <span class="o">*</span> <span class="n">bar_w</span><span class="p">)</span>
+        <span class="n">bar</span> <span class="o">=</span> <span class="s1">&#39;█&#39;</span> <span class="o">*</span> <span class="n">bar_len</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">lbl</span><span class="si">}</span><span class="s2"> │</span><span class="si">{</span><span class="n">bar</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">c</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">value_counts</span><span class="p">())</span> <span class="o">&gt;</span> <span class="n">n_show</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  ... and </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">value_counts</span><span class="p">())</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">n_show</span><span class="si">}</span><span class="s2"> more unique values&quot;</span><span class="p">)</span>
+
 <span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
     <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s1">&#39;Star file utility&#39;</span><span class="p">)</span>
-    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;star&#39;</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s1">&#39;+&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Input star file(s)&#39;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;star&#39;</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s1">&#39;+&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Input star file(s) (multiple for merge)&#39;</span><span class="p">)</span>
     <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;filters&#39;</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s1">&#39;*&#39;</span><span class="p">)</span>
     <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;-o&#39;</span><span class="p">,</span> <span class="s1">&#39;--output&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Output star file&#39;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--substitute&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;append&#39;</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s1">&#39;col:search:replace&#39;</span><span class="p">,</span>
+                        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;String substitution in column (repeatable)&#39;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--scale&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;append&#39;</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s1">&#39;col:factor&#39;</span><span class="p">,</span>
+                        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Multiply numeric column by constant (repeatable)&#39;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--drop&#39;</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s1">&#39;+&#39;</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s1">&#39;COL&#39;</span><span class="p">,</span>
+                        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Remove one or more columns from the dataframe&#39;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--histogram&#39;</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s1">&#39;COL&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Print value counts for column&#39;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--stats&#39;</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s1">&#39;COL&#39;</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s1">&#39;+&#39;</span><span class="p">,</span>
+                        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Print histogram stats for column(s)&#39;</span><span class="p">)</span>
     <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
 
     <span class="n">star_files</span> <span class="o">=</span> <span class="p">[]</span>
@@ -2241,9 +2360,29 @@ Save the script below as <code>starutil.py</code> and use it as <code>python sta
         <span class="k">else</span><span class="p">:</span>
             <span class="n">filters</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
 
-    <span class="n">all_blocks</span><span class="p">,</span> <span class="n">pkey</span> <span class="o">=</span> <span class="n">read_star</span><span class="p">(</span><span class="n">star_files</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
-    <span class="n">df</span> <span class="o">=</span> <span class="n">all_blocks</span><span class="p">[</span><span class="n">pkey</span><span class="p">]</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Rows: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">merging</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">star_files</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span>
+
+    <span class="k">if</span> <span class="n">merging</span><span class="p">:</span>
+        <span class="n">dfs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">sf</span> <span class="ow">in</span> <span class="n">star_files</span><span class="p">:</span>
+            <span class="n">all_blocks</span><span class="p">,</span> <span class="n">pkey</span> <span class="o">=</span> <span class="n">read_star</span><span class="p">(</span><span class="n">sf</span><span class="p">)</span>
+            <span class="n">dfs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">all_blocks</span><span class="p">[</span><span class="n">pkey</span><span class="p">])</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">sf</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">all_blocks</span><span class="p">[</span><span class="n">pkey</span><span class="p">])</span><span class="si">}</span><span class="s2"> rows&quot;</span><span class="p">)</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">dfs</span><span class="p">,</span> <span class="n">ignore_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">all_blocks</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># no extra blocks preserved for merge</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Merged: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span><span class="si">}</span><span class="s2"> rows&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">all_blocks</span><span class="p">,</span> <span class="n">pkey</span> <span class="o">=</span> <span class="n">read_star</span><span class="p">(</span><span class="n">star_files</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">all_blocks</span><span class="p">[</span><span class="n">pkey</span><span class="p">]</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Rows: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Columns: </span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">all_blocks</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Blocks: </span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">all_blocks</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span><span class="si">}</span><span class="s2"> (editing &#39;</span><span class="si">{</span><span class="n">pkey</span><span class="si">}</span><span class="s2">&#39;)&quot;</span><span class="p">)</span>
+
+    <span class="n">no_ops</span> <span class="o">=</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">([</span><span class="n">filters</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">substitute</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">scale</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">drop</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">histogram</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">stats</span><span class="p">,</span> <span class="n">merging</span><span class="p">])</span>
+
+    <span class="k">if</span> <span class="n">no_ops</span><span class="p">:</span>
+        <span class="k">return</span>
 
     <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">filters</span><span class="p">:</span>
         <span class="n">col</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">val</span> <span class="o">=</span> <span class="n">parse_filter</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
@@ -2251,12 +2390,55 @@ Save the script below as <code>starutil.py</code> and use it as <code>python sta
             <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Column &#39;</span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2">&#39; not found&quot;</span><span class="p">)</span>
         <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">op</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="n">col</span><span class="p">],</span> <span class="n">val</span><span class="p">)]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
 
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;After filtering: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span><span class="si">}</span><span class="s2"> rows&quot;</span><span class="p">)</span>
-    <span class="n">output</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">output</span> <span class="ow">or</span> <span class="nb">str</span><span class="p">(</span>
-        <span class="n">Path</span><span class="p">(</span><span class="n">star_files</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="o">.</span><span class="n">with_stem</span><span class="p">(</span>
-            <span class="n">Path</span><span class="p">(</span><span class="n">star_files</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="o">.</span><span class="n">stem</span> <span class="o">+</span> <span class="s1">&#39;_filtered&#39;</span><span class="p">))</span>
-    <span class="n">all_blocks</span><span class="p">[</span><span class="n">pkey</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span>
-    <span class="n">starfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">all_blocks</span><span class="p">,</span> <span class="n">output</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">substitute</span> <span class="ow">or</span> <span class="p">[]):</span>
+        <span class="n">col</span><span class="p">,</span> <span class="n">search</span><span class="p">,</span> <span class="n">replace</span> <span class="o">=</span> <span class="n">parse_substitute</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Column &#39;</span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2">&#39; not found&quot;</span><span class="p">)</span>
+        <span class="n">df</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">search</span><span class="p">,</span> <span class="n">replace</span><span class="p">,</span> <span class="n">regex</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">scale</span> <span class="ow">or</span> <span class="p">[]):</span>
+        <span class="n">col</span><span class="p">,</span> <span class="n">factor</span> <span class="o">=</span> <span class="n">parse_scale</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Column &#39;</span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2">&#39; not found&quot;</span><span class="p">)</span>
+        <span class="n">df</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">*</span> <span class="n">factor</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">drop</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">args</span><span class="o">.</span><span class="n">drop</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="n">col</span><span class="p">])</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Dropped column: </span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Warning: Column &#39;</span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2">&#39; not found, skipping drop.&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">histogram</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">histogram</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Column &#39;</span><span class="si">{</span><span class="n">args</span><span class="o">.</span><span class="n">histogram</span><span class="si">}</span><span class="s2">&#39; not found&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">val</span><span class="p">,</span> <span class="n">count</span> <span class="ow">in</span> <span class="n">df</span><span class="p">[</span><span class="n">args</span><span class="o">.</span><span class="n">histogram</span><span class="p">]</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">val</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">count</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">stats</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">args</span><span class="o">.</span><span class="n">stats</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Column &#39;</span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2">&#39; not found&quot;</span><span class="p">)</span>
+            <span class="n">print_histogram</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="n">col</span><span class="p">],</span> <span class="n">col</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;After operations: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span><span class="si">}</span><span class="s2"> rows&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">merging</span><span class="p">:</span>
+        <span class="n">default_out</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">star_files</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="o">.</span><span class="n">with_stem</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">star_files</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="o">.</span><span class="n">stem</span> <span class="o">+</span> <span class="s1">&#39;_merged&#39;</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">default_out</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">star_files</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="o">.</span><span class="n">with_stem</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">star_files</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="o">.</span><span class="n">stem</span> <span class="o">+</span> <span class="s1">&#39;_filtered&#39;</span><span class="p">))</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">output</span> <span class="ow">or</span> <span class="n">default_out</span>
+
+    <span class="k">if</span> <span class="n">merging</span> <span class="ow">or</span> <span class="n">all_blocks</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">all_blocks</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">out_data</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;particles&#39;</span><span class="p">:</span> <span class="n">df</span><span class="p">}</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">all_blocks</span><span class="p">[</span><span class="n">pkey</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span>
+        <span class="n">out_data</span> <span class="o">=</span> <span class="n">all_blocks</span>
+
+    <span class="n">starfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">out_data</span><span class="p">,</span> <span class="n">output</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Written to </span><span class="si">{</span><span class="n">output</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
 <span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>

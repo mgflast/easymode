@@ -1008,6 +1008,29 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user_guide/examples/picking_yturc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    8. Picking γTuRC
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1073,7 +1096,7 @@
   
   
   <span class="md-ellipsis">
-    8. easymode + Pom
+    9. easymode + Pom
     
   </span>
   
@@ -2027,6 +2050,7 @@
 <p><code>easymode segment actin</code></p>
 <p>The actin model was trained to output a cylindrical tube with a diameter of 60 Å along actin filaments. It was one of the most challenging models to train thus far and remains somewhat experimental.</p>
 <p>In combination with the <code>--filament</code> flag in <code>easymode pick</code>, the model enables tracing actin filaments and picking of particles at regular intervals along individual filaments, with an <strong>accurate prior on the particle orientation</strong> and class labels linking particles to the parent filaments (_aisFilamentID). Use the <code>--per-filament</code> flag to write .star files for individual actin filaments. </p>
+<p>This model does not currently label cross-sections of actin, as seen when the filaments are approximately parallel to the Z axis of the tomogram, as we were unable to confidently annotated enough examples of such views. When working with data from cells cultured on grid, this limitation may be less of an issue, as actin filaments are often oriented parallel to the grid plane. However, when working with cells deposited onto a grid just prior to plunging or with lift-out data, it is something to keep in mind.</p>
 <p><strong>Example output</strong></p>
 <div style="display: flex; gap: 1em; flex-wrap: wrap;">
 <div style="flex: 1; min-width: 300px;">
