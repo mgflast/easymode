@@ -119,6 +119,36 @@ def get_model(model_title, force_download=False, silent=False, _2d=False):
     return info["weights_path"], local_meta or remote_meta
 
 
+def get_preferred_mode(feature):
+    """Determine whether to use 3d or 2d for a feature.
+
+    Checks the feature's JSON metadata for a 'preferred' field ('3d' or '2d').
+    Falls back to '3d' if a .h5 exists, '2d' if only .scnm exists.
+    """
+    info_3d = get_model_info(feature, _2d=False)
+    info_2d = get_model_info(feature, _2d=True)
+
+    # Try reading preference from the 3d metadata first, then 2d
+    for info in (info_3d, info_2d):
+        meta = read_local_metadata(info["metadata_path"])
+        if meta and 'preferred' in meta:
+            return meta['preferred']
+
+    # Check remote metadata if local doesn't have it
+    if is_online():
+        for _2d in (False, True):
+            meta = get_remote_metadata(feature, _2d=_2d)
+            if meta and 'preferred' in meta:
+                return meta['preferred']
+
+    # Fallback: 3d if .h5 exists or can be found, else 2d
+    if os.path.exists(info_3d["weights_path"]):
+        return '3d'
+    if os.path.exists(info_2d["weights_path"]):
+        return '2d'
+    return '3d'
+
+
 def load_model_weights(weights_path):
     import tensorflow as tf
     if "n2n" in os.path.basename(weights_path):
@@ -208,11 +238,12 @@ def list_remote_models():
             has_2d = base in scnm_bases
 
             if has_3d and has_2d:
-                dim = "3D/2D"
+                pref = get_preferred_mode(base)
+                dim = f"3D/2D (default: {pref.upper()})"
             elif has_3d:
-                dim = "3D only"
+                dim = "3D"
             else:
-                dim = "2D only (--2d)"
+                dim = "2D"
 
             print(f"   > {base.ljust(30)} {dim}")
 

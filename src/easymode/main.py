@@ -63,7 +63,8 @@ def main():
     segment.add_argument('--format', type=str, choices=['float32', 'uint16', 'int8'], default='int8', help='Output format for the segmented volumes (default: int8).')
     segment.add_argument('--gpu', type=str, default=None, help="Comma-separated list of GPU ids to use (leave empty to use all available devices).")
     segment.add_argument('--apix', type=float, default=None, help="Override the pixel size stored in the .mrc header (in Angstrom). Use this if the pixel size is missing or incorrect. Set to 0.0 to disallow any scaling.")
-    segment.add_argument('--2d', dest="use_2d", action='store_true', help='Use the alternative Ais 2D/2.5D UNet instead of easymode 3D UNets.')
+    segment.add_argument('--2d', dest="force_2d", action='store_true', help='Force 2D segmentation for all features (overrides per-model preference).')
+    segment.add_argument('--3d', dest="force_3d", action='store_true', help='Force 3D segmentation for all features (overrides per-model preference).')
 
     report = subparsers.add_parser('report', help='Help improve easymode by reporting model failures and sharing the relevant volumes. All data will be kept confidential and is never released publicly.')
     report.add_argument("--tomogram", type=str, help="Path to the .mrc file to upload")
@@ -166,32 +167,28 @@ def main():
                                 threshold=args.threshold)
     elif args.command == 'segment':
         features = [f.lower() for f in args.features]
-        if args.use_2d:
-            from easymode.core.ais_wrapper import dispatch_segment as dispatch_segment_2d
-            for feature in features:
-                dispatch_segment_2d(
-                    feature=feature,
-                    data_directory=args.data,
-                    output_directory=args.output,
-                    tta=args.tta,
-                    batch_size=args.batch,
-                    overwrite=args.overwrite,
-                    data_format=args.format,
-                    gpus=args.gpu,
-                )
-        else:
-            from easymode.segmentation.inference import dispatch_segment as dispatch_segment_3d
-            for feature in features:
-                dispatch_segment_3d(
-                    feature=feature,
-                    data_directory=args.data,
-                    output_directory=args.output,
-                    tta=args.tta,
-                    batch_size=args.batch,
-                    overwrite=args.overwrite,
-                    data_format=args.format,
-                    gpus=args.gpu,
-                )
+        from easymode.core.distribution import get_preferred_mode
+        from easymode.core.ais_wrapper import dispatch_segment as dispatch_segment_2d
+        from easymode.segmentation.inference import dispatch_segment as dispatch_segment_3d
+        for feature in features:
+            if args.force_2d:
+                mode = '2d'
+            elif args.force_3d:
+                mode = '3d'
+            else:
+                mode = get_preferred_mode(feature)
+            print(f'{feature}: using {mode.upper()} model')
+            dispatch = dispatch_segment_2d if mode == '2d' else dispatch_segment_3d
+            dispatch(
+                feature=feature,
+                data_directory=args.data,
+                output_directory=args.output,
+                tta=args.tta,
+                batch_size=args.batch,
+                overwrite=args.overwrite,
+                data_format=args.format,
+                gpus=args.gpu,
+            )
     elif args.command == 'report':
         from easymode.core.reporting import report
         report(volume_path=args.tomogram,
