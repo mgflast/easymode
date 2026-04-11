@@ -17,14 +17,14 @@ Because 4508 maps are too many to manually inspect, we needed some tool to help 
     ```python
     #!/usr/bin/env python
     """Microtubule polarity classification tool.
-
+    
     Usage:
         python polarity_tool.py label     # manually label cross-sections (GUI)
         python polarity_tool.py train     # train L/R/0 classifier
         python polarity_tool.py predict   # batch prediction on all images
         python polarity_tool.py review    # review/correct predictions (GUI)
     """
-
+    
     import argparse, os, csv, glob, random
     import numpy as np
     import mrcfile
@@ -32,7 +32,7 @@ Because 4508 maps are too many to manually inspect, we needed some tool to help 
     import torch.nn as nn
     from torch.utils.data import Dataset, DataLoader
     from scipy.ndimage import rotate, gaussian_filter
-
+    
     MRC_DIR = "polarity_imgs"
     LABELS_FILE = "polarity_labels.csv"
     MODEL_FILE = "polarity_model.pt"
@@ -40,10 +40,10 @@ Because 4508 maps are too many to manually inspect, we needed some tool to help 
     IMG_SIZE = 64
     LABEL_MAP = {"L": 0, "R": 1, "0": 2}
     INV_LABEL_MAP = {v: k for k, v in LABEL_MAP.items()}
-
-
+    
+    
     # ── Utilities ──────────────────────────────────────────────────────
-
+    
     def pad_or_crop(img, size):
         h, w = img.shape
         if h < size or w < size:
@@ -53,13 +53,13 @@ Because 4508 maps are too many to manually inspect, we needed some tool to help 
             h, w = img.shape
         y0, x0 = (h - size) // 2, (w - size) // 2
         return img[y0:y0 + size, x0:x0 + size]
-
-
+    
+    
     def normalize(img):
         mu, std = img.mean(), img.std()
         return (img - mu) / (std + 1e-8)
-
-
+    
+    
     def load_labels():
         labels = {}
         if os.path.exists(LABELS_FILE):
@@ -68,10 +68,10 @@ Because 4508 maps are too many to manually inspect, we needed some tool to help 
                     if len(row) == 2:
                         labels[row[0]] = row[1]
         return labels
-
-
+    
+    
     # ── Model ──────────────────────────────────────────────────────────
-
+    
     class SmallCNN(nn.Module):
         def __init__(self):
             super().__init__()
@@ -84,19 +84,19 @@ Because 4508 maps are too many to manually inspect, we needed some tool to help 
                 nn.AdaptiveAvgPool2d(1),
             )
             self.head = nn.Sequential(nn.Dropout(0.3), nn.Linear(128, 3))
-
+    
         def forward(self, x):
             return self.head(self.conv(x).flatten(1))
-
-
+    
+    
     def load_model(device):
         model = SmallCNN().to(device)
         model.load_state_dict(torch.load(MODEL_FILE, map_location=device,
                                         weights_only=True))
         model.eval()
         return model
-
-
+    
+    
     def predict_image(model, data, device):
         d = pad_or_crop(data.astype(np.float32), IMG_SIZE)
         d = normalize(d)
@@ -106,23 +106,23 @@ Because 4508 maps are too many to manually inspect, we needed some tool to help 
         pred = INV_LABEL_MAP[probs.argmax().item()]
         prob_dict = {INV_LABEL_MAP[i]: probs[i].item() for i in range(3)}
         return pred, prob_dict
-
-
+    
+    
     def read_mrc(path):
         with mrcfile.open(path, permissive=True) as m:
             d = m.data.copy().astype(np.float32)
         if d.ndim == 3:
             d = d[0]
         return d
-
-
+    
+    
     # ── Label ──────────────────────────────────────────────────────────
-
+    
     def cmd_label():
         import tkinter as tk
         from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
         from matplotlib.figure import Figure
-
+    
         class Labeler:
             def __init__(self):
                 self.files = sorted(glob.glob(os.path.join(MRC_DIR, "*.mrc")))
@@ -133,7 +133,7 @@ Because 4508 maps are too many to manually inspect, we needed some tool to help 
                 self.device = torch.device(
                     "cuda" if torch.cuda.is_available() else "cpu")
                 self.model = load_model(self.device)
-
+    
                 self.root = tk.Tk()
                 self.root.title("MT Polarity Labeler")
                 self.fig = Figure(figsize=(5, 5))
@@ -149,12 +149,12 @@ Because 4508 maps are too many to manually inspect, we needed some tool to help 
                 self.root.bind("<KeyPress>", self._on_key)
                 self._show()
                 self.root.mainloop()
-
+    
             def _save_label(self, fname, label):
                 self.labels[fname] = label
                 with open(LABELS_FILE, "a") as f:
                     csv.writer(f).writerow([fname, label])
-
+    
             def _show(self):
                 self.ax.clear()
                 if self.idx >= len(self.unlabelled):
@@ -181,7 +181,7 @@ Because 4508 maps are too many to manually inspect, we needed some tool to help 
                     text=f"Remaining: {remaining} | "
                         f"Labelled: {len(self.labels)}/{len(self.files)} | "
                         f"L / R / 0 | U=undo  Q=quit")
-
+    
             def _on_key(self, event):
                 key = event.keysym.upper()
                 if key in ("L", "R", "0"):
@@ -200,15 +200,15 @@ Because 4508 maps are too many to manually inspect, we needed some tool to help 
                     self._show()
                 elif key == "Q":
                     self.root.destroy()
-
+    
         Labeler()
-
-
+    
+    
     # ── Train ──────────────────────────────────────────────────────────
-
+    
     def cmd_train():
         from collections import defaultdict
-
+    
         def augment(img, label):
             k = random.randint(0, 3)
             img = np.rot90(img, k).copy()
@@ -221,7 +221,7 @@ Because 4508 maps are too many to manually inspect, we needed some tool to help 
             if random.random() < 0.5:
                 img = gaussian_filter(img, sigma=random.uniform(0.5, 2.0))
             return img, label
-
+    
         class MTDataset(Dataset):
             def __init__(self, imgs, labels, aug=True):
                 self.imgs, self.labels, self.aug = imgs, labels, aug
@@ -234,7 +234,7 @@ Because 4508 maps are too many to manually inspect, we needed some tool to help 
                     img = pad_or_crop(img, IMG_SIZE)
                 img = normalize(img)
                 return torch.tensor(img[None], dtype=torch.float32), lab
-
+    
         labels = load_labels()
         imgs, ys = [], []
         for fname, lab in labels.items():
@@ -245,7 +245,7 @@ Because 4508 maps are too many to manually inspect, we needed some tool to help 
         print(f"Loaded {len(imgs)} labelled images")
         counts = {INV_LABEL_MAP[i]: ys.count(i) for i in range(3)}
         print(f"Class distribution: {counts}")
-
+    
         by_class = defaultdict(list)
         for i, l in enumerate(ys):
             by_class[l].append(i)
@@ -255,24 +255,24 @@ Because 4508 maps are too many to manually inspect, we needed some tool to help 
             split = max(1, int(0.8 * len(idxs)))
             train_idx.extend(idxs[:split])
             val_idx.extend(idxs[split:])
-
+    
         train_dl = DataLoader(MTDataset([imgs[i] for i in train_idx],
                                         [ys[i] for i in train_idx], aug=True),
                             batch_size=16, shuffle=True)
         val_dl = DataLoader(MTDataset([imgs[i] for i in val_idx],
                                     [ys[i] for i in val_idx], aug=False),
                             batch_size=16, shuffle=False)
-
+    
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model = SmallCNN().to(device)
         opt = torch.optim.AdamW(model.parameters(), lr=2e-4, weight_decay=1e-4)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, 150)
-
+    
         weights = torch.tensor([1.0 / max(ys.count(i), 1) for i in range(3)],
                             device=device)
         weights = weights / weights.sum() * 3
         criterion = nn.CrossEntropyLoss(weight=weights)
-
+    
         best_val = 0
         for ep in range(150):
             model.train()
@@ -298,16 +298,16 @@ Because 4508 maps are too many to manually inspect, we needed some tool to help 
                 best_val = val_acc
                 torch.save(model.state_dict(), MODEL_FILE)
         print(f"\nBest val accuracy: {best_val:.3f}")
-
-
+    
+    
     # ── Predict ────────────────────────────────────────────────────────
-
+    
     def cmd_predict():
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model = load_model(device)
         gt = load_labels()
         files = sorted(glob.glob(os.path.join(MRC_DIR, "*.mrc")))
-
+    
         rows = []
         for j, path in enumerate(files, 1):
             data = read_mrc(path)
@@ -327,7 +327,7 @@ Because 4508 maps are too many to manually inspect, we needed some tool to help 
             })
             if j % 500 == 0:
                 print(f"  {j}/{len(files)}")
-
+    
         with open(PREDICTIONS_FILE, "w", newline="") as f:
             w = csv.DictWriter(f, fieldnames=[
                 "filename", "gt", "pred", "confidence",
@@ -335,32 +335,32 @@ Because 4508 maps are too many to manually inspect, we needed some tool to help 
             w.writeheader()
             w.writerows(rows)
         print(f"Saved {len(rows)} predictions to {PREDICTIONS_FILE}")
-
+    
         preds = np.array([r["pred"] for r in rows])
         confs = np.array([r["confidence"] for r in rows])
         for c in ["L", "R", "0"]:
             n = (preds == c).sum()
             print(f"  {c}: {n} ({n/len(preds):.1%})")
         print(f"Mean confidence: {confs.mean():.3f}")
-
-
+    
+    
     # ── Review ─────────────────────────────────────────────────────────
-
+    
     def cmd_review():
         import tkinter as tk
         from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
         from matplotlib.figure import Figure
-
+    
         CONF_THRESHOLD = 0.85
-
+    
         class Reviewer:
             def __init__(self):
                 self.all_rows = self._load()
                 self.queue, self.idx = [], 0
-
+    
                 self.root = tk.Tk()
                 self.root.title("MT Polarity Reviewer")
-
+    
                 fbar = tk.Frame(self.root)
                 fbar.pack(fill="x", padx=5, pady=5)
                 tk.Label(fbar, text="Filter:").pack(side="left")
@@ -380,7 +380,7 @@ Because 4508 maps are too many to manually inspect, we needed some tool to help 
                                 value=val,
                                 command=self._apply_filter).pack(
                                     side="left", padx=2)
-
+    
                 self.fig = Figure(figsize=(5, 5))
                 self.ax = self.fig.add_subplot(111)
                 self.canvas = FigureCanvasTkAgg(self.fig, self.root)
@@ -397,7 +397,7 @@ Because 4508 maps are too many to manually inspect, we needed some tool to help 
                 self.root.bind("<KeyPress>", self._on_key)
                 self._apply_filter()
                 self.root.mainloop()
-
+    
             def _load(self):
                 rows = []
                 with open(PREDICTIONS_FILE) as f:
@@ -406,7 +406,7 @@ Because 4508 maps are too many to manually inspect, we needed some tool to help 
                             r[k] = float(r[k])
                         rows.append(r)
                 return rows
-
+    
             def _apply_filter(self):
                 filt = self.filter_var.get()
                 cls = self.class_var.get()
@@ -422,7 +422,7 @@ Because 4508 maps are too many to manually inspect, we needed some tool to help 
                 self.queue = sorted(q, key=lambda r: r["confidence"])
                 self.idx = 0
                 self._show()
-
+    
             def _show(self):
                 self.ax.clear()
                 if not self.queue or self.idx >= len(self.queue):
@@ -457,7 +457,7 @@ Because 4508 maps are too many to manually inspect, we needed some tool to help 
                     text=f"{self.idx+1}/{len(self.queue)} | "
                         f"L/R/0=set GT | Enter=accept | "
                         f"D=delete | ←/→=nav | Q=quit")
-
+    
             def _set_gt(self, fname, label):
                 for r in self.all_rows:
                     if r["filename"] == fname:
@@ -470,7 +470,7 @@ Because 4508 maps are too many to manually inspect, we needed some tool to help 
                         "prob_L", "prob_R", "prob_0"])
                     w.writeheader()
                     w.writerows(self.all_rows)
-
+    
             def _on_key(self, event):
                 key = event.keysym
                 if not self.queue or self.idx >= len(self.queue):
@@ -495,12 +495,12 @@ Because 4508 maps are too many to manually inspect, we needed some tool to help 
                     self.idx += 1; self._show()
                 elif key.upper() == "Q":
                     self.root.destroy()
-
+    
         Reviewer()
-
-
+    
+    
     # ── CLI ────────────────────────────────────────────────────────────
-
+    
     if __name__ == "__main__":
         parser = argparse.ArgumentParser(
             description="Microtubule polarity classification tool")
@@ -510,7 +510,7 @@ Because 4508 maps are too many to manually inspect, we needed some tool to help 
         {"label": cmd_label, "train": cmd_train,
         "predict": cmd_predict, "review": cmd_review}[args.command]()
     ```
-
+    
 Using the app we then labelled ~300 filaments before training and predicting on the rest. We then reviewed the decisions that the classifier had made and found that these were generally reliable:
 
 ```
@@ -533,13 +533,13 @@ We now have the traced filaments in `coordinates/microtubule/*.star` and the pol
     import numpy as np
     import pandas as pd
     import starfile
-
+    
     STAR_DIR = "coordinates/microtubule"
     PREDICTIONS_FILE = "polarity_predictions.csv"
     OUT_DIR = "out_coordinates"
     TANGENT_AVG_N = 5
     DEDUP_DIST_PX = 30  #
-
+    
     def load_polarity_labels():
         labels = {}
         with open(PREDICTIONS_FILE) as f:
@@ -551,14 +551,14 @@ We now have the traced filaments in `coordinates/microtubule/*.star` and the pol
                     pass
                 labels[fid] = row["pred"]
         return labels
-
+    
     def euler_to_tangent(rot_deg, tilt_deg, psi_deg):
         tilt = np.radians(tilt_deg)
         psi = np.radians(psi_deg)
         return np.array([-np.cos(psi) * np.sin(tilt),
                           np.sin(psi) * np.sin(tilt),
                           np.cos(tilt)])
-
+    
     def average_tangent(parts, n):
         k = min(n, len(parts))
         tangents = [euler_to_tangent(r["rlnAngleRot"], r["rlnAngleTilt"],
@@ -571,7 +571,7 @@ We now have the traced filaments in `coordinates/microtubule/*.star` and the pol
                                     parts.iloc[0]["rlnAngleTilt"],
                                     parts.iloc[0]["rlnAnglePsi"])
         return avg / norm
-
+    
     def process_filament(df, polarity):
         if len(df) < 2:
             return None, None, None
@@ -590,7 +590,7 @@ We now have the traced filaments in `coordinates/microtubule/*.star` and the pol
             return parts, parts.iloc[0], parts.iloc[-1]
         else:
             return parts, parts.iloc[-1], parts.iloc[0]
-
+    
     def deduplicate(particles, dist_px):
         if len(particles) <= 1:
             return particles
@@ -604,7 +604,7 @@ We now have the traced filaments in `coordinates/microtubule/*.star` and the pol
                 if j not in used and np.linalg.norm(coords[i] - coords[j]) < dist_px:
                     used.add(j)
         return keep
-
+    
     def main():
         polarity = load_polarity_labels()
         star_files = sorted(glob.glob(os.path.join(STAR_DIR, "*.star")))
@@ -618,7 +618,7 @@ We now have the traced filaments in `coordinates/microtubule/*.star` and the pol
             if lab and lab != "0":
                 tomo = basename.split("__microtubule_coords_filament_")[0]
                 filtered.append((sf, tomo, fid, lab))
-
+    
         all_by_tomo = defaultdict(list)
         minus_by_tomo = defaultdict(list)
         plus_by_tomo = defaultdict(list)
@@ -629,11 +629,11 @@ We now have the traced filaments in `coordinates/microtubule/*.star` and the pol
                 all_by_tomo[tomo].append(all_parts)
                 minus_by_tomo[tomo].append(minus)
                 plus_by_tomo[tomo].append(plus)
-
+    
         for tomo in minus_by_tomo:
             minus_by_tomo[tomo] = deduplicate(minus_by_tomo[tomo], DEDUP_DIST_PX)
             plus_by_tomo[tomo] = deduplicate(plus_by_tomo[tomo], DEDUP_DIST_PX)
-
+    
         os.makedirs(OUT_DIR, exist_ok=True)
         for tomo in sorted(minus_by_tomo):
             tomo_dir = os.path.join(OUT_DIR, tomo)
@@ -644,7 +644,7 @@ We now have the traced filaments in `coordinates/microtubule/*.star` and the pol
                            os.path.join(tomo_dir, "minus_ends.star"), overwrite=True)
             starfile.write({"particles": plus_df},
                            os.path.join(tomo_dir, "plus_ends.star"), overwrite=True)
-
+    
         all_minus = pd.concat([pd.DataFrame(minus_by_tomo[t]).reset_index(drop=True)
                                 for t in sorted(minus_by_tomo)], ignore_index=True)
         all_plus = pd.concat([pd.DataFrame(plus_by_tomo[t]).reset_index(drop=True)
@@ -654,11 +654,11 @@ We now have the traced filaments in `coordinates/microtubule/*.star` and the pol
         starfile.write({"particles": all_plus},
                        os.path.join(OUT_DIR, "all_plus_ends.star"), overwrite=True)
         print(f"Global: {len(all_minus)} minus ends, {len(all_plus)} plus ends")
-
+    
     if __name__ == "__main__":
         main()
     ```
-
+    
 This script gives us two new starfiles: `all_minus_ends.star` and `all_plus_ends.star`. Which end is plus and which is minus depends on the orientation of your original reference map at this point; they may be swapped, but that shouldn't be a problem. You can just change the .star file name.
 
 ### Step 4: averaging γTuRC at microtubule minus ends
@@ -670,25 +670,25 @@ In our case we ended up with around 2,800 particles for averaging. At this point
 ??? note "reference.py"
     ```python
     import mrcfile, numpy as np
-
+    
     r = np.zeros((96, 96, 96), dtype=np.float32)
     apix = 8.0
-
+    
     outer_r = 125.0 / apix  # ~15.6 px
     inner_r = 85.0 / apix   # ~10.6 px
-
+    
     y, x = np.mgrid[:96, :96] - (96-2)/2
     dist = np.sqrt(x**2 + y**2)
     ring = ((dist <= outer_r) & (dist >= inner_r)).astype(np.float32)
-
+    
     r[:] = ring[np.newaxis, :, :]
     r[:48] = 0
-
+    
     with mrcfile.new("reference.mrc", overwrite=True) as mrc:
         mrc.set_data(r)
         mrc.voxel_size = apix
     ```
-
+    
 And because some of the polarity correction, or the segmentation, or the filament tracing may of course have resulted in erroneous picks, we will do a round of 3D classification first.
 
 ```bash
