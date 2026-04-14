@@ -1,0 +1,109 @@
+site_name: easymode
+site_url: https://mgflast.github.io/easymode/
+repo_name: mgflast/easymode
+repo_url: https://github.com/mgflast/easymode
+copyright: copyright © 2023 - 2024
+nav:
+   - "🏠 Home":
+       - index.md
+       - "easymode + Ais & Pom": ais_and_pom.md
+       - "easymode + Warp/RELION/M": warp_relion_m.md
+       - "easymode training data collection": training_collection.md
+   - "📖 User Guide":
+       - user_guide/overview.md
+       - "<b>Functions</b>":
+          - user_guide/functions/installation.md
+          - user_guide/functions/preprocessing.md
+          - user_guide/functions/segmentation.md
+          - user_guide/functions/picking.md
+       - "<b>Tutorials</b>":
+          - "🎯 Picking and averaging":
+              - "1. Ribosomes": user_guide/examples/ribosome.md
+              - "2. Microtubules": user_guide/examples/microtubule.md
+              - "3. Actin filaments": user_guide/examples/actin.md
+              - "4. Vault complexes": user_guide/examples/vault.md
+          - "🗺️ Particles in context":
+              - "5. NPC orientation": user_guide/examples/npc_orientation.md
+              - "6. Hsp60-Hsp10 filtering": user_guide/examples/colocalization_filtering.md
+              - "7. Lamella surface distance": user_guide/examples/lamella_surface_distance.md
+              - "8. Picking γTuRC": user_guide/examples/picking_yturc.md
+          - "🧮 Dataset management":
+              - "9. easymode + Pom": user_guide/examples/easymode_and_pom.md
+       - "<b>Pom</b>":
+          - user_guide/pom/installation.md
+          - user_guide/pom/data_browser.md
+          - user_guide/pom/contextualizing_particles.md
+
+   - "🎨 Models":
+       - models/index.md
+       - "🐦 Species":
+          - "🟢 Ribosome": models/ribosome.md
+          - "🟢 Microtubule": models/microtubule.md
+          - "🟢 Vault": models/vault.md
+          - "🟢 TRiC": models/tric.md
+          - "🟢 Nuclear pore complex": models/npc.md
+          - "🟢 Actin": models/actin.md
+          - "🟢 hfIMPDH": models/impdh.md
+          - "🔵 Prohibitin": models/prohibitin.md
+          - "🔵 Intermediate filament": models/intermediate_filament.md
+          - "🚧 Ferritin": models/ferritin.md
+          - "🚧 Proteasome": models/proteasome.md
+       - "🏞️ Biomes":
+          - "🟢 Mitochondrion": models/mitochondrion.md
+          - "🟢 Cytoplasmic granule": models/cytoplasmic_granule.md
+          - "🟢 Mitochondrial granule": models/mitochondrial_granule.md
+          - "🟢 Nucleus": models/nucleus.md
+          - "🟢 Cytoplasm": models/cytoplasm.md
+          - "🟢 Nuclear envelope": models/nuclear_envelope.md
+          - "🔵 Lipid droplet": models/lipid_droplet.md
+       - "⚙️ Utility":
+          - "🟢 Void": models/void.md
+          - "🟢 Ice particle": models/ice_particle.md
+
+   - "📜 Papers": papers.md
+   - "🐞 Submit a bug": https://github.com/mgflast/easymode/issues
+theme:
+   name: material
+   logo: assets/Logo_small.png
+   favicon: assets/favicon.png
+   palette:
+      - media: "(prefers-color-scheme: light)"
+        scheme: default
+        primary: green
+        accent: amber
+   features:
+      - navigation.instant
+      - navigation.tracking
+      - navigation.tabs
+      - navigation.tabs.sticky
+      - navigation.expand
+      - navigation.sections
+      - search.highlight
+      - search.suggest
+      - content.tabs.link
+      - content.code.annotate
+      - content.code.copy
+   icon:
+      annotation: material/plus-circle
+markdown_extensions:
+  - admonition
+  - meta
+  - tables
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - pymdownx.highlight
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - md_in_html
+  - pymdownx.arithmatex:
+      generic: true
+  - toc:
+      toc_depth: 3
+extra_css:
+  - styles/extra.css
+plugins:
+  - search
