@@ -260,3 +260,41 @@ def list_remote_models():
     except Exception as e:
         print(f"Error listing remote models: {e}")
         return []
+
+
+FIXED_MODEL_TITLES = {"n2n_splits", "n2n_direct", "ddw_splits", "ddw_direct", "tilt"}
+
+
+def download_models(model_titles=None, silent=False):
+    """Download model weights for offline use. If model_titles is None or empty, download all; otherwise download only the listed models."""
+    if not is_online():
+        print("\nAn internet connection is required to download models. Aborting.\n")
+        return
+    if not model_titles:
+        models = list_remote_models()
+        if not models:
+            return
+        for d in models:
+            if d["has_3d"]:
+                get_model(d["title"], silent=silent)
+            if d["has_2d"]:
+                get_model(d["title"], _2d=True, silent=silent)
+        for t in FIXED_MODEL_TITLES:
+            get_model(t, silent=silent)
+    else:
+        models = list_remote_models()
+        if not models:
+            return
+        segment_by_title = {d["title"].lower(): d for d in models}
+        for name in model_titles:
+            key = name.lower()
+            if key in segment_by_title:
+                d = segment_by_title[key]
+                if d["has_3d"]:
+                    get_model(d["title"], silent=silent)
+                if d["has_2d"]:
+                    get_model(d["title"], _2d=True, silent=silent)
+            elif name in FIXED_MODEL_TITLES:
+                get_model(name, silent=silent)
+            else:
+                print(f"Warning: unknown model '{name}' - skipping.")
