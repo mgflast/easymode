@@ -15,35 +15,30 @@ def package_checkpoint(title='', checkpoint_directory='', apix=10.0):
     if 'n2n' in title:
         from easymode.n2n.model import create
         arch = 'n2n'
+        dummy_input = tf.zeros((1, 160, 160, 160, 1))
     elif 'ddw' in title:
         from easymode.ddw.model import create
         arch = 'ddw'
+        dummy_input = tf.zeros((1, 160, 160, 160, 1))
     elif 'tilt' in title:
         from easymode.tiltfilter.model import create
         arch = 'tilt'
+        dummy_input = [tf.zeros((1, 256, 256, 1)), tf.zeros((1, 256, 256, 1))]
     else:
+        from easymode.segmentation.models import get_arch, resolve_arch
         arch_file = os.path.join(checkpoint_directory, 'arch.json')
+        raw_arch = None
         if os.path.exists(arch_file):
             with open(arch_file) as f:
-                arch = json.load(f).get('arch', 'old')
-        else:
-            arch = 'old'
-        if arch == 'lite':
-            print('Packaging weights as lite segmentation model (shallow GroupNorm).')
-            from easymode.segmentation.model_lite import create
-        elif arch == 'current':
-            print('Packaging weights as current segmentation model (GroupNorm).')
-            from easymode.segmentation.model_current import create
-        else:
-            print('Packaging weights as old segmentation model (BatchNorm).')
-            from easymode.segmentation.model_old import create
+                raw_arch = json.load(f).get('arch')
+        arch = resolve_arch(raw_arch)
+        arch_info = get_arch(arch)
+        print(f'Packaging weights as {arch} segmentation model.')
+        create = arch_info['module'].create
+        dummy_input = tf.zeros((1, *arch_info['input_shape']))
+
     model = create()
-    if 'tilt' in title:
-        _ = model([tf.zeros((1, 256, 256, 1)), tf.zeros((1, 256, 256, 1))])
-    elif arch == 'lite':
-        _ = model(tf.zeros((1, 96, 96, 96, 1)))
-    else:
-        _ = model(tf.zeros((1, 160, 160, 160, 1)))
+    _ = model(dummy_input)
 
     model.load_weights(checkpoint_path).expect_partial()
     model.save_weights(os.path.join(MODEL_CACHE_DIR, f'{title}.h5'))

@@ -54,7 +54,7 @@ def filter_gaussian(img, label):
     return img, label
 
 def scale(img, label):
-    factor = np.random.uniform(0.85, 1.15)
+    factor = np.random.uniform(0.9, 1.1)
     box_size = img.shape[0]
 
     new_size = int(round(box_size * factor))

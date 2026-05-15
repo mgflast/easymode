@@ -161,22 +161,18 @@ def load_model_weights(weights_path):
         from easymode.tiltfilter.model import create
         dummy_input = [tf.zeros((1, 256, 256, 1)), tf.zeros((1, 256, 256, 1))]
     else:
-        arch = 'old'
+        from easymode.segmentation.models import get_arch
+        arch_name = None
         metadata_path = os.path.splitext(weights_path)[0] + '.json'
         if os.path.exists(metadata_path):
             try:
                 with open(metadata_path) as f:
-                    arch = json.load(f).get('arch', 'old')
+                    arch_name = json.load(f).get('arch')
             except Exception:
                 pass
-        if arch == 'current':
-            from easymode.segmentation.model_current import create
-        elif arch == 'lite':
-            from easymode.segmentation.model_lite import create
-        else:
-            from easymode.segmentation.model_old import create
-
-        dummy_input = tf.zeros((1, 96, 96, 96, 1)) if arch == 'lite' else tf.zeros((1, 160, 160, 160, 1))
+        arch = get_arch(arch_name)
+        create = arch['module'].create
+        dummy_input = tf.zeros((1, *arch['input_shape']))
 
     model = create()
     _ = model(dummy_input)

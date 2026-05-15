@@ -1,6 +1,9 @@
 import tensorflow as tf
 from tensorflow.keras import layers, Model
 
+INPUT_SHAPE = (96, 96, 96, 1)
+
+
 def masked_bce_loss(y_true, y_pred, fn_weight=1.0):
     ignore = tf.equal(y_true, 2.0)
     y_true_bin = tf.where(ignore, 0.0, y_true)
@@ -51,9 +54,6 @@ def masked_dice_loss(y_true, y_pred, smooth=1e-6):
     dice = (2.0 * intersection + smooth) / (union + smooth)
     per_sample_loss = 1.0 - dice
 
-    # Only average dice over samples that have foreground labels.
-    # Negative samples (no fg) always give loss=0, diluting the gradient
-    # and creating a local minimum at all-zeros prediction.
     has_fg = tf.reduce_sum(y_true_masked, axis=spatial_axes) > 0
     has_fg = tf.reshape(has_fg, [-1])
     per_sample_loss = tf.reshape(per_sample_loss, [-1])
@@ -75,11 +75,11 @@ class ResBlock3D(layers.Layer):
         self.filters = filters
 
         self.conv1 = layers.Conv3D(filters, 3, padding='same', use_bias=False)
-        self.bn1 = layers.GroupNormalization(groups=8)
+        self.bn1 = layers.GroupNormalization(groups=min(8, filters))
         self.relu1 = layers.ReLU()
 
         self.conv2 = layers.Conv3D(filters, 3, padding='same', use_bias=False)
-        self.bn2 = layers.GroupNormalization(groups=8)
+        self.bn2 = layers.GroupNormalization(groups=min(8, filters))
 
         self.skip_conv = None
         self.skip_bn = None
@@ -88,7 +88,7 @@ class ResBlock3D(layers.Layer):
         super().build(input_shape)
         if input_shape[-1] != self.filters:
             self.skip_conv = layers.Conv3D(self.filters, 1, padding='same', use_bias=False)
-            self.skip_bn = layers.GroupNormalization(groups=8)
+            self.skip_bn = layers.GroupNormalization(groups=min(8, self.filters))
 
     def call(self, inputs, training=None):
         x = self.conv1(inputs)
@@ -108,7 +108,6 @@ class ResBlock3D(layers.Layer):
 
 
 class EncoderBlock(layers.Layer):
-
     def __init__(self, filters: int, stride: int = 1, **kwargs):
         super().__init__(**kwargs)
         self.filters = filters
@@ -119,7 +118,7 @@ class EncoderBlock(layers.Layer):
                 filters, kernel_size=3, strides=stride,
                 padding='same', use_bias=False
             )
-            self.downsample_bn = layers.GroupNormalization(groups=8)
+            self.downsample_bn = layers.GroupNormalization(groups=min(8, filters))
             self.downsample_relu = layers.ReLU()
         else:
             self.downsample = None
@@ -128,18 +127,15 @@ class EncoderBlock(layers.Layer):
 
     def call(self, inputs, training=None):
         x = inputs
-
         if self.downsample is not None:
             x = self.downsample(x)
             x = self.downsample_bn(x, training=training)
             x = self.downsample_relu(x)
-
         x = self.res_block(x, training=training)
         return x
 
 
 class DecoderBlock(layers.Layer):
-
     def __init__(self, filters: int, upsample_kernel_size: int = 2, **kwargs):
         super().__init__(**kwargs)
         self.filters = filters
@@ -150,7 +146,7 @@ class DecoderBlock(layers.Layer):
                 filters, kernel_size=upsample_kernel_size,
                 strides=upsample_kernel_size, padding='same', use_bias=False
             )
-            self.upsample_bn = layers.GroupNormalization(groups=8)
+            self.upsample_bn = layers.GroupNormalization(groups=min(8, filters))
             self.upsample_relu = layers.ReLU()
         else:
             self.upsample = None
@@ -159,15 +155,12 @@ class DecoderBlock(layers.Layer):
 
     def call(self, inputs, skip_connection=None, training=None):
         x = inputs
-
         if self.upsample is not None:
             x = self.upsample(x)
             x = self.upsample_bn(x, training=training)
             x = self.upsample_relu(x)
-
         if skip_connection is not None:
             x = tf.concat([x, skip_connection], axis=-1)
-
         x = self.res_block(x, training=training)
         return x
 
@@ -176,9 +169,9 @@ class UNet(Model):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        filters = [32, 64, 128, 256, 512, 1024]
-        strides = [1, 2, 2, 2, 2, 2]
-        upsample_kernel_sizes = [1, 2, 2, 2, 2, 2]
+        filters = [32, 64, 128, 192, 256]
+        strides = [1, 2, 2, 2, 2]
+        upsample_kernel_sizes = [1, 2, 2, 2, 2]
 
         self.encoders = []
         for i, (f, s) in enumerate(zip(filters, strides)):
@@ -220,5 +213,4 @@ class UNet(Model):
 
 
 def create():
-    model = UNet()
-    return model
+    return UNet()

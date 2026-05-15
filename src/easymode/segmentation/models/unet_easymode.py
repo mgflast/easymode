@@ -1,6 +1,8 @@
 import tensorflow as tf
 from tensorflow.keras import layers, Model
 
+INPUT_SHAPE = (96, 96, 96, 1)
+
 
 def masked_bce_loss(y_true, y_pred, fn_weight=1.0):
     ignore = tf.equal(y_true, 2.0)
@@ -52,9 +54,6 @@ def masked_dice_loss(y_true, y_pred, smooth=1e-6):
     dice = (2.0 * intersection + smooth) / (union + smooth)
     per_sample_loss = 1.0 - dice
 
-    # Only average dice over samples that have foreground labels.
-    # Negative samples (no fg) always give loss=0, diluting the gradient
-    # and creating a local minimum at all-zeros prediction.
     has_fg = tf.reduce_sum(y_true_masked, axis=spatial_axes) > 0
     has_fg = tf.reshape(has_fg, [-1])
     per_sample_loss = tf.reshape(per_sample_loss, [-1])
@@ -167,15 +166,6 @@ class DecoderBlock(layers.Layer):
 
 
 class UNet(Model):
-    """Shallow 3D UNet: 3 pooling levels, ~20x fewer parameters than model_current.
-
-    Architecture:
-        Encoder: [32, 64, 128, 256] with strides [1, 2, 2, 2]
-        Bottleneck at 96/8 = 12 voxels (or 160/8 = 20 voxels) per side
-        Decoder mirrors encoder with skip connections
-        Receptive field: ~48 voxels — sufficient for ribosomes, filaments,
-        membranes, and most other features at 10 A/px.
-    """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -223,5 +213,4 @@ class UNet(Model):
 
 
 def create():
-    model = UNet()
-    return model
+    return UNet()

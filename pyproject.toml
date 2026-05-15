@@ -6,6 +6,9 @@ build-backend = "hatchling.build"
 only-include = ["src"]
 sources = ["src"]
 
+[tool.hatch.build.targets.sdist]
+only-include = ["src", "pyproject.toml", "README.md", "LICENSE.txt", "CHANGELOG.md"]
+
 [tool.hatch.build]
 artifacts = [
     "*.txt",

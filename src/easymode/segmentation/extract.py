@@ -176,7 +176,7 @@ def extract_training_data(features, apix):
         for f in se_frame.features:
             if f.title not in features:
                 continue
-            print(f'\tparsing {n}/{len(annotated_tomograms)} - {dataset} - {annotation} - {f.title}')
+            print(f'\tparsing {n}/{len(annotated_tomograms)} - {os.path.basename(dataset)} - {annotation} - {f.title}')
             box_coordinates = [(z, box[0], box[1]) for z in f.boxes for box in f.boxes[z]]
             for j, k, l in box_coordinates:
                 particle_id = make_id(tomo, j, k, l, f.title)

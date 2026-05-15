@@ -18,8 +18,17 @@ def main():
         train_parser.add_argument('--weights', type=str, default=None, help="Path to a .h5 weights file to initialize training from.")
         train_parser.add_argument('--bce', type=float, default=0.3, help="Weight of the BCE component of the loss (default 0.3). Set to 1.0 and --dice 0.0 for BCE-only training.")
         train_parser.add_argument('--dice', type=float, default=0.7, help="Weight of the dice component of the loss (default 0.7). Set to 0.0 for BCE-only training.")
-        train_parser.add_argument('--arch', type=str, default='current', choices=['current', 'lite'], help="Network architecture: 'current' (6-level UNet) or 'lite' (4-level shallow UNet, ~20x fewer parameters). Default: current.")
-        train_parser.add_argument('--crop', type=int, default=None, help="Training crop size (must be divisible by 8). Default: 160 for 'current', 96 for 'lite'.")
+        from easymode.segmentation.models import list_archs
+        train_parser.add_argument('--arch', type=str, default='unet-membrain-groupnorm', choices=list_archs(), help="Network architecture. Default: unet-membrain-groupnorm.")
+        def _parse_size(s):
+            parts = s.lower().split('x')
+            if len(parts) != 3:
+                raise argparse.ArgumentTypeError(f"--size must be ZxYxX (e.g. 96x96x96 or 64x128x128), got {s!r}")
+            try:
+                return tuple(int(p) for p in parts)
+            except ValueError:
+                raise argparse.ArgumentTypeError(f"--size dimensions must be integers, got {s!r}")
+        train_parser.add_argument('--size', type=_parse_size, default=None, help="Training crop shape as ZxYxX (e.g. 96x96x96 or 64x128x128). Each dim must be divisible by the arch's stride product (8 for unet-easymode, 16 for unet-easymode-deeper, 32 for unet-membrain*). Default: arch-specific cubic input size.")
         train_parser.add_argument('--test', action='store_true', help="(debug) test augmentations and save to .../training/3d/test_samples/")
 
     set_params = subparsers.add_parser('set', help='Set environment variables.')
@@ -125,7 +134,12 @@ def main():
             from easymode.segmentation.train import test_dataloader
             test_dataloader(args.features)
         else:
-            crop_size = args.crop if args.crop else (96 if args.arch == 'lite' else 160)
+            from easymode.segmentation.models import get_arch
+            if args.size is not None:
+                crop_shape = args.size
+            else:
+                d = get_arch(args.arch)['input_shape'][0]
+                crop_shape = (d, d, d)
             train_model(title=args.title,
                         features=args.features,
                         batch_size=args.batch_size,
@@ -136,7 +150,7 @@ def main():
                         bce_weight=args.bce,
                         dice_weight=args.dice,
                         arch=args.arch,
-                        crop_size=crop_size,
+                        crop_shape=crop_shape,
                         )
     elif args.command == 'tilt_train':
         from easymode.tiltfilter.train import train_model

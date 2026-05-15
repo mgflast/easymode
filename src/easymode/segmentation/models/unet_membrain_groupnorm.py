@@ -1,6 +1,9 @@
 import tensorflow as tf
 from tensorflow.keras import layers, Model
 
+INPUT_SHAPE = (160, 160, 160, 1)
+
+
 def masked_bce_loss(y_true, y_pred, fn_weight=1.0):
     ignore = tf.equal(y_true, 2.0)
     y_true_bin = tf.where(ignore, 0.0, y_true)
@@ -49,7 +52,15 @@ def masked_dice_loss(y_true, y_pred, smooth=1e-6):
     union = tf.reduce_sum(y_true_masked, axis=spatial_axes) + tf.reduce_sum(y_pred_masked, axis=spatial_axes)
 
     dice = (2.0 * intersection + smooth) / (union + smooth)
-    return tf.reduce_mean(1.0 - dice)
+    per_sample_loss = 1.0 - dice
+
+    has_fg = tf.reduce_sum(y_true_masked, axis=spatial_axes) > 0
+    has_fg = tf.reshape(has_fg, [-1])
+    per_sample_loss = tf.reshape(per_sample_loss, [-1])
+    fg_losses = tf.boolean_mask(per_sample_loss, has_fg)
+    return tf.cond(tf.size(fg_losses) > 0,
+                   lambda: tf.reduce_mean(fg_losses),
+                   lambda: tf.constant(0.0))
 
 def masked_dice(y_true, y_pred):
     return 1.0 - masked_dice_loss(y_true, y_pred)
@@ -64,11 +75,11 @@ class ResBlock3D(layers.Layer):
         self.filters = filters
 
         self.conv1 = layers.Conv3D(filters, 3, padding='same', use_bias=False)
-        self.bn1 = layers.BatchNormalization()
+        self.bn1 = layers.GroupNormalization(groups=8)
         self.relu1 = layers.ReLU()
 
         self.conv2 = layers.Conv3D(filters, 3, padding='same', use_bias=False)
-        self.bn2 = layers.BatchNormalization()
+        self.bn2 = layers.GroupNormalization(groups=8)
 
         self.skip_conv = None
         self.skip_bn = None
@@ -77,7 +88,7 @@ class ResBlock3D(layers.Layer):
         super().build(input_shape)
         if input_shape[-1] != self.filters:
             self.skip_conv = layers.Conv3D(self.filters, 1, padding='same', use_bias=False)
-            self.skip_bn = layers.BatchNormalization()
+            self.skip_bn = layers.GroupNormalization(groups=8)
 
     def call(self, inputs, training=None):
         x = self.conv1(inputs)
@@ -108,7 +119,7 @@ class EncoderBlock(layers.Layer):
                 filters, kernel_size=3, strides=stride,
                 padding='same', use_bias=False
             )
-            self.downsample_bn = layers.BatchNormalization()
+            self.downsample_bn = layers.GroupNormalization(groups=8)
             self.downsample_relu = layers.ReLU()
         else:
             self.downsample = None
@@ -139,7 +150,7 @@ class DecoderBlock(layers.Layer):
                 filters, kernel_size=upsample_kernel_size,
                 strides=upsample_kernel_size, padding='same', use_bias=False
             )
-            self.upsample_bn = layers.BatchNormalization()
+            self.upsample_bn = layers.GroupNormalization(groups=8)
             self.upsample_relu = layers.ReLU()
         else:
             self.upsample = None
@@ -209,5 +220,4 @@ class UNet(Model):
 
 
 def create():
-    model = UNet()
-    return model
+    return UNet()

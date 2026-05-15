@@ -33,6 +33,7 @@ nav:
           - user_guide/pom/installation.md
           - user_guide/pom/data_browser.md
           - user_guide/pom/contextualizing_particles.md
+       - "<b>FAQ</b>": user_guide/faq.md
 
    - "🎨 Models":
        - models/index.md

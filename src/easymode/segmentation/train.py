@@ -8,8 +8,8 @@ AUGMENTATIONS_ROT_XY = 0.2
 AUGMENTATIONS_MISSING_WEDGE = 0.0
 AUGMENTATIONS_GAUSSIAN = 0.2
 AUGMENTATIONS_SCALE = 0.2
-AUGMENTATIONS_MIXUP = 0.0
-AUGMENTATIONS_CONTRAST = 0.0
+AUGMENTATIONS_MIXUP = 0.2
+AUGMENTATIONS_CONTRAST = 0.2
 
 DEBUG = False
 ROOT = '/cephfs/mlast/compu_projects/easymode'
@@ -87,11 +87,11 @@ class Sample:
 
 
 class DataLoader:
-    def __init__(self, features, batch_size=8, validation=False, crop_size=160):
+    def __init__(self, features, batch_size=8, validation=False, crop_shape=(160, 160, 160)):
         self.features = features
         self.batch_size = batch_size
         self.validation = validation
-        self.crop_size = crop_size
+        self.crop_shape = tuple(crop_shape)
         self.samples = list()
         self.positive_samples = list()
         self.negative_samples = list()
@@ -173,14 +173,12 @@ class DataLoader:
         return img, label
 
     def random_crop(self, img, label):
-        """Random crop from 160^3 to self.crop_size^3."""
-        c = self.crop_size
-        if c >= img.shape[0]:
-            return img, label
-        z = random.randint(0, img.shape[0] - c)
-        y = random.randint(0, img.shape[1] - c)
-        x = random.randint(0, img.shape[2] - c)
-        return img[z:z+c, y:y+c, x:x+c], label[z:z+c, y:y+c, x:x+c]
+        cz, cy, cx = self.crop_shape
+        sz, sy, sx = img.shape[:3]
+        z = random.randint(0, max(sz - cz, 0))
+        y = random.randint(0, max(sy - cy, 0))
+        x = random.randint(0, max(sx - cx, 0))
+        return img[z:z+cz, y:y+cy, x:x+cx], label[z:z+cz, y:y+cy, x:x+cx]
 
     def preprocess(self, img, label, validity):
         img = img.astype(np.float32)
@@ -199,7 +197,7 @@ class DataLoader:
         return img, label
 
     def sample_generator(self):
-        e = 16
+        e = 8
         if self.validation:
             for sample in self.samples:
                 img, label, validity = sample.load(validation=True)
@@ -230,25 +228,34 @@ class DataLoader:
                     yield np.expand_dims(img, axis=-1), np.expand_dims(label, axis=-1)
 
     def as_generator(self, batch_size):
-        c = self.crop_size
-        dataset = tf.data.Dataset.from_generator(self.sample_generator, output_signature=(tf.TensorSpec(shape=(c, c, c, 1), dtype=tf.float32), tf.TensorSpec(shape=(c, c, c, 1), dtype=tf.float32))).batch(batch_size=batch_size, drop_remainder=True).prefetch(tf.data.AUTOTUNE)
+        cz, cy, cx = self.crop_shape
+        spec = tf.TensorSpec(shape=(cz, cy, cx, 1), dtype=tf.float32)
+        dataset = tf.data.Dataset.from_generator(self.sample_generator, output_signature=(spec, spec)).batch(batch_size=batch_size, drop_remainder=True).prefetch(tf.data.AUTOTUNE)
         if self.validation:
             return dataset, None  # finite dataset — Keras runs until exhausted
         n_steps = len(self.samples) // batch_size
         return dataset, n_steps
 
 
-def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, lr_end=1e-5, weights_path=None, bce_weight=0.3, dice_weight=0.7, arch='current', crop_size=160):
+def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, lr_end=1e-5, weights_path=None, bce_weight=0.3, dice_weight=0.7, arch='unet-membrain-groupnorm', crop_shape=(160, 160, 160)):
     import json
+    from easymode.segmentation.models import get_arch, resolve_arch
 
-    if arch == 'lite':
-        from easymode.segmentation.model_lite import create, masked_bce_loss, masked_dice_loss, masked_precision, masked_recall, masked_dice
-    else:
-        from easymode.segmentation.model_current import create, masked_bce_loss, masked_dice_loss, masked_precision, masked_recall, masked_dice
+    arch = resolve_arch(arch)
+    m = get_arch(arch)['module']
+    create = m.create
+    masked_bce_loss = m.masked_bce_loss
+    masked_dice_loss = m.masked_dice_loss
+    masked_precision = m.masked_precision
+    masked_recall = m.masked_recall
+    masked_dice = m.masked_dice
+
+    crop_shape = tuple(crop_shape)
+    cz, cy, cx = crop_shape
 
     tf.config.run_functions_eagerly(False)
 
-    print(f'\nTraining model with features: {features} (arch: {arch}, crop: {crop_size})\n')
+    print(f'\nTraining model with features: {features} (arch: {arch}, crop: {cz}x{cy}x{cx})\n')
     print(f'Loss weights: BCE={bce_weight}, dice={dice_weight}\n')
 
     def combined_loss(y_true, y_pred):
@@ -258,7 +265,7 @@ def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, 
         model = create()
         model.compile(optimizer=model.optimizer, loss=combined_loss, metrics=[masked_precision, masked_recall, masked_bce_loss, masked_dice], run_eagerly=False)
         if weights_path is not None:
-            dummy = tf.zeros((1, crop_size, crop_size, crop_size, 1))
+            dummy = tf.zeros((1, cz, cy, cx, 1))
             model(dummy)
             if os.path.isdir(weights_path):
                 weights_path = tf.train.latest_checkpoint(weights_path)
@@ -268,8 +275,8 @@ def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, 
     model.optimizer.learning_rate.assign(lr_start)
 
     # data loaders
-    training_ds, training_steps = DataLoader(features, batch_size=batch_size, validation=False, crop_size=crop_size).as_generator(batch_size=batch_size)
-    validation_ds, validation_steps = DataLoader(features, batch_size=batch_size, validation=True, crop_size=crop_size).as_generator(batch_size=batch_size)
+    training_ds, training_steps = DataLoader(features, batch_size=batch_size, validation=False, crop_shape=crop_shape).as_generator(batch_size=batch_size)
+    validation_ds, validation_steps = DataLoader(features, batch_size=batch_size, validation=True, crop_shape=crop_shape).as_generator(batch_size=batch_size)
 
     # callbacks
     os.makedirs(f'{ROOT}/training/3d/checkpoints/{title}', exist_ok=True)
