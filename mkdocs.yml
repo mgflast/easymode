@@ -56,6 +56,7 @@ nav:
           - "🟢 Nucleus": models/nucleus.md
           - "🟢 Cytoplasm": models/cytoplasm.md
           - "🟢 Nuclear envelope": models/nuclear_envelope.md
+          - "🔵 Membrane": models/membrane.md
           - "🔵 Lipid droplet": models/lipid_droplet.md
        - "⚙️ Utility":
           - "🟢 Void": models/void.md
