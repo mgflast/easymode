@@ -1,7 +1,9 @@
-import os, json, requests
+import os, json, logging, requests
 from pathlib import Path
 from huggingface_hub import hf_hub_download, HfApi
 import easymode.core.config as cfg
+
+logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
 
 HF_REPO_ID = "mgflast/easymode"
 MODEL_CACHE_DIR = cfg.settings["MODEL_DIRECTORY"]
@@ -48,8 +50,8 @@ def get_remote_metadata(model_title, _2d=False):
     try:
         path = hf_hub_download(repo_id=HF_REPO_ID, filename=filename, cache_dir=MODEL_CACHE_DIR)
         with open(path, "r") as f: metadata = json.load(f)
-    except Exception as e:
-        print(f"Warning: Could not get remote metadata for {model_title} ({filename}): {e}")
+    except Exception:
+        pass
     finally:
         if prev is None: os.environ.pop("HF_HUB_DISABLE_PROGRESS_BARS", None)
         else: os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = prev
