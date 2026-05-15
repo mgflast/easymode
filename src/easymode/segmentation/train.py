@@ -211,7 +211,7 @@ class DataLoader:
             while True:
                 np.random.shuffle(self.samples)
                 for j in range(len(self.samples)):
-                    if j % 2 == 0:
+                    if j % 3 == 0:
                         sample = random.choice(self.positive_samples)
                     else:
                         sample = self.samples[j]
