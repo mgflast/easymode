@@ -11,7 +11,6 @@ conda activate easymode
 pip install tensorflow==2.11.0 protobuf==3.20.3
 pip install git+https://github.com/bionanopatterning/Ais.git
 pip install git+https://github.com/mgflast/easymode.git
-pip install git+https://github.com/bionanopatterning/Pom.git
 
 # Set up CUDA library paths (one-time setup)
 mkdir -p $CONDA_PREFIX/etc/conda/activate.d $CONDA_PREFIX/etc/conda/deactivate.d

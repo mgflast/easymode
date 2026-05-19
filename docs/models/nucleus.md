@@ -15,5 +15,5 @@ Segmenting the nucleus can be useful to generate masks for picking, or to add co
     Video failed to load.
   </video>
 </p>
-Example of `easymode segment nucleus --2d` output overlaid on a tomogram from EMPIAR-11845 (FIB-milled D. discoideum) - note that while this dataset was included in the training collection, the tomogram was not.
+Example of `easymode segment nucleus --2d` output overlaid on a tomogram from EMPIAR-11845 (FIB-milled D. discoideum).
 
