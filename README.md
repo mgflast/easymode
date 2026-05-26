@@ -15,7 +15,7 @@ Easymode is a collection of general pretrained neural networks for cellular cryo
 ```bash
 conda create -n easymode python=3.10 cudatoolkit=11.2 cudnn=8.1 git -c conda-forge
 conda activate easymode
-pip install tensorflow==2.11.0 protobuf==3.20.3
+pip install tensorflow==2.11.0
 pip install git+https://github.com/mgflast/easymode.git
 ```
 
