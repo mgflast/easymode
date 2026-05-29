@@ -222,6 +222,7 @@ def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, bat
     model = load_model(model_path)
 
     process_start_time = psutil.Process().create_time()
+    print(f'GPU {gpu} - starting inference.')
 
     for j, tomogram_path in enumerate(tomogram_list, 1):
         tomo_name = os.path.splitext(os.path.basename(tomogram_path))[0]
