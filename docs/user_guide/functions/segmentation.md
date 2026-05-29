@@ -37,9 +37,9 @@ Optional arguments:
     easymode uses almost exactly the same network architecture as [Membrain](https://github.com/CellArchLab/MemBrain-v2). If your hardware can handle Membrain, it should also work for easymode.
 
 !!! tip
-    If accuracy is not _super_ important, set `--tta 1` to speed up segmentation significantly. This can be useful when you're just exploring the data and only want to roughly estimate tomogram contents.
+    If accuracy is not _super_ important, set `--tta 1` to speed the segmentation up significantly. This can be useful when you're just exploring the data and only want to roughly estimate tomogram contents.
 
 !!! note
-    You can run multiple processes simultaneously on the same data and for the same feature, for example if you have some GPUs on cluster node A and some more on cluster node B. Whenever a thread starts processing a tomogram, it creates a provisional output file that prevents other threads from processing that same tomogram. In some cases, when you abort a process, a number of preliminary output files may not be deleted properly. In that case, simply delete those files manually before restarting the segmentation.
+    You can run multiple processes simultaneously on the same data and for the same feature, for example if you have some GPUs on node A and some more on node B. Whenever a thread starts processing a tomogram, it creates a provisional output file that prevents other threads from processing that same tomogram. In some cases, when you abort a process, a number of preliminary output files may not be deleted properly. In that case, you'll have to delete those files manually before restarting the segmentation.
     
     

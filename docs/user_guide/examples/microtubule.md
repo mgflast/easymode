@@ -40,7 +40,7 @@ Subtomogram averaging (STA) of microtubules is a bit more involved than averagin
 
 ### Step 4: vectorizing microtubule instances & generating coordinates
 ```
-easymode pick microtubule --data segmented --output coordinates/microtubule --length 1000 --spacing 200 --per_filament
+easymode pick microtubule --data segmented --output coordinates/microtubule --length 1000 --spacing 200 --filament --separ
 ```
 This created 699 star files, one per detected microtubule, listing coordinates with priors on the particle orientation based on the tangent to the filament. 
 
@@ -51,80 +51,110 @@ A tricky thing about microtubules is that they have a distinct polarity, but whe
     ```python
     import os, glob, subprocess, json, starfile
     import numpy as np, mrcfile
-    
+
     ROOT = '/cephfs/mlast/em/HeLa_MPA_merged'
+    MICRO = f'{ROOT}/MICROTUBULE'              # all per-filament work lives here
+    POLARITY = f'{MICRO}/polarity_maps'        # output maps (was never created)
+    REF = f'{MICRO}/emd_7973.mrc'              # reference (was referenced as ../emd_7973.mrc)
+
+    # create the shared output dirs once, up front
+    os.makedirs(MICRO, exist_ok=True)
+    os.makedirs(POLARITY, exist_ok=True)
+
+
     def _run(cmd, capture=False):
         print(f'\033[42m{cmd}\033[0m\n')
         ret = subprocess.run(cmd, shell=True, capture_output=capture, text=True if capture else None)
         if ret.returncode != 0:
             print(f'\033[91merror running {cmd}\033[0m')
         return ret.stdout
-    
+
+
+    def _abs(p):
+        """Make a star-file path absolute (idempotent): WarpTools writes paths relative to ROOT."""
+        return p if os.path.isabs(p) else f'{ROOT}/{p}'
+
+
     filaments = sorted(glob.glob(f'{ROOT}/coordinates/microtubule/*.star'))
     filaments = sorted(filaments, key=lambda x: os.path.getsize(x), reverse=True)
-    
+
     for f in filaments:
         try:
             name = os.path.basename(os.path.splitext(f)[0])
-            os.makedirs(name, exist_ok=True)
-    
-            if os.path.exists(f'{ROOT}/{name}/Refine3D/job001/run_data.star'):
+            work = f'{MICRO}/{name}'                       # this filament's working dir
+            job = f'{work}/Refine3D/job001'
+            os.makedirs(work, exist_ok=True)
+
+            if os.path.exists(f'{job}/run_data.star'):     # FIX: was {ROOT}/{name}/... (never matched)
                 print(f'skipping {name}')
             else:
                 particles = starfile.read(f)
-                tomostar = particles['rlnMicrographName'][0]
-                # # STEP 1 - export particles with WarpTools
                 if len(particles) < 10:
                     continue
-                if not os.path.exists(f'{ROOT}/MICROTUBULE/{name}/particles.star'):
-                    os.chdir('..')
-                    _run(f"WarpTools ts_export_particles --perdevice 4 --input_data {ROOT}/tomostar/{tomostar} --settings {ROOT}/warp_tiltseries.settings --input_star {f} --coords_angpix 10.0 --output_angpix 5.0 --box 64 --diameter 300 --3d --output_star {ROOT}/MICROTUBULE/{name}/particles.star --output_processing {ROOT}/MICROTUBULE/{name}/particles")
-                    os.chdir('MICROTUBULE')
-    
-                    star_data = starfile.read(f'{ROOT}/MICROTUBULE/{name}/particles.star')
-                    star_data['rlnImageName'] = [p.replace('MICROTUBULE', f'{ROOT}/MICROTUBULE') for p in star_data['rlnImageName']]
-                    star_data['rlnCtfImage'] = [p.replace('MICROTUBULE', f'{ROOT}/MICROTUBULE') for p in star_data['rlnCtfImage']]
-                    starfile.write(star_data, f'{ROOT}/MICROTUBULE/{name}/particles.star')
-    
-                # STEP 2 - run Relion 3D refinement.
-                os.chdir(f'{ROOT}/MICROTUBULE/{name}')
-                os.makedirs(f'Refine3D/job001', exist_ok=True)
+                tomostar = os.path.basename(particles['rlnMicrographName'][0])
+
+                # STEP 1 - export particles with WarpTools (all paths absolute; cwd irrelevant)
+                if not os.path.exists(f'{work}/particles.star'):
+                    os.makedirs(f'{work}/particles', exist_ok=True)
+                    os.chdir(ROOT)
+                    _run(f"WarpTools ts_export_particles --perdevice 4 "
+                        f"--input_data {ROOT}/tomostar/{tomostar} "
+                        f"--settings {ROOT}/warp_tiltseries.settings "
+                        f"--input_star {f} --coords_angpix 10.0 --output_angpix 5.0 "
+                        f"--box 64 --diameter 300 --3d "
+                        f"--output_star {work}/particles.star "
+                        f"--output_processing {work}/particles")
+
+                    # rewrite image/ctf paths to absolute so relion finds them from any cwd
+                    star_data = starfile.read(f'{work}/particles.star')
+                    star_data['rlnImageName'] = [_abs(p) for p in star_data['rlnImageName']]
+                    star_data['rlnCtfImage'] = [_abs(p) for p in star_data['rlnCtfImage']]
+                    starfile.write(star_data, f'{work}/particles.star', overwrite=True)
+
+                # STEP 2 - Relion 3D auto-refine (run from the filament dir; uses relative --o/--i)
+                os.makedirs(job, exist_ok=True)
+                os.chdir(work)
                 _run('mpirun -n 5 --oversubscribe relion_refine_mpi '
-                     '--sym C11 '
-                     '--o Refine3D/job001/run '
-                     '--auto_refine '
-                     '--split_random_halves '
-                     '--i particles.star '
-                     '--sigma_tilt 30 '
-                     '--ref ../emd_7973.mrc '
-                     '--firstiter_cc '
-                     '--trust_ref_size '
-                     '--ini_high 90 '
-                     '--pool 3 '
-                     '--pad 2  '
-                     '--ctf '
-                     '--particle_diameter 300 '
-                     '--flatten_solvent '
-                     '--zero_mask '
-                     '--oversampling 1 '
-                     '--healpix_order 1 '
-                     '--auto_local_healpix_order 1 '
-                     '--offset_range 3 '
-                     '--offset_step 1 '
-                     '--low_resol_join_halves 40 '
-                     '--norm '
-                     '--scale  '
-                     '--j 14 '
-                     '--gpu ""  '
-                     '--pipeline_control Refine3D/job001/')
-                os.chdir(f'{ROOT}/MICROTUBULE')
-    
-            last_it = sorted(glob.glob(f'{ROOT}/MICROTUBULE/{name}/Refine3D/job001/run_it*_half1_class001.mrc'))[-1]
-            polarity_map = mrcfile.read(last_it)[32-12:32+12, :, :].mean(axis=0)
-            with mrcfile.new(f'polarity_maps/{name}.mrc', overwrite=True) as mrc:
+                    '--sym C1 '
+                    '--o Refine3D/job001/run '
+                    '--auto_refine '
+                    '--split_random_halves '
+                    '--i particles.star '
+                    '--sigma_tilt 30 '
+                    f'--ref {REF} '
+                    '--firstiter_cc '
+                    '--trust_ref_size '
+                    '--ini_high 90 '
+                    '--pool 3 '
+                    '--pad 2  '
+                    '--ctf '
+                    '--particle_diameter 300 '
+                    '--flatten_solvent '
+                    '--zero_mask '
+                    '--oversampling 1 '
+                    '--healpix_order 1 '
+                    '--auto_local_healpix_order 1 '
+                    '--offset_range 3 '
+                    '--offset_step 1 '
+                    '--low_resol_join_halves 40 '
+                    '--norm '
+                    '--scale  '
+                    '--j 14 '
+                    '--gpu ""  '
+                    '--pipeline_control Refine3D/job001/')
+
+            # STEP 3 - polarity map from the last refinement iteration
+            its = sorted(glob.glob(f'{job}/run_it*_half1_class001.mrc'))
+            if not its:
+                print(f'no refinement output for {name}, skipping polarity map')
+                continue
+            vol = mrcfile.read(its[-1])
+            c = vol.shape[0] // 2                           # center slab, robust to box size
+            polarity_map = vol[c - 12:c + 12, :, :].mean(axis=0)
+            with mrcfile.new(f'{POLARITY}/{name}.mrc', overwrite=True) as mrc:
                 mrc.set_data(polarity_map.astype(np.float32))
         except Exception as e:
-            print(e)
+            print(f'{name}: {e}')
     ```
     
     You could also run a variation of this script with C13 symmetry enforced in the Refine3D job. For filaments that do have 13 protofilaments, this helps to accentuate the polarity in the resulting averages. Or even running it three times, once with C12, C13, and C14 symmetry, to figure out the polarity and the number of protofilaments. **To adapt this script to your situation, you might want to copy it into an LLM and ask for guidance.**   

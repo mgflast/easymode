@@ -218,10 +218,10 @@ def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, bat
     for device in tf.config.list_physical_devices('GPU'):
         tf.config.experimental.set_memory_growth(device, True)
 
-    process_start_time = psutil.Process().create_time()
-
     print(f'GPU {gpu} - loading model ({model_path}).')
     model = load_model(model_path)
+
+    process_start_time = psutil.Process().create_time()
 
     for j, tomogram_path in enumerate(tomogram_list, 1):
         tomo_name = os.path.splitext(os.path.basename(tomogram_path))[0]
@@ -246,7 +246,7 @@ def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, bat
             eta = time.strftime('%H:%M:%S', time.gmtime(elapsed / j * (len(tomogram_list) - j)))
             avg_secs = int(elapsed / j)
             per_tomo = f"{avg_secs // 60:02d}:{avg_secs % 60:02d}"
-            print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {feature} - {os.path.basename(tomogram_path)} - eta {eta} ({per_tomo} per tomo)")
+            print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {feature} - {os.path.basename(tomogram_path)} - etc {eta} ({per_tomo} per tomo)")
         except Exception as e:
             if wrote_temporary:
                 os.remove(output_file)
