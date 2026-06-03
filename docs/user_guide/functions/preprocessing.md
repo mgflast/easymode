@@ -1,4 +1,4 @@
-# Preprocessing
+# Tomogram reconstruction
 
 Although the core of **easymode** is really just about feature detection, we've included a couple of tools to facilitate cryoET data preprocessing. These are built on [Warp](https://warpem.github.io) and [AreTomo3](https://github.com/czimaginginstitute/AreTomo3).
 
@@ -18,8 +18,8 @@ Optional arguments:
 --shape <int>x<int>       Size (in pixels) of the tilt images (default: auto-detected)
 --no_halfmaps             Include this flag in order NOT to generate even/odd frame and volume splits
 ```
-!!! tip "Tip: direct denoising"
-    If you don't need _perfect_ denoising performance and _good_ is good enough, you can use a pretrained denoiser and save time & memory by skipping the generation of halfmaps with `--no_halfmaps`. More about this in the **Denoising** section.
+!!! tip "Tip: skip the halfmaps"
+    If you don't plan to use the noise2noise denoiser, or you intend to use the DeepDeWedge denoiser (which works on a single tomogram), you can save time and memory by skipping the generation of halfmaps with `--no_halfmaps`. See the [general denoisers](general_denoisers.md) page for details.
 
 ## Tilt selection
 Use `easymode select_tilts` to automatically identify bad tilt images and exclude them from tomogram reconstruction. To avoid repeating tomogram reconstruction, you could run the above `easymode reconstruct` with argument `--steps 11100000` first, then run tilt selection, and then reconstruct with `--steps 00011111`. Or just reconstruct and think about tilt selection later.
@@ -39,28 +39,3 @@ Optional arguments:
 --overwrite                If used, if output star files already exist in --output, they will be overwritten. 
 ```
 If you provide --tomostar only, a standard Warp file structure is assumed, with tilt stacks in warp_tiltseries/tiltstack/\*/\*.st and xml files in warp_tiltseries/*.xml. If you provide --tiltstack only, output tomostar files will be written in the location of each tilt stack file and no Warp-style file structure is used. 
-
-## Denoising
-In cases where you don't have access to raw frames, or you want to save memory, or want to save time, you can denoise your full tomograms directly using `easymode denoise`, our noise2noise model pretrained on data from 43 distinct sources. 
-
-```
-easymode denoise --data warp_tiltseries/reconstruction --output warp_tiltseries/reconstruction/denoised --mode direct --method n2n --gpu 0,1,2,3
-```
-
-Optional arguments:
-```
---mode {'direct', 'splits'}     Use 'direct' mode to denoise full tomograms, or 'splits' to denoise and combine independent even and odd tomogram splits.
---tta <int>                     Test-time augmentation factor (default: 1). Probably superflous for denoising; when set to >1, the model will denoise multiple augmented versions of the input and average the results.
---iter <int>                    Number of denoising iterations to perform (default: 1). Only valid in 'direct' mode. A direct denoiser can be re-applied to its own output, to enhance contrast further - at the risk of introducing many artifacts.
---overwrite                     If used, if output tomograms already exist in --output, they will be overwritten.
-```
-
-!!! note
-    For optimal denoising , it is probably always best to train a new network on your own data. But for general segmentation and picking purposes, the easymode general denoiser does the job. 
-
-
-### Direct versus split denoising
-
-We currently offer one denoising method (noise2noise), and two denoising modes: direct and splits. In 'splits' mode, we denoise in the usual way: using a network that was trained on independent data splits (e.g., even and odd volumes), running inference on the even and odd volume and averaging the results. This is the statistically sound and superior method, but generating and processing the independent splits can cost a lot of time and memory. Plus, it requires access to splittable data, ideally raw frame stacks, which are not always available (although you can always split on the tilt angles)
-
-In 'direct' mode, we use a network that was trained in two steps. First, we trained in the typical even -> odd fashion. We then applied the resulting network to denoise all training subtomograms, and prepared a new training set using full subtomograms (i.e. the even + odd splits) as the input, and the denoised subtomogram as the output. The resulting model can be applied to full tomograms directly, and approximates the output that even/odd denoising achieves relatively well. It about twice as fast and doesn't require data splitting, which can help save a lot of memory.

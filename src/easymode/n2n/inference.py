@@ -151,7 +151,13 @@ def save_mrc(pxd, path, data_format, voxel_size=10.0):
         m.set_data(pxd)
         m.voxel_size = voxel_size
 
-def denoiser_thread(mode, tomogram_list, model_path, output_dir, gpu, batch_size, tta, overwrite, iter):
+METHOD_TO_WEIGHTS = {
+    'n2n': 'n2n_direct',                          # noise2noise direct-input student (the deployed default)
+    'ddw': 'ddw_direct',                          # distilled DeepDeWedge student (new; also fills the wedge)
+}
+
+
+def denoiser_thread(tomogram_list, model_path, output_dir, gpu, batch_size, tta, overwrite, iter):
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
 
     for device in tf.config.list_physical_devices('GPU'):
@@ -162,8 +168,10 @@ def denoiser_thread(mode, tomogram_list, model_path, output_dir, gpu, batch_size
     print(f'GPU {gpu} - loading model ({model_path}).')
     model = load_model(model_path)
 
-    for j, tomogram_tuple in enumerate(tomogram_list, start=1):
-        tomo_name = os.path.splitext(os.path.basename(tomogram_tuple[0]))[0]
+    print(f'GPU {gpu} - starting inference.')
+
+    for j, tomo_path in enumerate(tomogram_list, start=1):
+        tomo_name = os.path.splitext(os.path.basename(tomo_path))[0]
         output_file = os.path.join(output_dir, f"{tomo_name}.mrc")
         wrote_temporary = False
         try:
@@ -176,12 +184,7 @@ def denoiser_thread(mode, tomogram_list, model_path, output_dir, gpu, batch_size
                 m.set_data(-1.0 * np.ones((10, 10, 10), dtype=np.float32))
                 wrote_temporary = True
 
-
-            if mode=='splits':
-                denoised_volume = (denoise_tomogram(model, tomogram_tuple[0], tta, batch_size) + denoise_tomogram(model, tomogram_tuple[1], tta, batch_size)) / 2.0
-            else:
-                denoised_volume = denoise_tomogram(model, tomogram_tuple[0], tta, batch_size, iter=iter)
-
+            denoised_volume = denoise_tomogram(model, tomo_path, tta, batch_size, iter=iter)
             save_mrc(denoised_volume, output_file, data_format='float32')
 
             etc = time.strftime('%H:%M:%S', time.gmtime((time.time() - process_start_time) / j * (len(tomogram_list) - j)))
@@ -191,10 +194,14 @@ def denoiser_thread(mode, tomogram_list, model_path, output_dir, gpu, batch_size
                 os.remove(output_file)
             print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {os.path.basename(output_file)} - ERROR: {e}")
 
-def dispatch(input_directory, output_directory, mode='splits', tta=1, batch_size=8, overwrite=False, iter=1, gpus="0"):
+
+def dispatch(input_directory, output_directory, method='n2n', tta=1, batch_size=8, overwrite=False, iter=1, gpus="0"):
     if output_directory == input_directory:
         print("Please choose an output directory that is different from the input directory - we dont want to overwrite your original volumes.")
         exit()
+
+    if method not in METHOD_TO_WEIGHTS:
+        raise ValueError(f"unknown denoising method {method!r}; available: {sorted(METHOD_TO_WEIGHTS)}")
 
     if gpus is None:
         gpus = list(range(0, len(tf.config.list_physical_devices('GPU'))))
@@ -205,12 +212,8 @@ def dispatch(input_directory, output_directory, mode='splits', tta=1, batch_size
         print("\033[93m" + "warning: no GPUs detected. processing will continue, but using CPUs only!" + "\033[0m")
         gpus = [-1]
 
-    if len(gpus) == 0:
-        print("\033[93m" + "warning: no GPUs detected. processing will continue, but using CPUs only!" + "\033[0m")
-
     print(f'easymode denoise\n'
-          f'mode: {mode}\n'
-          f'method: n2n\n'
+          f'method: {method}\n'
           f'data_directory: {input_directory}\n'
           f'output_directory: {output_directory}\n'
           f'gpus: {gpus}\n'
@@ -218,21 +221,10 @@ def dispatch(input_directory, output_directory, mode='splits', tta=1, batch_size
           f'overwrite: {overwrite}\n'
           f'batch_size: {batch_size}\n')
 
-    if mode == 'direct':
-        tomograms = sorted(glob.glob(os.path.join(input_directory, '*.mrc')))
-        tomograms = list(zip(tomograms, tomograms))
-    else:
-        tomograms_evn = sorted(glob.glob(os.path.join(input_directory, 'even', '*.mrc')))
-        tomograms_odd = [os.path.join(input_directory, 'odd', f'{os.path.basename(f)}') for f in tomograms_evn]
-        for t in tomograms_odd:
-            if not os.path.exists(t):
-                raise FileNotFoundError(f"Could not find matching odd tomogram for {t}")
-
-        tomograms = list(zip(tomograms_evn, tomograms_odd))
-
+    tomograms = sorted(glob.glob(os.path.join(input_directory, '*.mrc')))
     print(f'Found {len(tomograms)} tomograms to denoise in {input_directory}.')
 
-    model_path = get_model('n2n_splits' if mode=='splits' else 'n2n_direct')[0]
+    model_path = get_model(METHOD_TO_WEIGHTS[method])[0]
 
     os.makedirs(output_directory, exist_ok=True)
 
@@ -240,7 +232,7 @@ def dispatch(input_directory, output_directory, mode='splits', tta=1, batch_size
 
     processes = []
     for gpu in gpus:
-        p = multiprocessing.Process(target=denoiser_thread, args=(mode, tomograms, model_path, output_directory, gpu, batch_size, tta, overwrite, iter))
+        p = multiprocessing.Process(target=denoiser_thread, args=(tomograms, model_path, output_directory, gpu, batch_size, tta, overwrite, iter))
         processes.append(p)
         p.start()
         time.sleep(2)

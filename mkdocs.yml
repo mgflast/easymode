@@ -14,6 +14,7 @@ nav:
        - "<b>Functions</b>":
           - user_guide/functions/installation.md
           - user_guide/functions/preprocessing.md
+          - user_guide/functions/general_denoisers.md
           - user_guide/functions/segmentation.md
           - user_guide/functions/picking.md
        - "<b>Tutorials</b>":

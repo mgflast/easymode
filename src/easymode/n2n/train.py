@@ -1,285 +1,157 @@
-import glob, os, mrcfile, shutil
-from easymode.segmentation.augmentations import *
+"""
+N2N-style supervised trainer for easymode denoising/dewedging models.
+
+The sampling step (writing matched (x, y) box pairs to training/{mode}/volumes_*)
+lives in `easymode.training.sampler`. This module owns the runtime dataloader and
+the Keras `fit` loop.
+
+Modes are defined in `easymode.training.sampler.MODES`. The deployed pairs are:
+
+  mode='n2n'  -> (x=even, y=odd)     classic noise2noise on half-map pairs
+  mode='ddw'  -> (x=raw,  y=ddw)     distillation from the per-dataset DDW2 teachers
+
+Both produce weights with the same architecture (easymode.n2n.model.UNet) but on
+different supervision, so any tomogram-shaped weights file is loadable by the
+same `create()`.
+"""
+import glob, os
+import mrcfile
+import numpy as np
 import tensorflow as tf
-
-ROOT = '/cephfs/mlast/compu_projects/easymode'
-
-class N2NDatasetGenerator:
-    def __init__(self, mode='splits', samples_per_dataset=200, box_size=96):
-        self.mode = mode
-        self.samples_per_dataset = samples_per_dataset
-        self.box_size = box_size
-        self.datasets = {}  # dataset_name -> [(even_path, odd_path), ...]
-        self.box_counter = {'training': 0, 'validation': 0}
-        self.tomo_counter = 0
-
-    @staticmethod
-    def get_sample_coordinates(shape, box_size, n_samples):
-        # first, distribute as many as possible evenly
-        n_y = shape[1] // box_size
-        n_x = shape[2] // box_size
-        coordinates = []
-        for j in range(n_y):
-            for i in range(n_x):
-                coordinates.append((0, j * box_size, i * box_size))
-        np.random.shuffle(coordinates)
-
-        # if not enough samples (because the XY plane doesn't fit enough), randomly position some more:
-        if len(coordinates) < n_samples:
-            while len(coordinates) < n_samples:
-                coordinates.append((0, random.randint(0, shape[1] - box_size), random.randint(0, shape[2] - box_size)))
-
-        # now assign the z coordinate. Two cases, if shape[0] < 2 * box_size, just place them randomly; part of it will overlap with the non void content. Else, place in the center 2 * BOX_SIZE slab.
-        if shape[0] < box_size * 2:
-            for i in range(len(coordinates)):
-                coordinates[i] = (random.randint(0, shape[0] - box_size), coordinates[i][1], coordinates[i][2])
-        else:
-            for i in range(len(coordinates)):
-                coordinates[i] = (shape[0] // 2 + random.randint(-box_size, 0), coordinates[i][1], coordinates[i][2])
-
-        return coordinates[:n_samples]
-
-    def sample_tomogram_pair(self, vol_a_path, vol_b_path, n_samples):
-        vol_a = mrcfile.read(vol_a_path)
-        vol_b = mrcfile.read(vol_b_path)
-        coordinates = self.get_sample_coordinates(vol_a.data.shape, self.box_size, n_samples)
-        self.tomo_counter += 1
-        split = 'validation' if self.tomo_counter % 10 == 0 else 'training'
-
-        for (j, k, l) in coordinates:
-            box_a = vol_a[j:j+self.box_size, k:k+self.box_size, l:l+self.box_size]
-            box_b = vol_b[j:j + self.box_size, k:k + self.box_size, l:l + self.box_size]
-            if self.mode == 'splits':
-                with mrcfile.new(f'{ROOT}/training/n2n/{self.mode}/volumes_{split}/x/{self.box_counter[split]}.mrc', overwrite=True) as m:
-                    m.set_data(box_a.astype(np.float32))
-                with mrcfile.new(f'{ROOT}/training/n2n/{self.mode}/volumes_{split}/y/{self.box_counter[split]}.mrc', overwrite=True) as m:
-                    m.set_data(box_b.astype(np.float32))
-            elif self.mode == 'direct':
-                box = (box_a + box_b) / 2.0
-                with mrcfile.new(f'{ROOT}/training/n2n/{self.mode}/volumes_{split}/x/{self.box_counter[split]}.mrc', overwrite=True) as m:
-                    m.set_data(box.astype(np.float32))
-                with mrcfile.new(f'{ROOT}/training/n2n/{self.mode}/volumes_{split}/x/even/{self.box_counter[split]}.mrc', overwrite=True) as m:
-                    m.set_data(box_a.astype(np.float32))
-                with mrcfile.new(f'{ROOT}/training/n2n/{self.mode}/volumes_{split}/x/odd/{self.box_counter[split]}.mrc', overwrite=True) as m:
-                    m.set_data(box_b.astype(np.float32))
-
-            self.box_counter[split] += 1
-
-
-    def generate_direct_mode_outputs(self):
-        print(f'Applying easymode n2n in split mode to the even/odd pairs to generate direct mode training data.')
-        gpus = ','.join(str(i) for i in range(len(tf.config.list_physical_devices('GPU'))))
-        for split in ['training', 'validation']:
-            input_dir = f'{ROOT}/training/n2n/{self.mode}/volumes_{split}/x/'
-            output_dir = f'{ROOT}/training/n2n/{self.mode}/volumes_{split}/y/'
-
-            print(f'easymode denoise --data {input_dir} --output {output_dir} --tta 4 --mode splits --overwrite --gpu {gpus}')
-            os.system(f'easymode denoise --data {input_dir} --output {output_dir} --tta 4 --mode splits --overwrite --gpu {gpus}')
-
-            shutil.rmtree(os.path.join(input_dir, 'even'))
-            shutil.rmtree(os.path.join(input_dir, 'odd'))
-
-    def generate(self):
-        print(
-            f'Preparing to generate training data for n2n mode {self.mode} with {self.samples_per_dataset} samples per dataset.\n')
-
-        if self.mode == 'splits':
-            base_path = f'{ROOT}/training/n2n/splits'
-            shutil.rmtree(f'{base_path}/volumes_training', ignore_errors=True)
-            shutil.rmtree(f'{base_path}/volumes_validation', ignore_errors=True)
-
-            os.makedirs(f'{base_path}/volumes_training/x', exist_ok=True)
-            os.makedirs(f'{base_path}/volumes_training/y', exist_ok=True)
-            os.makedirs(f'{base_path}/volumes_validation/x', exist_ok=True)
-            os.makedirs(f'{base_path}/volumes_validation/y', exist_ok=True)
-        elif self.mode == 'direct':
-            base_path = f'{ROOT}/training/n2n/direct'
-            shutil.rmtree(f'{base_path}/volumes_training', ignore_errors=True)
-            shutil.rmtree(f'{base_path}/volumes_validation', ignore_errors=True)
-
-            os.makedirs(f'{base_path}/volumes_training/x', exist_ok=True)
-            os.makedirs(f'{base_path}/volumes_training/x/even', exist_ok=True)
-            os.makedirs(f'{base_path}/volumes_training/x/odd', exist_ok=True)
-            os.makedirs(f'{base_path}/volumes_training/y', exist_ok=True)
-            os.makedirs(f'{base_path}/volumes_validation/x', exist_ok=True)
-            os.makedirs(f'{base_path}/volumes_validation/x/even', exist_ok=True)
-            os.makedirs(f'{base_path}/volumes_validation/x/odd', exist_ok=True)
-            os.makedirs(f'{base_path}/volumes_validation/y', exist_ok=True)
-
-        self.load_splits()
-
-        total_tomos = sum(len(pairs) for pairs in self.datasets.values())
-        for dataset_name, pairs in self.datasets.items():
-            n_tomos = len(pairs)
-            # Distribute samples_per_dataset evenly across this dataset's tomograms
-            base = self.samples_per_dataset // n_tomos
-            remainder = self.samples_per_dataset % n_tomos
-            np.random.shuffle(pairs)
-            print(f'Dataset {dataset_name}: {n_tomos} tomograms, {self.samples_per_dataset} samples ({base}-{base+1} per tomo)')
-            for j, (vol_a, vol_b) in enumerate(pairs):
-                n_samples = base + (1 if j < remainder else 0)
-                if n_samples == 0:
-                    continue
-                print(f'  {j + 1}/{n_tomos}: {os.path.basename(vol_a)} ({n_samples} samples)')
-                self.sample_tomogram_pair(vol_a, vol_b, n_samples)
-
-        print(f'\nTotal: {self.box_counter["training"]} training + {self.box_counter["validation"]} validation boxes from {total_tomos} tomograms across {len(self.datasets)} datasets.')
-
-        if self.mode == 'direct':
-            self.generate_direct_mode_outputs()
-
-    def load_splits(self):
-        dataset_dirs = sorted(glob.glob(f'{ROOT}/datasets/*/'))
-        datasets = [os.path.basename(os.path.dirname(f)) for f in dataset_dirs]
-
-        print(f'Found {len(datasets)} datasets to sample.')
-
-        self.datasets = {}
-        for d in datasets:
-            tomograms = [os.path.basename(f) for f in glob.glob(f'{ROOT}/datasets/{d}/warp_tiltseries/reconstruction/even/*.mrc')]
-            pairs = []
-            for t in tomograms:
-                path_evn = f'{ROOT}/datasets/{d}/warp_tiltseries/reconstruction/even/{t}'
-                path_odd = f'{ROOT}/datasets/{d}/warp_tiltseries/reconstruction/odd/{t}'
-                if os.path.exists(path_evn) and os.path.exists(path_odd):
-                    pairs.append((path_evn, path_odd))
-            if pairs:
-                self.datasets[d] = pairs
-
+from easymode.segmentation.augmentations import *  # noqa: F401,F403 -- np/random shim used below
+from easymode.training.sampler import ROOT, MODES
 
 
 class N2NDataloader:
-    def __init__(self, mode='splits', batch_size=32, box_size=96, validation=False):
+    """Runtime dataloader: reads boxes from training/{mode}/volumes_{split}/{x,y}/
+    and yields augmented (x, y) pairs as a tf.data.Dataset.
+
+    For modes whose two flavours are exchangeable (n2n: x=even, y=odd; either side
+    is a valid n2n training target), we randomly swap x<->y during training. For
+    asymmetric modes (ddw: x=raw, y=teacher-corrected), we never swap."""
+
+    # modes where x and y are interchangeable noisy realisations of the same signal
+    SYMMETRIC = {"n2n"}
+
+    def __init__(self, mode, batch_size=32, box_size=96, validation=False):
+        if mode not in MODES:
+            raise ValueError(f"unknown mode {mode!r}; known: {sorted(MODES)}")
         self.mode = mode
         self.batch_size = batch_size
         self.box_size = box_size
         self.validation = validation
-        self.indices = list()
-        self.parse_indices()
+        self._dir = f"{ROOT}/training/{mode}/volumes_{'validation' if validation else 'training'}"
+        # filenames are md5 hashes from the sampler -- just list them, no integer parse
+        self.indices = sorted(os.path.splitext(os.path.basename(f))[0]
+                              for f in glob.glob(f"{self._dir}/x/*.mrc"))
 
     @staticmethod
-    def augment(train_x, train_y, validation=False):
-        if validation:
-            return train_x, train_y
-
+    def augment(x, y):
         k = np.random.randint(0, 4)
-        train_x = np.rot90(train_x, k, axes=(1, 2))
-        train_y = np.rot90(train_y, k, axes=(1, 2))
-
+        x = np.rot90(x, k, axes=(1, 2))
+        y = np.rot90(y, k, axes=(1, 2))
         if np.random.rand() < 0.5:
-            train_x = np.rot90(train_x, k=2, axes=(0, 2))
-            train_y = np.rot90(train_y, k=2, axes=(0, 2))
-
+            x = np.rot90(x, k=2, axes=(0, 2))
+            y = np.rot90(y, k=2, axes=(0, 2))
         if np.random.rand() < 0.5:
-            train_x = np.flip(train_x, axis=2)
-            train_y = np.flip(train_y, axis=2)
-
-        return train_x, train_y
+            x = np.flip(x, axis=2)
+            y = np.flip(y, axis=2)
+        return x, y
 
     @staticmethod
-    def preprocess(train_x, train_y):
-        train_x = train_x.astype(np.float32)
-        train_x -= np.mean(train_x)
-        train_x /= np.std(train_x) + 1e-8
+    def preprocess(x, y):
+        x = x.astype(np.float32)
+        x -= np.mean(x)
+        x /= np.std(x) + 1e-8
+        y = y.astype(np.float32)
+        y -= np.mean(y)
+        y /= np.std(y) + 1e-8
+        return x[..., None], y[..., None]
 
-        train_y = train_y.astype(np.float32)
-        train_y -= np.mean(train_y)
-        train_y /= np.std(train_y) + 1e-8
-
-        train_x = np.expand_dims(train_x, axis=-1)
-        train_y = np.expand_dims(train_y, axis=-1)
-
-        return train_x, train_y
-
-    def parse_indices(self):
-        sample_directory = f'{ROOT}/training/n2n/{self.mode}/volumes_{"validation" if self.validation else "training"}/x/'
-        sample_names = sorted([os.path.basename(f) for f in glob.glob(f'{sample_directory}/*.mrc')])
-        self.indices = list(range(len(sample_names)))
-
-    def get_sample(self, index):
-        train_x = mrcfile.read(f'{ROOT}/training/n2n/{self.mode}/volumes_{"validation" if self.validation else "training"}/x/{index}.mrc').data
-        train_y = mrcfile.read(f'{ROOT}/training/n2n/{self.mode}/volumes_{"validation" if self.validation else "training"}/y/{index}.mrc').data
-
-        train_x = np.asarray(train_x)
-        train_y = np.asarray(train_y)
-
-        return train_x, train_y
+    def _load(self, idx):
+        x = np.asarray(mrcfile.read(f"{self._dir}/x/{idx}.mrc"))
+        y = np.asarray(mrcfile.read(f"{self._dir}/y/{idx}.mrc"))
+        return x, y
 
     def sample_generator(self):
         while True:
             np.random.shuffle(self.indices)
-            for j in self.indices:
-                train_x, train_y = self.get_sample(j)
-                train_x, train_y = self.augment(train_x, train_y, self.validation)
-                train_x, train_y = self.preprocess(train_x, train_y)
-
-                if not self.validation and self.mode == 'splits' and np.random.rand() < 0.5:  # when training from odd/even splits, train_x and train_y can be swapped.
-                    yield train_y, train_x
+            for i in self.indices:
+                x, y = self._load(i)
+                if not self.validation:
+                    x, y = self.augment(x, y)
+                x, y = self.preprocess(x, y)
+                if (not self.validation) and self.mode in self.SYMMETRIC and np.random.rand() < 0.5:
+                    yield y, x                    # n2n-style swap: target and input are interchangeable
                 else:
-                    yield train_x, train_y
+                    yield x, y
 
-    def as_generator(self, batch_size, num_epochs=None):
-        dataset = tf.data.Dataset.from_generator(
+    def as_dataset(self, batch_size, num_epochs=None):
+        ds = tf.data.Dataset.from_generator(
             self.sample_generator,
             output_signature=(
                 tf.TensorSpec(shape=(self.box_size, self.box_size, self.box_size, 1), dtype=tf.float32),
-                tf.TensorSpec(shape=(self.box_size, self.box_size, self.box_size, 1), dtype=tf.float32)
-            )
+                tf.TensorSpec(shape=(self.box_size, self.box_size, self.box_size, 1), dtype=tf.float32),
+            ),
         )
-
         options = tf.data.Options()
         options.experimental_distribute.auto_shard_policy = tf.data.experimental.AutoShardPolicy.DATA
         options.threading.private_threadpool_size = 32
-        dataset = dataset.with_options(options)
-
+        ds = ds.with_options(options)
         if num_epochs:
-            dataset = dataset.repeat(num_epochs)
-
-        dataset = dataset.batch(batch_size=batch_size, drop_remainder=True)
-        dataset = dataset.prefetch(tf.data.AUTOTUNE)
-
-        n_steps = len(self.indices) // batch_size
-        return dataset, n_steps
+            ds = ds.repeat(num_epochs)
+        ds = ds.batch(batch_size=batch_size, drop_remainder=True)
+        ds = ds.prefetch(tf.data.AUTOTUNE)
+        return ds, len(self.indices) // batch_size
 
 
-def train_n2n(mode='splits', batch_size=32, box_size=96, epochs=100, lr_start=1e-3, lr_end=1e-5, temp=""):
+def train_n2n(mode, batch_size=32, box_size=96, epochs=100, lr_start=1e-3, lr_end=1e-5, temp=""):
+    """Train the n2n-style UNet on the (x, y) pairs produced by the sampler for
+    `mode`. Reads from training/{mode}/volumes_*/, writes checkpoints to
+    training/{mode}/checkpoints/ (or `temp` if provided)."""
     from easymode.n2n.model import create
 
+    if mode not in MODES:
+        raise ValueError(f"unknown mode {mode!r}; known: {sorted(MODES)}")
     tf.config.run_functions_eagerly(False)
-
-    print(f'\nTraining n2n model for mode: {mode}\n')
+    print(f"\nTraining n2n-style model for mode: {mode} "
+          f"(x={MODES[mode][0]}, y={MODES[mode][1]})\n")
 
     with tf.distribute.MirroredStrategy().scope():
         model = create()
     model.optimizer.learning_rate.assign(lr_start)
 
-    # data loaders
-    training_ds, training_steps = N2NDataloader(mode=mode, batch_size=batch_size, box_size=box_size, validation=False).as_generator(batch_size=batch_size)
-    validation_ds, validation_steps = N2NDataloader(mode=mode, batch_size=batch_size, box_size=box_size, validation=True).as_generator(batch_size=batch_size)
+    train_ds, train_steps = N2NDataloader(mode=mode, batch_size=batch_size, box_size=box_size,
+                                          validation=False).as_dataset(batch_size=batch_size)
+    val_ds, val_steps = N2NDataloader(mode=mode, batch_size=batch_size, box_size=box_size,
+                                      validation=True).as_dataset(batch_size=batch_size)
 
-    # callbacks
-    checkpoint_directory = temp if temp != "" else f'{ROOT}/training/ddw/{mode}/checkpoints/'
-    checkpoint_directory += '/' if not checkpoint_directory.endswith('/') else ''
-    os.makedirs(checkpoint_directory, exist_ok=True)
-    # cb_checkpoint_val = tf.keras.callbacks.ModelCheckpoint(filepath=f'{checkpoint_directory}' + "validation_loss",
-    #                                                        monitor=f'val_loss',
-    #                                                        save_best_only=True,
-    #                                                        save_weights_only=True,
-    #                                                        mode='min',
-    #                                                        verbose=1)
-    cb_checkpoint_train = tf.keras.callbacks.ModelCheckpoint(filepath=f'{checkpoint_directory}' + "training_loss",
-                                                             monitor=f'loss',
-                                                             save_best_only=True,
-                                                             save_weights_only=True,
-                                                             mode='min',
-                                                             verbose=1)
+    ckpt_dir = temp if temp else f"{ROOT}/training/{mode}/checkpoints/"
+    if not ckpt_dir.endswith("/"):
+        ckpt_dir += "/"
+    os.makedirs(ckpt_dir, exist_ok=True)
+
+    cb_ckpt_train = tf.keras.callbacks.ModelCheckpoint(
+        filepath=f"{ckpt_dir}training_loss",
+        monitor="loss", save_best_only=True, save_weights_only=True, mode="min", verbose=1,
+    )
+    cb_ckpt_val = tf.keras.callbacks.ModelCheckpoint(
+        filepath=f"{ckpt_dir}validation_loss",
+        monitor="val_loss", save_best_only=True, save_weights_only=True, mode="min", verbose=1,
+    )
 
     def lr_decay(epoch, _):
         return float(lr_start + (lr_end - lr_start) * ((epoch - 2) / epochs))
-
     cb_lr = tf.keras.callbacks.LearningRateScheduler(lr_decay, verbose=1)
 
-    cb_csv = tf.keras.callbacks.CSVLogger(f'{checkpoint_directory}training_log.csv', append=True)
+    cb_csv = tf.keras.callbacks.CSVLogger(f"{ckpt_dir}training_log.csv", append=True)
 
-    model.fit(training_ds, steps_per_epoch=training_steps, validation_data=validation_ds, validation_steps=validation_steps, epochs=epochs, validation_freq=1, callbacks=[cb_checkpoint_val, cb_checkpoint_train, cb_lr, cb_csv])
-
+    model.fit(
+        train_ds,
+        steps_per_epoch=train_steps,
+        validation_data=val_ds,
+        validation_steps=val_steps,
+        epochs=epochs,
+        validation_freq=1,
+        callbacks=[cb_ckpt_val, cb_ckpt_train, cb_lr, cb_csv],
+    )

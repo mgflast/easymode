@@ -101,6 +101,8 @@ def main():
     denoise = subparsers.add_parser('denoise', help='Denoise or enhance contrast of tomograms.')
     denoise.add_argument('--data', type=str, required=True, help="Directory containing tomograms to denoise.")
     denoise.add_argument('--output', type=str, required=True, help="Directory to save denoised tomograms to.")
+    denoise.add_argument('--method', type=str, choices=['n2n', 'ddw'], default='n2n',
+                         help="Denoising method (default 'n2n'). 'n2n' is the classic noise2noise model trained on even/odd half-map pairs. 'ddw' is the distilled DeepDeWedge model that also fills the missing wedge -- requires only the raw tomogram (no halves needed).")
     denoise.add_argument('--tta', type=int, default=1, help="Test-time augmentation factor (default 1). Higher values increase computation time. Maximum is 16.")
     denoise.add_argument('--overwrite', action='store_true', help='If set, overwrite existing denoised tomograms in the output directory.')
     denoise.add_argument('--batch', type=int, default=1, help='Batch size (default 1). Volumes are processed in batches of 128x128x128 shaped tiles.')
@@ -124,6 +126,24 @@ def main():
         tilt_train.add_argument('-b', "--batch_size", type=int, help="Batch size for training (default 32).", default=32)
         tilt_train.add_argument('-ls', "--lr_start", type=float, help="Initial learning rate for the optimizer (default 5e-3).", default=1e-3)
         tilt_train.add_argument('-le', "--lr_end", type=float, help="Final learning rate for the optimizer (default 5e-5).", default=1e-5)
+
+    if os.path.exists('/lmb/home/mlast/easymode_dev'):
+        denoise_train = subparsers.add_parser('denoise_train',
+            description='Sample subtomograms and train a denoiser. Two stages: (1) walk datasets/ and write matched (x, y) box pairs to training/{method}/volumes_*/; (2) fit the n2n UNet on those boxes. The method picks which flavour pair to sample (n2n: even/odd; ddw: raw/ddw-corrected).')
+        denoise_train.add_argument('--method', type=str, choices=['n2n', 'ddw'], required=True,
+                                   help="Which (x, y) flavour pair to train on. 'n2n': (even, odd) -- classic noise2noise on half-map pairs. 'ddw': (raw, ddw) -- distillation from the per-dataset DDW2 teachers (requires volumes_ddw/ pool to exist; populate with training/ddw2/flatten_corrected.py).")
+        denoise_train.add_argument('--sample-only', action='store_true', help="Run only the sampling stage (write boxes to training/{method}/volumes_*/) and exit.")
+        denoise_train.add_argument('--train-only',  action='store_true', help="Run only the training stage; assumes boxes already exist on disk.")
+        denoise_train.add_argument('--samples-per-dataset', type=int, default=500, help="Boxes per dataset (default 500, matches DDW2 per-dataset budget).")
+        denoise_train.add_argument('--box-size', type=int, default=96, help="Box edge in voxels (default 96).")
+        denoise_train.add_argument('--workers', type=int, default=None, help="Sampling-stage worker processes (default: min(16, n_cpus)).")
+        denoise_train.add_argument('--exclude', type=str, default='', help="Comma-separated dataset names/prefixes to skip entirely (e.g. '013_DIAT,024_TAN'). Prefix-match: '013' matches '013_DIAT'.")
+        denoise_train.add_argument('--flip-y-for', type=str, default='', help="Comma-separated dataset names/prefixes whose y (target) box should be sign-flipped at sample time. For datasets whose per-dataset DDW2 teacher converged to inverted contrast.")
+        denoise_train.add_argument('-e', '--epochs', type=int, default=100)
+        denoise_train.add_argument('-b', '--batch_size', type=int, default=32, help="Per-replica batch size; total batch = batch_size * len(gpus).")
+        denoise_train.add_argument('-ls', '--lr_start', type=float, default=1e-3, help="Initial LR. Default kept identical to the calibrated value.")
+        denoise_train.add_argument('-le', '--lr_end',   type=float, default=1e-5, help="Final LR. Default kept identical to the calibrated value.")
+        denoise_train.add_argument('--gpus', type=str, default='0,1,2,3', help="Comma-separated GPU ids for the training stage (default '0,1,2,3').")
 
 
     args = parser.parse_args()
@@ -152,6 +172,23 @@ def main():
                         arch=args.arch,
                         crop_shape=crop_shape,
                         )
+    elif args.command == 'denoise_train':
+        from easymode.training import run as denoise_train_run
+        excl = tuple(s.strip() for s in args.exclude.split(',') if s.strip())
+        flip = tuple(s.strip() for s in args.flip_y_for.split(',') if s.strip())
+        denoise_train_run(method=args.method,
+                          sample_only=args.sample_only,
+                          train_only=args.train_only,
+                          samples_per_dataset=args.samples_per_dataset,
+                          box_size=args.box_size,
+                          workers=args.workers,
+                          exclude=excl,
+                          flip_y_for=flip,
+                          epochs=args.epochs,
+                          batch_size=args.batch_size,
+                          lr_start=args.lr_start,
+                          lr_end=args.lr_end,
+                          gpus=args.gpus)
     elif args.command == 'tilt_train':
         from easymode.tiltfilter.train import train_model
         train_model(batch_size=args.batch_size,
@@ -160,7 +197,7 @@ def main():
                     lr_end=args.lr_end, )
     elif args.command == 'denoise':
         import easymode.n2n.inference as n2n
-        n2n.dispatch(mode='direct',
+        n2n.dispatch(method=args.method,
                      input_directory=args.data,
                      output_directory=args.output,
                      tta=args.tta,

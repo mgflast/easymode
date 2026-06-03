@@ -69,7 +69,7 @@
 
 ??? question "8. What pixel size should my tomograms be at?"
 
-    Technically it doesn't matter — easymode rescales automatically. The training collection spans data collected with a pixel size of 0.7 - 3.5 Å/px and we expect acceptable performance within this range. For tomograms that were acquired at very low magnification, e.g. > 5 Å/px, we imagine that the output quality could be worse, especially for fine grained feature such as actin or ribosomes. 
+    Technically it doesn't matter — easymode rescales automatically. The training collection spans data collected with a pixel size of 0.7 - 3.5 Å/px and we expect acceptable performance within this range. For tomograms that were acquired at very low magnification, e.g. > 5 Å/px, we imagine that the output quality could be worse, especially for fine grained features like actin filaments or ribosomes. 
 
 ??? question "9. Can I retrain or fine-tune a model on my own data?"
 

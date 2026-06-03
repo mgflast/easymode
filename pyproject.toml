@@ -25,7 +25,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "GPL-3.0-or-later" }
 authors = [
-    { name = "Mart Last", email = "mgflast@gmail.com" }
+    { name = "Mart So-Last", email = "mgflast@gmail.com" }
 ]
 keywords = [
     "cryo-electron tomography",

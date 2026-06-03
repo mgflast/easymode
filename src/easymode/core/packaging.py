@@ -12,13 +12,11 @@ def package_checkpoint(title='', checkpoint_directory='', apix=10.0):
     checkpoint_path = os.path.join(checkpoint_directory, checkpoint_files[-1])
 
     # Determine which model architecture to use
-    if 'n2n' in title:
+    # n2n and ddw share the same UNet -- the difference is the (x, y) supervision,
+    # not the layers. We tag arch separately so packaged metadata still records which.
+    if 'n2n' in title or 'ddw' in title:
         from easymode.n2n.model import create
-        arch = 'n2n'
-        dummy_input = tf.zeros((1, 160, 160, 160, 1))
-    elif 'ddw' in title:
-        from easymode.ddw.model import create
-        arch = 'ddw'
+        arch = 'n2n' if 'n2n' in title else 'ddw'
         dummy_input = tf.zeros((1, 160, 160, 160, 1))
     elif 'tilt' in title:
         from easymode.tiltfilter.model import create
