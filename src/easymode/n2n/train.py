@@ -47,9 +47,9 @@ class N2NDataloader:
 
     @staticmethod
     def augment(x, y):
-        k = np.random.randint(0, 4)
-        x = np.rot90(x, k, axes=(1, 2))
-        y = np.rot90(y, k, axes=(1, 2))
+        k = np.random.randint(0, 2)
+        x = np.rot90(x, 2 * k, axes=(1, 2))
+        y = np.rot90(y, 2 * k, axes=(1, 2))
         if np.random.rand() < 0.5:
             x = np.rot90(x, k=2, axes=(0, 2))
             y = np.rot90(y, k=2, axes=(0, 2))

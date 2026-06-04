@@ -192,7 +192,7 @@ def reconstruct(frames, mdocs, apix=None, dose=None, extension=None, tomo_apix=1
 
     if steps[5]:
         print(f'\n\033[96mEstimating tilt series CTF\033[0m')
-        _run(f'WarpTools ts_ctf --settings warp_tiltseries.settings --range_high 10.0 --defocus_max 8 --perdevice 1')
+        _run(f'WarpTools ts_ctf --settings warp_tiltseries.settings --range_high {max(5.0, 2 * apix)} --defocus_max 8 --perdevice 1')
 
     if steps[6]:
         print(f'\n\033[96mChecking handedness\033[0m')
@@ -203,6 +203,7 @@ def reconstruct(frames, mdocs, apix=None, dose=None, extension=None, tomo_apix=1
             if 'Average correlation:' in line:
                 correlation = float(line.split('Average correlation: ')[1].strip())
                 break
+
         if correlation < 0.0:
             print(f'\033[38;5;208mCorrecting handedness!.\n\033[0m')
             _run(f'WarpTools ts_defocus_hand --settings warp_tiltseries.settings --set_flip')

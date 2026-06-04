@@ -9,8 +9,8 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 tf.get_logger().setLevel('ERROR')
 tf.config.optimizer.set_experimental_options({'layout_optimizer': False})
 
-TILE_SIZE = 128
-OVERLAP = 16
+TILE_SIZE = 160
+OVERLAP = 32
 MAX_CHUNK_SIZE = 64
 
 def tile_volume(volume, patch_size=TILE_SIZE, overlap=OVERLAP):

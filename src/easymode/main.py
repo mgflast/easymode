@@ -140,7 +140,7 @@ def main():
         denoise_train.add_argument('--exclude', type=str, default='', help="Comma-separated dataset names/prefixes to skip entirely (e.g. '013_DIAT,024_TAN'). Prefix-match: '013' matches '013_DIAT'.")
         denoise_train.add_argument('--flip-y-for', type=str, default='', help="Comma-separated dataset names/prefixes whose y (target) box should be sign-flipped at sample time. For datasets whose per-dataset DDW2 teacher converged to inverted contrast.")
         denoise_train.add_argument('-e', '--epochs', type=int, default=100)
-        denoise_train.add_argument('-b', '--batch_size', type=int, default=32, help="Per-replica batch size; total batch = batch_size * len(gpus).")
+        denoise_train.add_argument('-b', '--batch_size', type=int, default=32, help="Must be divisible by n_gpus.")
         denoise_train.add_argument('-ls', '--lr_start', type=float, default=1e-3, help="Initial LR. Default kept identical to the calibrated value.")
         denoise_train.add_argument('-le', '--lr_end',   type=float, default=1e-5, help="Final LR. Default kept identical to the calibrated value.")
         denoise_train.add_argument('--gpus', type=str, default='0,1,2,3', help="Comma-separated GPU ids for the training stage (default '0,1,2,3').")
