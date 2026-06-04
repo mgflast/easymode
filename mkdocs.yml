@@ -30,6 +30,8 @@ nav:
               - "8. Picking γTuRC": user_guide/examples/picking_yturc.md
           - "🧮 Dataset management":
               - "9. easymode + Pom": user_guide/examples/easymode_and_pom.md
+          - "🎓 Workshops":
+              - "10. Michigan 2026": user_guide/examples/Workshop_2026.md
        - "<b>Pom</b>":
           - user_guide/pom/installation.md
           - user_guide/pom/data_browser.md
@@ -105,7 +107,7 @@ markdown_extensions:
   - pymdownx.arithmatex:
       generic: true
   - toc:
-      toc_depth: 3
+      toc_depth: 5
 extra_css:
   - styles/extra.css
 plugins:

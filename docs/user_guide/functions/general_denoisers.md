@@ -17,8 +17,8 @@ Optional arguments:
 ```
 
 !!! note "When to train your own denoiser"
-    Denoising is unsupervised: there is nothing to label, you only need to spend compute. For optimal denoising performance it is therefore probably always best to train a new network on your own data. Both n2n and wedge-inpainting models learn to adapt to the specifics of your data -- in n2n's case, to the particular noise statistics of your data; for wedge inpainting, additionally to the missing-wedge geometry and the structural priors present in your sample. A single general network can only approximate this.
-    
+    Both n2n and wedge-inpainting models learn to adapt to the specifics of your acquisition -- in n2n's case, to the particular noise statistics; for wedge inpainting, additionally to the missing-wedge geometry and the structural priors of your sample. A single general network can only approximate this, so for optimal denoising performance you should train a new network on your own data. And because denoising is unsupervised -- there is nothing to label, only compute to spend -- the cost of going custom is just GPU time.
+
     That said, for use within the easymode toolchain -- data inspection, segmentation, picking -- the pretrained general denoisers are perfectly adequate. They were in fact used during training of the segmentation networks, so applying them at inference time tends to *improve* segmentation results rather than hurt them.
 
 ## Method: `n2n` — noise2noise

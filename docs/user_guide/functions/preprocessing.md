@@ -19,7 +19,7 @@ Optional arguments:
 --no_halfmaps             Include this flag in order NOT to generate even/odd frame and volume splits
 ```
 !!! tip "Tip: skip the halfmaps"
-    If you don't plan to use the noise2noise denoiser, or you intend to use the DeepDeWedge denoiser (which works on a single tomogram), you can save time and memory by skipping the generation of halfmaps with `--no_halfmaps`. See the [general denoisers](general_denoisers.md) page for details.
+    If you plan to use one the easymode general pretrained denoisers, you can save a lot of time and memory by skipping the generation of the halfmaps with `--no_halfmaps`. See the [general denoisers](general_denoisers.md) page for details.
 
 ## Tilt selection
 Use `easymode select_tilts` to automatically identify bad tilt images and exclude them from tomogram reconstruction. To avoid repeating tomogram reconstruction, you could run the above `easymode reconstruct` with argument `--steps 11100000` first, then run tilt selection, and then reconstruct with `--steps 00011111`. Or just reconstruct and think about tilt selection later.
