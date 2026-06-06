@@ -30,7 +30,7 @@
 ## CryoET data processing with Warp, easymode, and Pom
 *University of Michigan - July 8th, 2026*
 
-The goal of this tutorial is to run through the whole front-end of cryoET data processing in one day. In the morning we will cover every step in the tomogram reconstruction pipeline in Warp: starting with raw frames, ending with denoised tomograms. In the afternoon, we will explore and visualize the biological content of the tomograms and briefly look at some downstream processes that you might want to apply in your own work: particle picking & subtomogram averaging, training a custom network for segmentation, or performing measurements on particles in their context.
+The goal of this tutorial is to run through the whole front-end of cryoET data processing in one day. In the morning we will cover every step in the tomogram reconstruction pipeline in Warp: starting with raw frames, ending with denoised tomograms. In the afternoon, we will explore and visualize the biological content of the tomograms and, if time permits, briefly look at some downstream processes that you might want to use in your own work: particle picking & subtomogram averaging, training a custom network for segmentation, or performing measurements on particles in their context.
 
 !!! info "Credit"
     The Warp portion of this tutorial is heavily based on Dimitry Tegunov and Alister Burt's [WarpTools tilt-series quick start](https://warpem.github.io/warp/user_guide/warptools/quick_start_warptools_tilt_series), adapted to the workshop dataset.
@@ -39,23 +39,39 @@ The goal of this tutorial is to run through the whole front-end of cryoET data p
 
 #### 0. Data layout
 
-The dataset consists of just raw frame stacks and mdocs for 50 tilt series collected on plasma-FIB milled, mycophenolic acid-treated HeLa cells. Copy the `frames/` and `mdocs/` directories over to your drive. Don't copy the other folders yet (`pom` and `ribosomes`) - those are for later.
+On the workshop AWS instance the tutorial dataset lives in `/work/data/Day1/`. It contain 50 tilt series of plasma-FIB milled, mycophenolic acid-treated HeLa cells. For the first part of the workshop we will only use a subset of 5 tilt series, so that the full reconstruction pipeline can finish in a reasonable time (note: after testing the below routine on a workshop instance, it seems that we could easily do more than 5; if you like, you can copy an extra couple of tilt series over from `/work/data/Day1/precomputed/{frames, mdocs}`)
 
 ```
-project_root/
-├── frames/        # 1550 .tiff stacks, one per tilt
+/work/data/
+├── frames/        # 155 .tiff stacks (5 tilt series × 31 tilts)
 │   ├── 250531_l1p2_001_10.00_20250531_*_Fractions.tiff
 │   ├── 250531_l1p2_002_13.00_20250531_*_Fractions.tiff
 │   └── ...
-└── mdocs/         # 50 .mdoc files, one per tilt series
-    ├── 250531_l1p2.mdoc
-    ├── 250531_l1p2_2.mdoc
-    └── ...
+├── mdocs/         # 5 .mdoc files, one per tilt series
+│   ├── 250531_l1p2.mdoc
+│   ├── 250531_l1p2_2.mdoc
+│   └── ...
+├── pom.zip        # a pre-configured Pom database, used in the afternoon
+├── precomputed/   # full pre-computed outputs for all 50 tilt series, used in the afternoon
+├── segmented/     # some segmentation outputs for the 50 tilt series, optional use in the afternoon
+└── various/       # reference maps, masks, and helper scripts used in the optional tutorials
+```
+
+Make a working directory in your home (`/work/participant`) and copy just the `frames/` and `mdocs/` directories over to it.
+
+```
+cd ~
+mkdir day1 && cd day1
+cp /work/data/Day1/frames .
+cp /work/data/Day1/mdocs .
 ```
 
 #### 1. Frame series processing settings
 
+The first step will be motion correction of the fractionated tilt images. In our case the frames are 4096x4096x5-shaped `.tiff` frames from a Falcon4i, acquired at 1.514 Å/px and a dose of 4.6 e/Å2 per tilt spread over 5 fractions.
 ```
+module load warp/2.0.0dev39
+
 WarpTools create_settings \
     --output warp_frameseries.settings \
     --extension "*.tiff" \
@@ -66,6 +82,7 @@ WarpTools create_settings \
 ```
 
 #### 2. Motion correction and CTF estimation
+Motion correction reduces the tilt image to a single frame (4096x4096x1) with a much better signal to noise ratio, using which we can also do CTF-fitting on each tilt image. In WarpTools these tasks are combined in a single command (separate commands are also available if you needed them): after reducing the stack to a single image and with that image still in memory, we might as well do CTF-fitting right away.
 
 ```
 WarpTools fs_motion_and_ctf \
@@ -74,7 +91,7 @@ WarpTools fs_motion_and_ctf \
     --c_grid 2x2x1 \
     --c_range_max 4.0 \
     --c_defocus_max 7 \
-    --out_averages
+    --out_averages \
     --perdevice 4
 ```
 
@@ -88,7 +105,7 @@ After running this command, the warp_frameseries/ directory will contain one .xm
 
 #### 3. Importing tilt series
 
-Motion correction and CTF estimation are essentially the only preprocessing steps applied to the frames. The next step is to import tilt series. WarpTools parses the `.mdoc` files in `mdocs/` to determine which frames belong to which tilt series, and in what order. If you ever want to rename a tilt series / tomogram, you can do so simply by renaming the mdoc prior to running `WarpTools ts_import` - the content of the mdoc does not need to be changed.
+Motion correction and CTF estimation are essentially the only preprocessing steps applied to the frames - after that, we are in tilt series processing territory. The next step is to import tilt series. WarpTools parses the `.mdoc` files in `mdocs/` to determine which frames belong to which tilt series, and in what order. If you ever want to rename a tilt series / tomogram, you can do so simply by renaming the mdoc prior to running `WarpTools ts_import` - the content of the mdoc does not need to be changed.
 
 ```
 WarpTools ts_import \
@@ -134,16 +151,17 @@ Tilt series alignment is one of the core cryoET data processing steps for which 
 
 Regardless of which tool you use, the tilt-series alignment results are slotted directly back into the Warp pipeline by copying the alignment parameters (`.xf`, `.tlt`, `.xtilt`, etc.) into `warp_tiltseries/alignments/*/`, from where Warp will parse them and store the values in the corresponding tilt-series `.xml` files.
 
-The wrapper for the workshop, `ts_aretomo3.py`, is a single Python script that (1) runs AreTomo3 in parallel across the available GPUs on every tilt stack under `warp_tiltseries/tiltstack/*/`, and (2) copies the resulting `*_Imod/` folders into `warp_tiltseries/alignments/`. Grab it with:
+The wrapper for the workshop, `ts_aretomo3.py`, is a single Python script that (1) runs AreTomo3 in parallel across the available GPUs on every tilt stack under `warp_tiltseries/tiltstack/*/`, and (2) copies the resulting `*_Imod/` folders into `warp_tiltseries/alignments/`. Copy the wrapper over from `/work/data/Day1/various/ts_aretomo3.py` or download it:
 
 ```
 wget https://mgflast.github.io/easymode/assets/ts_aretomo3.py
 ```
 
-or copy it from `path/to/tutorial_data/various/ts_aretomo3.py` and run it from the project root:
+Then run the tilt series alignment script:
 
 ```
-python ts_aretomo3.py --aretomo3 /path/to/AreTomo3 --gpus 0,1,2,3
+module load aretomo3
+python3 ts_aretomo3.py --aretomo3 /sw/aretomo3/2.2.2/bin/AreTomo3 --gpus 0
 ```
 
 Once the script has finished, have WarpTools import the alignments with:
@@ -175,7 +193,7 @@ WarpTools ts_reconstruct \
 ```
 
 ??? note "`--halfmap_frames` and `--halfmap_tilts`"
-    Same story as the half-splits discussion in step 2: if you wanted to train a noise2noise / DeepDeWedge / IsoNet2-style network on this dataset, you would reconstruct two tomograms per tilt series - one for each half - by adding `--halfmap_frames` (preferred, but requires `--out_average_halves` to have been set back in step 2) or `--halfmap_tilts` (works with what we have, but gives lower-quality splits per the [cryoCARE paper](https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=8759519)). We skip both because we will use a pretrained general denoiser later.
+    Same story as the half-splits discussion in step 2: if you wanted to train a noise2noise / DeepDeWedge / IsoNet2-style network on this dataset, you would reconstruct two half-split tomograms per tilt series, using either the flag `--halfmap_frames` (preferred, but requires `--out_average_halves` to have been set back in step 2) or `--halfmap_tilts` (works without frame splits, but gives lower-quality splits per the [cryoCARE paper](https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=8759519)). We skip both because we will use a pretrained general denoiser later.
 
 ??? note "`--dont_invert`"
     `--dont_invert` keeps the tomograms in their as-acquired contrast: protein density is dark on a light background, the same way it appears in the raw frames. Subtomogram averages and density maps are conventionally displayed inverted (protein light on a dark background), but we leave that flip to the downstream STA tools (RELION, M) - they expect inverted maps and handle the inversion themselves. Keeping tomograms uninverted at this stage avoids any ambiguity about which sign convention is in play.
@@ -190,8 +208,9 @@ We now have 50 raw tomograms in `warp_tiltseries/reconstruction/`. Their contras
 This is where the halfmap discussion from steps 2 and 8 comes back. The classic noise2noise recipe trains a denoiser on the independent even/odd half-splits of your own dataset, then applies it to each half at inference time. Generating and storing those half-splits roughly triples the size of `warp_frameseries/` and `warp_tiltseries/`, and training the network on them takes hours. We sidestep both costs by using one of easymode's pretrained [general denoisers](../functions/general_denoisers.md) instead: a single n2n network distilled from >20,000 half-split subtomograms sampled across 48 different datasets, whose output approximates that of a model trained specifically on your data - qualitatively, at least; we haven't rigorously benchmarked the two options.
 
 ```
+source ~/conda_init.sh
 conda activate easymode
-easymode denoise --data warp_tiltseries/reconstruction --method n2n --output denoised
+easymode denoise --data warp_tiltseries/reconstruction --output denoised
 ```
 
 ??? note "When to train your own denoiser"
@@ -199,15 +218,15 @@ easymode denoise --data warp_tiltseries/reconstruction --method n2n --output den
 
     That said, for use within the easymode toolchain - data inspection, segmentation, picking - the pretrained general denoisers are perfectly adequate. They were in fact used during training of the segmentation networks, so applying them at inference time tends to *improve* segmentation results rather than hurt them.
 
-    We're also working on general [DeepDeWedge](https://github.com/MLI-lab/DeepDeWedge)- and [IsoNet2](https://github.com/IsoNet-cryoET/IsoNet2)-derived networks. The DeepDeWedge one is already available - run `easymode denoise` with `--method ddw`. It is still a bit preliminary, though: we accidentally trained it for far too long and the result ended up a bit weird, so use with care.
+    We're also working on general [DeepDeWedge](https://github.com/MLI-lab/DeepDeWedge)- and [IsoNet2](https://github.com/IsoNet-cryoET/IsoNet2)-derived networks. when they're done, they will be available in `easymode denoise` via the `--method {n2n, ddw, iso}` argument. (The ddw net is already online, but not accessible in the version of easymode installed on the AWS instances. Sorry!)
 
 #### 10. Couldn't this be automated?
 
-You'll have noticed that with WarpTools, processing cryoET data from raw frames to reconstructed tomograms is just a matter of stringing together some commands - starting with motion correction and CTF estimation, parsing tilt series metadata, assembling the tilt stack, aligning the tilt series, then improved CTF fitting and finally reconstruction. You will probably always be doing these steps in this order, and there isn't a lot of input to give or curation to do along the way. So with a simple script that calls all the WarpTools in order you could just automate the whole procedure. This is available in easymode, but you can also point your favourite LLM at the [WarpTools documentation](https://warpem.github.io/warp/reference/warptools/api/general/) and [easymode wrapper](https://github.com/mgflast/easymode/blob/master/src/easymode/core/warp_wrapper.py) and tell it the specifics of your compute environment, and with some iteration it'll probably cook something up that works.
+You'll have noticed that with WarpTools, processing cryoET data from raw frames to reconstructed tomograms is just a matter of stringing together some commands - starting with motion correction and CTF estimation, parsing tilt series metadata, assembling the tilt stack, aligning the tilt series, then improved CTF fitting and finally reconstruction. You will probably always be doing these steps in this order, and there isn't a lot of input to give or curation to do along the way. So with a simple script that calls all the WarpTools in order you could just automate the whole procedure. This is available in easymode, but you can also point your favourite [LLM](https://claude.ai/) at the [WarpTools documentation](https://warpem.github.io/warp/reference/warptools/api/general/) and [easymode wrapper](https://github.com/mgflast/easymode/blob/master/src/easymode/core/warp_wrapper.py) and tell it the specifics of your compute environment, and with some iteration it'll probably cook something up that works.
 
 ```
-easymode set --aretomo3-path "path/to/AreTomo3"
-easymode set --aretomo3-env "module load AreTomo3"                  
+easymode set --aretomo3-path "/sw/aretomo3/2.2.2/bin/AreTomo3"
+easymode set --aretomo3-env "module load aretomo3/2.2.2"                  
 easymode reconstruct --frames frames/ --mdocs mdocs/ --apix 1.514 --dose 4.6 --no_halfmaps
 ```
 
@@ -225,20 +244,21 @@ At this point the project directory will look as follows:
 
 ```
 project_root/
-├── denoised/                    # 50 denoised tomograms
+├── denoised/                    # 5 denoised tomograms
 ├── frames/                      # raw tilt-series frames
 ├── mdocs/                       # mdoc files
 ├── tomostar/                    # tomogram star files
 ├── warp_frameseries/            # Warp frame-series processing
-├── warp_tiltseries/             # Warp tilt-series processing (incl. reconstruction/)
+├── warp_tiltseries/             # Warp tilt-series processing
 ├── warp_frameseries.settings
 ├── warp_tiltseries.settings
 └── ts_aretomo3.py
 ```
 
-The denoised tomograms in `denoised/` are what we'll use from here on. The raw tomograms are still in `warp_tiltseries/reconstruction/`, but we won't use them because the denoised tomograms are much easier to interpret and better for segmentation. To set up Pom, it only needs to be told where the data lives:
+The denoised tomograms in `denoised/` are what we'll use from here on. The raw tomograms are still in `warp_tiltseries/reconstruction/`, but we won't use them because the denoised tomograms are to interpret and better for segmentation. To set up Pom, it only needs to be told where the data lives:
 
 ```
+conda activate easymode && conda activate --stack pom && conda activate --stack ais
 pom initialize
 pom add_source --tomograms denoised/
 ```
@@ -265,13 +285,15 @@ The main page won't have much on it, but if you open the *gallery* it should loo
 Next we segment a first feature to give us a sense of what's in each tomogram. Easymode offers pretrained general networks for a range of common cellular features. To see which features are available, run:
 
 ```
+conda activate easymode
+conda activate --stack ais
 easymode list
 ```
 
 Different features are segmented at different scales: ribosomes, for example, are segmented at 10 Å/px, but larger features like mitochondria can be picked out accurately at 50 Å/px. Segmentation at 50 Å/px is much faster, so to get started quickly we'll segment just the mitochondria:
 
 ```
-easymode segment mitochondrion --data denoised
+easymode segment mitochondrion --data denoised --2d
 ```
 
 Easymode automatically grabs the required network weights from [Hugging Face](https://huggingface.co/mgflast/easymode), so you don't have to worry about where to find them. Mitochondrion segmentation should take around 10-20 seconds per tomogram on a single GPU for the current dataset.
@@ -282,6 +304,7 @@ Easymode automatically grabs the required network weights from [Hugging Face](ht
 Once segmentation has finished, we register an additional data source. easymode will have saved the segmentations to the default output folder `segmented/`. Segmentation filenames follow the following pattern: `<tomo_name>__<feature_name>.mrc`. For any tomogram found in `denoised/` Pom will know that a segmentation belongs to it if the segmentation volume follows this naming pattern. 
 
 ```
+conda activate pom
 pom add_source --segmentations segmented/
 ```
 
@@ -304,14 +327,16 @@ Back in the Pom gallery, you can now sort the dataset by how much mitochondrion 
 
 ![Pom gallery sorted by mitochondrion content](../../assets/umich_pom_1.png)
 
+!!! note "Volume rendering and spinny moves"
+I recently added some features to the rendering in Pom. It now supports volume rendering as well the old as isosurface rendering, and it can generate and display .gif's with a 360 degree rotating view. I released this too late for it to be available in the workshop version of Pom, but if you want you can update the code with: `pip install --user --force-reinstall --no-deps --no-cache-dir "git+https://github.com/bionanopatterning/Pom@main"`
 
 #### 14. Data subsets
 
-When you're working with a very large dataset (imagine 10,000 tomograms), it would be expensive to run segmentation, template matching, or compute-heavy feature detection tools on the whole set. 
+When you're working with a very large dataset (imagine 10,000 tomograms), it would be prohibitively expensive to run segmentation, template matching, or compute-heavy feature detection tools on the whole set. 
 
 Depending on the target you're after, you can almost always use prior knowledge about its biology to restrict the search to a subset of tomograms - or even to sub-tomogram regions. For this example, let's pretend we are looking for the mitochondrial Hsp60-Hsp10 complex (see [this paper](https://www.science.org/doi/10.1126/sciadv.aed3579) for some nice examples). Since Hsp60-Hsp10 sits inside mitochondria, the mitochondrion segmentation output also tells us where to look for Hsp60-Hsp10 particles.
 
-In the Pom gallery, sort the dataset by mitochondrion content and open the first tomogram in the list - the one with the most mitochondrion volume (`250531_l15p5_2_10.00Apx`). On its detail page you can create a new tomogram subset; we'll call it `Hsp60-Hsp10` and add this tomogram to it. You can add as many or as few tomograms as you like - we'll use the 4 top-mitochondrion tomograms here. 
+In the Pom gallery, sort the dataset by mitochondrion content and open the first tomogram in the list - the one with the most mitochondrion volume (`250531_l15p5_2_10.00Apx`). On its detail page you can create a new tomogram subset; we'll call it `Hsp60-Hsp10` and add this tomogram to it. You can add as many or as few tomograms as you like - we'll use the 4 top-mitochondrion tomograms here (note: that was top 4 out of 50 - since we're only using 5 tilt series for the tutorial that choice now makes less sense. Let's do 1 instead.). 
 
 ![Creating the Hsp60-Hsp10 subset on a tomogram detail page](../../assets/umich_pom_2.png)
 
@@ -322,12 +347,12 @@ Back in the gallery, you can now view just the Hsp60-Hsp10 subset:
 
 #### 15. Segmenting membranes, ribosomes, and microtubules
 
-To dig further into these tomograms, we segment a few more features - membranes, ribosomes, and microtubules - but only within the Hsp60-Hsp10 subset, which is much faster than running on the full dataset. These networks operate at 10 Å/px (rather than 50 Å/px for the mitochondrion network) so they are significantly slower per tomogram. To save further time, we also drop the default 4-fold test-time augmentation to 2-fold.
+To dig further into these tomograms, we segment a few more features - we'll do membranes and ribosomes - but only within the data subset, which is much faster than running on the full dataset. These networks operate at 10 Å/px (rather than 50 Å/px for the mitochondrion network) so they are significantly slower per tomogram. To save further time, we also drop the default 4-fold test-time augmentation to 2-fold.
 
 When segmenting or picking particles in easymode, you can use a Pom subset as the `--data` argument. Some WarpTools functions also take .txt files with lists of tomograms as the input, allowing you to process data subsets in Warp as well. For example in `WarpTools ts_export_particles`, the `--input_data` command allows you to point at a .txt file with one tomogram name per line.
 
 ```
-easymode segment membrane ribosome microtubule --data pom/subsets/Hsp60-Hsp10.txt --tta 2
+easymode segment membrane ribosome --data pom/subsets/Hsp60-Hsp10.txt --tta 2
 ```
 
 This should cost roughly 1 minute per tomogram per feature on a single GPU for this dataset. When done, update the database:
@@ -354,7 +379,7 @@ Now the gallery (for the Hsp60-Hsp10 subset) should look like this:
 
 #### 16. Exploring a full Pom app
 
-Because we don't have enough time to apply all easymode networks to every tomogram, there's a pre-calculated Pom database available in the tutorial data. Remove your local `pom` directory and then copy the `pom` directory from the tutorial dataset over to your project root instead, then run the app with `pom browse`. In this one we have segmentations for actin, intermediate filaments, microtubules, ribosomes, TRiC, IMPDH, membranes, mitochondrial granules, prohibitin, mitochondria, cytoplasm, nucleus, nuclear envelope, nuclear pore complexes, lipid droplets, ice particles, and void (= lamella boundaries). They're not perfect - actin, for example, remains difficult to trace in cellular tomograms - but offer a way to navigate the dataset and search for specific structures. For example, try to find the tomogram with a lipid droplet, or the 3 tomograms containing IMPDH filaments. 
+Because we don't have enough time to apply all easymode networks to every tomogram, there's a pre-calculated Pom database available in the tutorial data. Remove your local `pom` directory and then copy the `pom` directory from the tutorial dataset over to your project root instead, then run the app with `pom browse`. In this one we have segmentations for actin, intermediate filaments, microtubules, ribosomes, TRiC, IMPDH, membranes, mitochondrial granules, prohibitin, mitochondria, cytoplasm, nucleus, nuclear envelope, nuclear pore complexes, lipid droplets, ice particles, and void (= lamella boundaries). They're not perfect - actin, for example, remains difficult to trace in cellular tomograms - but they offer a reliable way to navigate the dataset and search for specific structures. For example, try to find the tomogram with a lipid droplet, or the 3 tomograms containing IMPDH filaments. 
 
 
 <video autoplay loop muted playsinline controls style="width:100%; aspect-ratio:16/9; background:#fff; border-radius:8px;">
@@ -401,7 +426,7 @@ To save time, the pre-computed ribosome segmentations are available in the tutor
         --3d
 
     cd relion/ribosome
-    cp path/to/tutorial_data/various/ribosome.mrc reference.mrc
+    cp /work/data/various/ribosome.mrc reference.mrc
 
     mkdir Refine3D
     mkdir Refine3D/job001
@@ -434,7 +459,7 @@ To save time, the pre-computed ribosome segmentations are available in the tutor
         --gpu "" \
         --pipeline_control Refine3D/job001/
 
-    cp path/to/tutorial_data/various/ribosome_mask.mrc mask.mrc
+    cp /work/data/various/ribosome_mask.mrc mask.mrc
     cd ../../
 
     MTools create_species \
@@ -465,7 +490,7 @@ To save time, the pre-computed ribosome segmentations are available in the tutor
 
 The goal of easymode is to make the biological content of tomograms straightforwardly computationally accessible. Given segmentations of many different features, you can quantitatively answer all sorts of questions about the cellular context surrounding particles of interest - how close each particle of one class sits to a structure of another, what fraction of a population falls inside a given organelle, and so on. In this brief tutorial we'll do that for ribosomes: starting from a particle `.star` file, we will measure the distance from every ribosome to the nearest membrane and use that to classify membrane-bound versus cytosolic ribosomes. We'll also measure the distance from each ribosome to the nearest lamella surface. 
 
-To begin, copy over the ribosome and membrane segmentations from `various/` into your local segmentation directory. Also copy `various/ribosomes.star` over into the project root directory. Using this data you can follow the [Lamella surface distance](lamella_surface_distance.md) tutorial. To do the membrane distance measurement, the sampler you'll need is `membrane:0.5:1000000`. To make the starfile-wrangling a little bit more convenient you can use the `starutil.py` script in `path/to/tutorial/data/various/starutil.py`.
+To begin, copy over the ribosome and membrane segmentations from `various/` into your local segmentation directory. Also copy `various/ribosomes.star` over into the project root directory. Using this data you can follow the [Lamella surface distance](lamella_surface_distance.md) tutorial. To do the membrane distance measurement, the sampler you'll need is `membrane:0.5:1000000`. To make the starfile-wrangling a little bit more convenient you can use the `starutil.py` script in `/work/data/various/starutil.py`.
 
 After running the `pom contextualize` command described in the Lamella surface distance tutorial, you can use the `various/ribosome.mrc` map, the output .star file, and the membrane segmentations to visualize the spatial distribution of the ribosomes in ChimeraX/ArtiaX.
 
