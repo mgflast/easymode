@@ -28,7 +28,7 @@
 </p>
 
 ## CryoET data processing with Warp, easymode, and Pom
-*University of Michigan - July 8th, 2026*
+*University of Michigan - June 8th, 2026*
 
 The goal of this tutorial is to run through the whole front-end of cryoET data processing in one day. In the morning we will cover every step in the tomogram reconstruction pipeline in Warp: starting with raw frames, ending with denoised tomograms. In the afternoon, we will explore and visualize the biological content of the tomograms and, if time permits, briefly look at some downstream processes that you might want to use in your own work: particle picking & subtomogram averaging, training a custom network for segmentation, or performing measurements on particles in their context.
 
@@ -461,6 +461,10 @@ To save time, the pre-computed ribosome segmentations are available in the tutor
 
     cp /work/data/various/ribosome_mask.mrc mask.mrc
     cd ../../
+    
+    MTools create_population --directory m --name easymode
+
+    MTools create_source --population m/easymode.population --processing_settings warp_tiltseries.settings --name easymode
 
     MTools create_species \
         --half1 relion/ribosome/Refine3D/job001/run_half1_class001_unfil.mrc \
