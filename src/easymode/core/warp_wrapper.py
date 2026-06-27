@@ -123,10 +123,11 @@ def get_gpu_list():
         except:
             return []
 
-def reconstruct(frames, mdocs, apix=None, dose=None, extension=None, tomo_apix=10.0, thickness=3000, shape=None, steps='1111111', halfmaps=True, force_align=False):
+def reconstruct(frames, mdocs, apix=None, dose=None, extension=None, tomo_apix=10.0, thickness=3000, shape=None, steps='1111111', halfmaps=True, force_align=False, gain=None, gain_flip_x=False, gain_flip_y=False, gain_transpose=False):
     root = os.getcwd()
     frames_path = frames if os.path.exists(frames) else os.path.join(root, frames)
     mdoc_path = mdocs if os.path.exists(mdocs) else os.path.join(root, mdocs)
+    gain_path = (gain if os.path.exists(gain) else os.path.join(root, gain)) if gain else None
     extension = extension if extension is not None else find_extension(frames_path)
     extension = f'.{extension}' if not '.' in extension else extension
 
@@ -140,6 +141,7 @@ def reconstruct(frames, mdocs, apix=None, dose=None, extension=None, tomo_apix=1
           f'\ntomo apix: {tomo_apix}'
           f'\nthickness: {thickness}'
           f'\nshape: {shape if shape is not None else "auto"}'
+          f'\ngain: {gain_path if gain_path is not None else "none (frames assumed gain-corrected)"}'
           f'\nsteps: {steps}')
 
     if dose is None:
@@ -153,7 +155,16 @@ def reconstruct(frames, mdocs, apix=None, dose=None, extension=None, tomo_apix=1
 
 
     print(f'\n\033[96mCreating settings (frame series)\033[0m')
-    _run(f'WarpTools create_settings --folder_data {frames_path} --folder_processing warp_frameseries --output warp_frameseries.settings --extension "*{extension}" --angpix {apix} --exposure {dose}')
+    gain_args = ''
+    if gain_path is not None:
+        gain_args = f' --gain_path {gain_path}'
+        if gain_flip_x:
+            gain_args += ' --gain_flip_x'
+        if gain_flip_y:
+            gain_args += ' --gain_flip_y'
+        if gain_transpose:
+            gain_args += ' --gain_transpose'
+    _run(f'WarpTools create_settings --folder_data {frames_path} --folder_processing warp_frameseries --output warp_frameseries.settings --extension "*{extension}" --angpix {apix} --exposure {dose}{gain_args}')
 
     print(f'\n\033[96mCreating settings (tilt series)\033[0m')
     tomo_size = [int(f) for f in shape.split('x')] if shape is not None else find_shape(frames_path, extension)
