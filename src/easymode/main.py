@@ -61,6 +61,10 @@ def main():
     reconstruct.add_argument('--steps', type=str, default='11111111', help="8-character string indicating which processing steps to perform (default: '1111111'). Each character corresponds to a specific step: 1 to perform the step, 0 to skip it. The steps are: 1) Frame motion and CTF, 2) Importing tilt series, 3) Creating tilt stacks, 4) Tilt series alignment, 5) Import alignments, 6) Tilt series CTF, 7) Check handedness, 8) Reconstruct volumes.")
     reconstruct.add_argument('--no_halfmaps', dest='halfmaps', action='store_false', help="If set, do not generate half-maps during motion correction or tomogram reconstruction. This precludes most methods of denoising.")
     reconstruct.add_argument('--force_align', action='store_true', help="If set, force AreTomo3 alignment of tilt series even if alignment files are already present.")
+    reconstruct.add_argument('--gain', type=str, default=None, help="Path to a gain reference file. Applied during WarpTools create_settings (frame series). Leave empty when frames are already gain-corrected.")
+    reconstruct.add_argument('--gain_flip_x', action='store_true', help="Flip the gain reference along the X axis.")
+    reconstruct.add_argument('--gain_flip_y', action='store_true', help="Flip the gain reference along the Y axis.")
+    reconstruct.add_argument('--gain_transpose', action='store_true', help="Transpose the gain reference.")
 
     segment = subparsers.add_parser('segment', help='Segment data using pretrained easymode networks.')
     segment.add_argument( "features", metavar='FEATURE', nargs="+", type=str, help="One or more features to segment (e.g. 'ribosome membrane microtubule'). Use 'easymode list' to see available features.")
@@ -275,7 +279,11 @@ def main():
                     shape=args.shape,
                     steps=args.steps,
                     halfmaps=args.halfmaps,
-                    force_align=args.force_align)
+                    force_align=args.force_align,
+                    gain=args.gain,
+                    gain_flip_x=args.gain_flip_x,
+                    gain_flip_y=args.gain_flip_y,
+                    gain_transpose=args.gain_transpose)
     elif args.command == 'set':
         if args.cache_directory:
             if os.path.exists(args.cache_directory):
