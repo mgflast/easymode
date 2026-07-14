@@ -112,7 +112,7 @@ def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, model_apix=10.0,
         model_apix_z = model_apix
 
     # load tomo & read pixel size
-    with mrcfile.open(tomogram_path) as m:
+    with mrcfile.open(tomogram_path, permissive=True) as m:
         volume = m.data.astype(np.float32)
         volume_apix = m.voxel_size.x
         oj, ok, ol = volume.shape
