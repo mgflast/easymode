@@ -1,0 +1,3634 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://mgflast.github.io/easymode/user_guide/examples/workshop_2026/">
+      
+      
+        <link rel="prev" href="../easymode_and_pom/">
+      
+      
+        <link rel="next" href="../../pom/installation/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>10. Michigan 2026 - easymode</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+  
+  
+  
+  
+  <style>:root{--md-annotation-icon:url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M17%2013h-4v4h-2v-4H7v-2h4V7h2v4h4m-5-9A10%2010%200%200%200%202%2012a10%2010%200%200%200%2010%2010%2010%2010%200%200%200%2010-10A10%2010%200%200%200%2012%202%22/%3E%3C/svg%3E');}</style>
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../styles/extra.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#cryoet-data-processing-with-warp-easymode-and-pom" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="easymode" class="md-header__button md-logo" aria-label="easymode" data-md-component="logo">
+      
+  <img src="../../../assets/Logo_small.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            easymode
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              10. Michigan 2026
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="amber"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/mgflast/easymode" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    mgflast/easymode
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../.." class="md-tabs__link">
+          
+  
+  
+  🏠 Home
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../overview/" class="md-tabs__link">
+          
+  
+  
+  📖 User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../models/" class="md-tabs__link">
+          
+  
+  
+  🎨 Models
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../papers/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  📜 Papers
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="https://github.com/mgflast/easymode/issues" class="md-tabs__link">
+        
+  
+  
+    
+  
+  🐞 Submit a bug
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="easymode" class="md-nav__button md-logo" aria-label="easymode" data-md-component="logo">
+      
+  <img src="../../../assets/Logo_small.png" alt="logo">
+
+    </a>
+    easymode
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/mgflast/easymode" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    mgflast/easymode
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_1" id="__nav_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🏠 Home
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    🏠 Home
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ais_and_pom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    easymode + Ais & Pom
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../warp_relion_m/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    easymode + Warp/RELION/M
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../training_collection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    easymode training data collection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    📖 User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    📖 User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+     
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_2" id="__nav_2_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    <b>Functions</b>
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    <b>Functions</b>
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../functions/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../functions/preprocessing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tomogram reconstruction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../functions/general_denoisers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    General denoisers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../functions/segmentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Segmentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../functions/picking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Picking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    <b>Tutorials</b>
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    <b>Tutorials</b>
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_3_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_3_1" id="__nav_2_3_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🎯 Picking and averaging
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_3_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    🎯 Picking and averaging
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ribosome/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1. Ribosomes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../microtubule/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2. Microtubules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../actin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3. Actin filaments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../vault/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4. Vault complexes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_3_2" id="__nav_2_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🗺️ Particles in context
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    🗺️ Particles in context
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../npc_orientation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    5. NPC orientation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../colocalization_filtering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    6. Hsp60-Hsp10 filtering
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lamella_surface_distance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    7. Lamella surface distance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../picking_yturc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    8. Picking γTuRC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_3_3" id="__nav_2_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🧮 Dataset management
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    🧮 Dataset management
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../easymode_and_pom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    9. easymode + Pom
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_3_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2_3_4" id="__nav_2_3_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🎓 Workshops
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_3_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    🎓 Workshops
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10. Michigan 2026
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10. Michigan 2026
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#cryoet-data-processing-with-warp-easymode-and-pom" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CryoET data processing with Warp, easymode, and Pom
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CryoET data processing with Warp, easymode, and Pom">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#morning-from-raw-data-to-tomograms-with-warptools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🌅 Morning - from raw data to tomograms with WarpTools
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🌅 Morning - from raw data to tomograms with WarpTools">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#0-data-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0. Data layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1-frame-series-processing-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Frame series processing settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-motion-correction-and-ctf-estimation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Motion correction and CTF estimation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-importing-tilt-series" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Importing tilt series
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-tilt-series-processing-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Tilt series processing settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-exporting-tilt-stacks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Exporting tilt stacks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-tilt-series-alignment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Tilt series alignment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-tilt-series-ctf-estimation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Tilt series CTF estimation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8-reconstructing-the-tomograms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Reconstructing the tomograms
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#9-denoising" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Denoising
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#10-couldnt-this-be-automated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Couldn't this be automated?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#afternoon-from-tomograms-to-cellular-landscapes-with-easymodepom" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🌇 Afternoon - from tomograms to cellular landscapes with easymode/Pom
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🌇 Afternoon - from tomograms to cellular landscapes with easymode/Pom">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-setting-up-pom" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Setting up Pom
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-segmentation-with-easymode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Segmentation with easymode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-exploring-the-mitochondrion-segmentations-in-pom" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. Exploring the mitochondrion segmentations in Pom
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#14-data-subsets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14. Data subsets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#15-segmenting-membranes-ribosomes-and-microtubules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15. Segmenting membranes, ribosomes, and microtubules
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#16-exploring-a-full-pom-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16. Exploring a full Pom app
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optional-tutorials" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🚀 Optional tutorials
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🚀 Optional tutorials">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-segmentation-based-picking-and-subtomogram-averaging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A. Segmentation-based picking and subtomogram averaging
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b-particle-set-contextualization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B. Particle set contextualization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#c-training-a-custom-network-in-ais" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        C. Training a custom network in Ais
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_4" id="__nav_2_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    <b>Pom</b>
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    <b>Pom</b>
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pom/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pom installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pom/data_browser/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data browser
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pom/contextualizing_particles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contextualizing particles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    <b>FAQ</b>
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🎨 Models
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    🎨 Models
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    easymode model library
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🐦 Species
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    🐦 Species
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../models/ribosome/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🟢 Ribosome
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../models/microtubule/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🟢 Microtubule
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../models/vault/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🟢 Vault
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../models/tric/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🟢 TRiC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../models/npc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🟢 Nuclear pore complex
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../models/actin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🟢 Actin
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../models/impdh/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🟢 hfIMPDH
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../models/prohibitin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🔵 Prohibitin
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../models/intermediate_filament/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🔵 Intermediate filament
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../models/ferritin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🚧 Ferritin
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../models/proteasome/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🚧 Proteasome
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🏞️ Biomes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    🏞️ Biomes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../models/mitochondrion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🟢 Mitochondrion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../models/cytoplasmic_granule/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🟢 Cytoplasmic granule
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../models/mitochondrial_granule/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🟢 Mitochondrial granule
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../models/nucleus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🟢 Nucleus
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../models/cytoplasm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🟢 Cytoplasm
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../models/nuclear_envelope/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🟢 Nuclear envelope
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../models/membrane/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🔵 Membrane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../models/lipid_droplet/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🔵 Lipid droplet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ⚙️ Utility
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ⚙️ Utility
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../models/void/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🟢 Void
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../models/ice_particle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🟢 Ice particle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../papers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    📜 Papers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/mgflast/easymode/issues" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🐞 Submit a bug
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#cryoet-data-processing-with-warp-easymode-and-pom" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CryoET data processing with Warp, easymode, and Pom
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CryoET data processing with Warp, easymode, and Pom">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#morning-from-raw-data-to-tomograms-with-warptools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🌅 Morning - from raw data to tomograms with WarpTools
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🌅 Morning - from raw data to tomograms with WarpTools">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#0-data-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0. Data layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1-frame-series-processing-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Frame series processing settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-motion-correction-and-ctf-estimation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Motion correction and CTF estimation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-importing-tilt-series" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Importing tilt series
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-tilt-series-processing-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Tilt series processing settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-exporting-tilt-stacks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Exporting tilt stacks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-tilt-series-alignment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Tilt series alignment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-tilt-series-ctf-estimation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Tilt series CTF estimation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8-reconstructing-the-tomograms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Reconstructing the tomograms
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#9-denoising" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Denoising
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#10-couldnt-this-be-automated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Couldn't this be automated?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#afternoon-from-tomograms-to-cellular-landscapes-with-easymodepom" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🌇 Afternoon - from tomograms to cellular landscapes with easymode/Pom
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🌇 Afternoon - from tomograms to cellular landscapes with easymode/Pom">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-setting-up-pom" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Setting up Pom
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-segmentation-with-easymode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Segmentation with easymode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-exploring-the-mitochondrion-segmentations-in-pom" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. Exploring the mitochondrion segmentations in Pom
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#14-data-subsets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14. Data subsets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#15-segmenting-membranes-ribosomes-and-microtubules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15. Segmenting membranes, ribosomes, and microtubules
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#16-exploring-a-full-pom-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16. Exploring a full Pom app
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optional-tutorials" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🚀 Optional tutorials
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🚀 Optional tutorials">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-segmentation-based-picking-and-subtomogram-averaging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A. Segmentation-based picking and subtomogram averaging
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b-particle-set-contextualization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B. Particle set contextualization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#c-training-a-custom-network-in-ais" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        C. Training a custom network in Ais
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+  <h1>10. Michigan 2026</h1>
+
+<style>
+[data-md-color-primary] {
+  --md-primary-fg-color: #FFCB05 !important;
+  --md-primary-fg-color--light: #FFCB05 !important;
+  --md-primary-fg-color--dark: #FFCB05 !important;
+  --md-primary-bg-color: #10284c !important;            /* UMich blue header text */
+  --md-primary-bg-color--light: rgba(16, 40, 76, 0.7) !important;
+}
+[data-md-color-accent] {
+  --md-accent-fg-color: #10284c !important;             /* UMich blue */
+  --md-accent-fg-color--transparent: rgba(16, 40, 76, 0.1) !important;
+  --md-accent-bg-color: #ffffff !important;
+  --md-accent-bg-color--light: rgba(255, 255, 255, 0.7) !important;
+}
+
+.md-header__topic:first-child .md-ellipsis {
+  font-size: 0;
+}
+.md-header__topic:first-child .md-ellipsis::before {
+  content: "2026 Cryo-Electron Tomography Data Processing Workshop";
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+</style>
+
+<p style="text-align: center;">
+  <img src="../../../assets/umich_banner.png" alt="UMich 2026 workshop banner" style="width: 50%;">
+</p>
+
+<h2 id="cryoet-data-processing-with-warp-easymode-and-pom">CryoET data processing with Warp, easymode, and Pom</h2>
+<p><em>University of Michigan - June 8th, 2026</em></p>
+<p>The goal of this tutorial is to run through the whole front-end of cryoET data processing in one day. In the morning we will cover every step in the tomogram reconstruction pipeline in Warp: starting with raw frames, ending with denoised tomograms. In the afternoon, we will explore and visualize the biological content of the tomograms and, if time permits, briefly look at some downstream processes that you might want to use in your own work: particle picking &amp; subtomogram averaging, training a custom network for segmentation, or performing measurements on particles in their context.</p>
+<div class="admonition info">
+<p class="admonition-title">Credit</p>
+<p>The Warp portion of this tutorial is heavily based on Dimitry Tegunov and Alister Burt's <a href="https://warpem.github.io/warp/user_guide/warptools/quick_start_warptools_tilt_series">WarpTools tilt-series quick start</a>, adapted to the workshop dataset.</p>
+</div>
+<h3 id="morning-from-raw-data-to-tomograms-with-warptools">🌅 Morning - from raw data to tomograms with WarpTools</h3>
+<h4 id="0-data-layout">0. Data layout</h4>
+<p>On the workshop AWS instance the tutorial dataset lives in <code>/work/data/Day1/</code>. It contain 50 tilt series of plasma-FIB milled, mycophenolic acid-treated HeLa cells. For the first part of the workshop we will only use a subset of 5 tilt series, so that the full reconstruction pipeline can finish in a reasonable time (note: after testing the below routine on a workshop instance, it seems that we could easily do more than 5; if you like, you can copy an extra couple of tilt series over from <code>/work/data/Day1/precomputed/{frames, mdocs}</code>)</p>
+<div class="highlight"><pre><span></span><code>/work/data/
+├── frames/        # 155 .tiff stacks (5 tilt series × 31 tilts)
+│   ├── 250531_l1p2_001_10.00_20250531_*_Fractions.tiff
+│   ├── 250531_l1p2_002_13.00_20250531_*_Fractions.tiff
+│   └── ...
+├── mdocs/         # 5 .mdoc files, one per tilt series
+│   ├── 250531_l1p2.mdoc
+│   ├── 250531_l1p2_2.mdoc
+│   └── ...
+├── pom.zip        # a pre-configured Pom database, used in the afternoon
+├── precomputed/   # full pre-computed outputs for all 50 tilt series, used in the afternoon
+├── segmented/     # some segmentation outputs for the 50 tilt series, optional use in the afternoon
+└── various/       # reference maps, masks, and helper scripts used in the optional tutorials
+</code></pre></div>
+<p>Make a working directory in your home (<code>/work/participant</code>) and copy just the <code>frames/</code> and <code>mdocs/</code> directories over to it.</p>
+<div class="highlight"><pre><span></span><code>cd ~
+mkdir day1 &amp;&amp; cd day1
+cp /work/data/Day1/frames .
+cp /work/data/Day1/mdocs .
+</code></pre></div>
+<h4 id="1-frame-series-processing-settings">1. Frame series processing settings</h4>
+<p>The first step will be motion correction of the fractionated tilt images. In our case the frames are 4096x4096x5-shaped <code>.tiff</code> frames from a Falcon4i, acquired at 1.514 Å/px and a dose of 4.6 e/Å2 per tilt spread over 5 fractions.
+<div class="highlight"><pre><span></span><code>module load warp/2.0.0dev39
+
+WarpTools create_settings \
+    --output warp_frameseries.settings \
+    --extension &quot;*.tiff&quot; \
+    --angpix 1.514 \
+    --exposure 4.60 \
+    --folder_data frames/ \
+    --folder_processing warp_frameseries
+</code></pre></div></p>
+<h4 id="2-motion-correction-and-ctf-estimation">2. Motion correction and CTF estimation</h4>
+<p>Motion correction reduces the tilt image to a single frame (4096x4096x1) with a much better signal to noise ratio, using which we can also do CTF-fitting on each tilt image. In WarpTools these tasks are combined in a single command (separate commands are also available if you needed them): after reducing the stack to a single image and with that image still in memory, we might as well do CTF-fitting right away.</p>
+<div class="highlight"><pre><span></span><code>WarpTools fs_motion_and_ctf \
+    --settings warp_frameseries.settings \
+    --m_grid 1x1x5 \
+    --c_grid 2x2x1 \
+    --c_range_max 4.0 \
+    --c_defocus_max 7 \
+    --out_averages \
+    --perdevice 4
+</code></pre></div>
+<p>After running this command, the warp_frameseries/ directory will contain one .xml file for every tilt image (frame) in the dataset. A subdirectory warp_frameseries/average contains the motion-corrected frames as .mrc files. Once files live in Warp processing output folders, you generally don't need to think too much about what's in them and where they live - until perhaps you run in to issues later on. Most of the important metadata is contained in warp_tiltseries/*.xml files, and these are versioned. A brute-force reset of the metadata can sometimes be useful (for example if a tilt selection job or a refinement in M has gone awry): copy the files from the olders warp_tiltseries/versions/ directory back over into warp_tiltseries. </p>
+<details class="note">
+<summary>Note on the processing parameters</summary>
+<p>The values used here depend on your acquisition. The 3rd value of <code>--m_grid</code> would typically be the number of fractions per tilt image - 5 in our case (which is a bit on the low side). Data from a Falcon4 detector doesn't really have a fixed number of fractions in the same way, so instead you would set <code>--eer_ngroups</code> in <code>WarpTools create_settings</code> (or leave it out and rely on the auto settings, which are generally fine). <code>--c_defocus_max</code> is the maximum CTF defocus value allowed during fitting; the tutorial dataset was acquired with a defocus range of 2.5-5 µm, so 7 is conservative. <code>--c_range_max</code> caps the frequency (expressed as a resolution in Å) up to which CTF fitting is performed - it must be larger than 2 × pixel_size (Nyquist).</p>
+</details>
+<details class="note">
+<summary><code>--out_averages</code> and <code>--out_average_halves</code></summary>
+<p>Unsupervised denoising methods like noise2noise, DeepDeWedge, IsoNet2, etc., are trained on independent half splits (even/odd). Half splits can be generated two ways: by splitting frames at motion correction time (<strong>frame-based</strong>) or by splitting tilts at reconstruction time (<strong>tilt-based</strong>). As described in the <a href="https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=8759519">cryoCARE paper</a>, frame-based splitting yields better results. If you wanted to train a network with any of these methods, you would therefore have to add <code>--out_average_halves</code> here, to output the frame splits you later need to generate tomogram half splits. We skip this in the tutorial because for denoising we will use a pretrained general noise2noise-style network. </p>
+</details>
+<h4 id="3-importing-tilt-series">3. Importing tilt series</h4>
+<p>Motion correction and CTF estimation are essentially the only preprocessing steps applied to the frames - after that, we are in tilt series processing territory. The next step is to import tilt series. WarpTools parses the <code>.mdoc</code> files in <code>mdocs/</code> to determine which frames belong to which tilt series, and in what order. If you ever want to rename a tilt series / tomogram, you can do so simply by renaming the mdoc prior to running <code>WarpTools ts_import</code> - the content of the mdoc does not need to be changed.</p>
+<div class="highlight"><pre><span></span><code>WarpTools ts_import \
+    --mdocs mdocs/ \
+    --frameseries warp_frameseries \
+    --tilt_exposure 4.60 \
+    --min_intensity 0.3 \
+    --dont_invert \
+    --output tomostar
+</code></pre></div>
+<details class="note">
+<summary>Tilt axis angle</summary>
+<p>For <code>.mdoc</code> files written by Tomo5, WarpTools will warn that the tilt axis angle may be incorrect. You can ignore this - AreTomo3 will work regardless. In general the tilt axis angle will be known exactly by your EM managers, so if you do run in to issues you can simply add <code>--override_axis 86.4</code> (or whatever the angle is).</p>
+</details>
+<h4 id="4-tilt-series-processing-settings">4. Tilt series processing settings</h4>
+<div class="highlight"><pre><span></span><code>WarpTools create_settings \
+    --output warp_tiltseries.settings \
+    --folder_processing warp_tiltseries \
+    --folder_data tomostar \
+    --extension &quot;*.tomostar&quot; \
+    --angpix 1.514 \
+    --exposure 4.60 \
+    --tomo_dimensions 4096x4096x1981
+</code></pre></div>
+<details class="note">
+<summary>Tilt series and tomogram pixel size</summary>
+<p><code>--angpix</code> is the <strong>acquisition</strong> pixel size, 1.514 Å/px in this case. The pixel size at which tomograms are actually reconstructed is arbitrary; 10.0 Å/px is convenient because that is what tools like MemBrain, TomoTwin, and easymode were trained on. However, large pixel sizes may limit the accuracy of template-matching-based picking approaches. See Joe Dobbs and Julia Mahamid's recent <a href="https://www.biorxiv.org/content/10.64898/2026.04.12.717927v1.abstract">preprint</a>, for a discussion. <code>--tomo_dimensions</code> sets the output volume shape in pixels at the <strong>acquisition</strong> pixel size (here, 1.514 Å/px) - not at the reconstruction pixel size. Use the detector dimensions for X and Y (a Falcon4i, in the tutorial data). To make the output tomograms span 300 nm in Z, set Z to <code>3000 Å / apix</code> ≈ 1981.</p>
+</details>
+<h4 id="5-exporting-tilt-stacks">5. Exporting tilt stacks</h4>
+<p>Saving all tilt images in a single stack is somewhat redundant - Warp or M don't refer to these tilt stacks themselves but instead always get data directly from the frame averages. But for tilt series alignment with AreTomo3 we do need the stacks. In principle the stacks can be deleted again after running the alignment, to free up memory.</p>
+<div class="highlight"><pre><span></span><code>WarpTools ts_stack \
+    --settings warp_tiltseries.settings \
+    --perdevice 2
+</code></pre></div>
+<h4 id="6-tilt-series-alignment">6. Tilt series alignment</h4>
+<p>Tilt series alignment is one of the core cryoET data processing steps for which WarpTools does not (yet) offer its own implementation (but see Marten Chaillet et al.'s <a href="https://www.biorxiv.org/content/10.64898/2026.04.29.721716v1">MissAlignment</a>). Instead, WarpTools wraps <a href="https://bio3d.colorado.edu/imod/doc/etomoTutorial.html">etomo</a> or <a href="https://github.com/czimaginginstitute/AreTomo2">AreTomo2</a>. In this tutorial we will use a custom wrapper that uses AreTomo3.</p>
+<p>Regardless of which tool you use, the tilt-series alignment results are slotted directly back into the Warp pipeline by copying the alignment parameters (<code>.xf</code>, <code>.tlt</code>, <code>.xtilt</code>, etc.) into <code>warp_tiltseries/alignments/*/</code>, from where Warp will parse them and store the values in the corresponding tilt-series <code>.xml</code> files.</p>
+<p>The wrapper for the workshop, <code>ts_aretomo3.py</code>, is a single Python script that (1) runs AreTomo3 in parallel across the available GPUs on every tilt stack under <code>warp_tiltseries/tiltstack/*/</code>, and (2) copies the resulting <code>*_Imod/</code> folders into <code>warp_tiltseries/alignments/</code>. Copy the wrapper over from <code>/work/data/Day1/various/ts_aretomo3.py</code> or download it:</p>
+<div class="highlight"><pre><span></span><code>wget https://mgflast.github.io/easymode/assets/ts_aretomo3.py
+</code></pre></div>
+<p>Then run the tilt series alignment script:</p>
+<div class="highlight"><pre><span></span><code>module load aretomo3
+python3 ts_aretomo3.py --aretomo3 /sw/aretomo3/2.2.2/bin/AreTomo3 --gpus 0
+</code></pre></div>
+<p>Once the script has finished, have WarpTools import the alignments with:</p>
+<div class="highlight"><pre><span></span><code>WarpTools ts_import_alignments \
+    --settings warp_tiltseries.settings \
+    --alignments warp_tiltseries/alignments \
+    --alignment_angpix 1.514
+</code></pre></div>
+<h4 id="7-tilt-series-ctf-estimation">7. Tilt series CTF estimation</h4>
+<div class="highlight"><pre><span></span><code>WarpTools ts_ctf \
+    --settings warp_tiltseries.settings \
+    --defocus_max 7 \
+    --perdevice 4
+</code></pre></div>
+<h4 id="8-reconstructing-the-tomograms">8. Reconstructing the tomograms</h4>
+<p>Now that we have good estimates of the tilt series CTF and aligned the tilt series we can finally reconstruct the tomograms. We do this at 10 Å/px - a good tradeoff between the level of detail we can see at that pixel size (more than enough for visualisation, segmentation, and picking) and memory consumption. The tomograms that Warp outputs (and which we look at, and may use for manual segmentation or picking) are really only ever used for visualisation: whenever you use Warp to prepare data for subtomogram averaging in RELION, or use Warp/M for STA refinement, the software always refers back to the frames, not to the reconstructed tomograms. The pixel size at which you export tomograms therefore has no bearing on the achievable downstream resolution - other than indirectly, through how it affects the accuracy of particle picking.</p>
+<div class="highlight"><pre><span></span><code>WarpTools ts_reconstruct \
+    --settings warp_tiltseries.settings \
+    --angpix 10.0 \
+    --dont_invert \
+    --perdevice 2
+</code></pre></div>
+<details class="note">
+<summary><code>--halfmap_frames</code> and <code>--halfmap_tilts</code></summary>
+<p>Same story as the half-splits discussion in step 2: if you wanted to train a noise2noise / DeepDeWedge / IsoNet2-style network on this dataset, you would reconstruct two half-split tomograms per tilt series, using either the flag <code>--halfmap_frames</code> (preferred, but requires <code>--out_average_halves</code> to have been set back in step 2) or <code>--halfmap_tilts</code> (works without frame splits, but gives lower-quality splits per the <a href="https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=8759519">cryoCARE paper</a>). We skip both because we will use a pretrained general denoiser later.</p>
+</details>
+<details class="note">
+<summary><code>--dont_invert</code></summary>
+<p><code>--dont_invert</code> keeps the tomograms in their as-acquired contrast: protein density is dark on a light background, the same way it appears in the raw frames. Subtomogram averages and density maps are conventionally displayed inverted (protein light on a dark background), but we leave that flip to the downstream STA tools (RELION, M) - they expect inverted maps and handle the inversion themselves. Keeping tomograms uninverted at this stage avoids any ambiguity about which sign convention is in play.</p>
+</details>
+<h4 id="9-denoising">9. Denoising</h4>
+<p>We now have 50 raw tomograms in <code>warp_tiltseries/reconstruction/</code>. Their contrast is quite limited - the signal-to-noise ratio in cryoEM and cryoET is always very poor. Fortunately there are various ways to denoise the data; perhaps the most commonly used cryoET denoiser of the last few years has been <a href="https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=8759519">cryoCARE</a>, which is based on the <a href="https://arxiv.org/abs/1803.04189">noise2noise framework</a>.</p>
+<details class="note">
+<summary>Noise2Noise framework</summary>
+<p>Take two independent noise-corrupted observations of the same underlying signal, and train a network to predict one from the other. The signal is identical in both; the noise is not. The best the network can do, then, is to predict the signal without the noise - and it learns this without ever being shown a clean target. Because cryoET data is recorded as dose-fractionated movies, it lends itself directly to the required splitting and is therefore very well suited to Noise2Noise-style denoising. </p>
+</details>
+<p>This is where the halfmap discussion from steps 2 and 8 comes back. The classic noise2noise recipe trains a denoiser on the independent even/odd half-splits of your own dataset, then applies it to each half at inference time. Generating and storing those half-splits roughly triples the size of <code>warp_frameseries/</code> and <code>warp_tiltseries/</code>, and training the network on them takes hours. We sidestep both costs by using one of easymode's pretrained <a href="../../functions/general_denoisers/">general denoisers</a> instead: a single n2n network distilled from &gt;20,000 half-split subtomograms sampled across 48 different datasets, whose output approximates that of a model trained specifically on your data - qualitatively, at least; we haven't rigorously benchmarked the two options.</p>
+<div class="highlight"><pre><span></span><code>source ~/conda_init.sh
+conda activate easymode
+easymode denoise --data warp_tiltseries/reconstruction --output denoised
+</code></pre></div>
+<details class="note">
+<summary>When to train your own denoiser</summary>
+<p>Both n2n and wedge-inpainting models learn to adapt to the specifics of your acquisition. In n2n's case, to the particular noise statistics; for wedge inpainting, additionally to the missing-wedge geometry and the structural priors of your sample. A single general network can only approximate this, so for theoretically optimal denoising performance you would want to train a new network on your own data. Because these denoising methods are unsupervised the only cost of doing this is compute.</p>
+<p>That said, for use within the easymode toolchain - data inspection, segmentation, picking - the pretrained general denoisers are perfectly adequate. They were in fact used during training of the segmentation networks, so applying them at inference time tends to <em>improve</em> segmentation results rather than hurt them.</p>
+<p>We're also working on general <a href="https://github.com/MLI-lab/DeepDeWedge">DeepDeWedge</a>- and <a href="https://github.com/IsoNet-cryoET/IsoNet2">IsoNet2</a>-derived networks. when they're done, they will be available in <code>easymode denoise</code> via the <code>--method {n2n, ddw, iso}</code> argument. (The ddw net is already online, but not accessible in the version of easymode installed on the AWS instances. Sorry!)</p>
+</details>
+<h4 id="10-couldnt-this-be-automated">10. Couldn't this be automated?</h4>
+<p>You'll have noticed that with WarpTools, processing cryoET data from raw frames to reconstructed tomograms is just a matter of stringing together some commands - starting with motion correction and CTF estimation, parsing tilt series metadata, assembling the tilt stack, aligning the tilt series, then improved CTF fitting and finally reconstruction. You will probably always be doing these steps in this order, and there isn't a lot of input to give or curation to do along the way. So with a simple script that calls all the WarpTools in order you could just automate the whole procedure. This is available in easymode, but you can also point your favourite <a href="https://claude.ai/">LLM</a> at the <a href="https://warpem.github.io/warp/reference/warptools/api/general/">WarpTools documentation</a> and <a href="https://github.com/mgflast/easymode/blob/master/src/easymode/core/warp_wrapper.py">easymode wrapper</a> and tell it the specifics of your compute environment, and with some iteration it'll probably cook something up that works.</p>
+<div class="highlight"><pre><span></span><code>easymode set --aretomo3-path &quot;/sw/aretomo3/2.2.2/bin/AreTomo3&quot;
+easymode set --aretomo3-env &quot;module load aretomo3/2.2.2&quot;                  
+easymode reconstruct --frames frames/ --mdocs mdocs/ --apix 1.514 --dose 4.6 --no_halfmaps
+</code></pre></div>
+<p>But in general I would recommend running through the pipeline manually a couple of times before relying on automation. Then at least when something breaks or crashes, you'll have an idea about what's going on and possibly how to fix it.</p>
+<h3 id="afternoon-from-tomograms-to-cellular-landscapes-with-easymodepom">🌇 Afternoon - from tomograms to cellular landscapes with easymode/Pom</h3>
+<p>CryoET data is generally very complex. Even within one tomogram, I still often spot something new when I look at it for a fifth time. The longer you look at the data and the more you become accustomed to staring at tomograms, the better you get at recognising common patterns, until at some point the common complexes - ribosomes, membranes, actin, microtubules, intermediate filaments, chaperones, and so on - become immediately obvious when you open a new tomogram. There is always a lot to discover in a new dataset, and the take-home message from this workshop should be that the best way to work with cryoET data is to engage with it directly - to open tomograms, scroll through them, and build familiarity with what is actually there. As tempting as it sometimes is to lean in to automation entirely, we cannot do visual proteomics by relying blindly on automation.</p>
+<p>That said, in this tutorial we will in fact be looking at automation. Because there is so much going on in just one tomogram and datasets are getting up to thousands of tomograms (see for example the <a href="https://cryoetdataportal.czscience.com/datasets/10302/">Chlamy visual proteomics dataset</a>), we do have to rely on automated tools at least in part. Manually inspecting thousands of tomograms and keeping an Excel sheet with comments and scores just isn't very practical any more. Here, we'll use <em>easymode</em> for automated segmentation and <em>Pom</em> to turn a segmented dataset into a visual, browser-based, explorable and searchable database. </p>
+<h4 id="11-setting-up-pom">11. Setting up Pom</h4>
+<p>At this point the project directory will look as follows:</p>
+<div class="highlight"><pre><span></span><code>project_root/
+├── denoised/                    # 5 denoised tomograms
+├── frames/                      # raw tilt-series frames
+├── mdocs/                       # mdoc files
+├── tomostar/                    # tomogram star files
+├── warp_frameseries/            # Warp frame-series processing
+├── warp_tiltseries/             # Warp tilt-series processing
+├── warp_frameseries.settings
+├── warp_tiltseries.settings
+└── ts_aretomo3.py
+</code></pre></div>
+<p>The denoised tomograms in <code>denoised/</code> are what we'll use from here on. The raw tomograms are still in <code>warp_tiltseries/reconstruction/</code>, but we won't use them because the denoised tomograms are to interpret and better for segmentation. To set up Pom, it only needs to be told where the data lives:</p>
+<div class="highlight"><pre><span></span><code>conda activate easymode &amp;&amp; conda activate --stack pom &amp;&amp; conda activate --stack ais
+pom initialize
+pom add_source --tomograms denoised/
+</code></pre></div>
+<p>With a tomogram source registered, <code>pom summarize</code> populates the tomogram database and <code>pom projections</code> writes the preview images that the app displays:</p>
+<div class="highlight"><pre><span></span><code>pom summarize
+pom projections
+</code></pre></div>
+<p>Although we haven't segmented or picked anything yet, the app is now ready to use:</p>
+<div class="highlight"><pre><span></span><code>pom browse &amp;
+</code></pre></div>
+<p>The main page won't have much on it, but if you open the <em>gallery</em> it should look like this:</p>
+<p><img alt="Pom gallery on denoised tomograms" src="../../../assets/umich_pom_0.png" /></p>
+<h4 id="12-segmentation-with-easymode">12. Segmentation with easymode</h4>
+<p>Next we segment a first feature to give us a sense of what's in each tomogram. Easymode offers pretrained general networks for a range of common cellular features. To see which features are available, run:</p>
+<div class="highlight"><pre><span></span><code>conda activate easymode
+conda activate --stack ais
+easymode list
+</code></pre></div>
+<p>Different features are segmented at different scales: ribosomes, for example, are segmented at 10 Å/px, but larger features like mitochondria can be picked out accurately at 50 Å/px. Segmentation at 50 Å/px is much faster, so to get started quickly we'll segment just the mitochondria:</p>
+<div class="highlight"><pre><span></span><code>easymode segment mitochondrion --data denoised --2d
+</code></pre></div>
+<p>Easymode automatically grabs the required network weights from <a href="https://huggingface.co/mgflast/easymode">Hugging Face</a>, so you don't have to worry about where to find them. Mitochondrion segmentation should take around 10-20 seconds per tomogram on a single GPU for the current dataset.</p>
+<h4 id="13-exploring-the-mitochondrion-segmentations-in-pom">13. Exploring the mitochondrion segmentations in Pom</h4>
+<p>Once segmentation has finished, we register an additional data source. easymode will have saved the segmentations to the default output folder <code>segmented/</code>. Segmentation filenames follow the following pattern: <code>&lt;tomo_name&gt;__&lt;feature_name&gt;.mrc</code>. For any tomogram found in <code>denoised/</code> Pom will know that a segmentation belongs to it if the segmentation volume follows this naming pattern. </p>
+<div class="highlight"><pre><span></span><code>conda activate pom
+pom add_source --segmentations segmented/
+</code></pre></div>
+<p>Then we re-run <code>summarize</code> and <code>projections</code> to update the database:</p>
+<div class="highlight"><pre><span></span><code>pom summarize
+pom projections
+</code></pre></div>
+<p>And now that there are segmentations to visualize, we also render them in 3D:</p>
+<div class="highlight"><pre><span></span><code>pom render
+</code></pre></div>
+<p>The Pom app should still be running (if you launched it with <code>pom browse &amp;</code>); if not, launch it again. Rather than calling each command separately, you can also just run <code>pom auto</code>, which does everything in one go. By default Pom does not overwrite existing images - add <code>--overwrite</code> if you want to update them.</p>
+<p>Back in the Pom gallery, you can now sort the dataset by how much mitochondrion was found in each tomogram. You can also choose different preview images: the tomogram density, a 3D rendered thumbnail, or a Z-projection of any segmented feature. In the image below we've sorted by mitochondrion and switched the display option to the newly rendered 3D thumbnail:</p>
+<p><img alt="Pom gallery sorted by mitochondrion content" src="../../../assets/umich_pom_1.png" /></p>
+<div class="admonition note">
+<p class="admonition-title">Volume rendering and spinny moves</p>
+</div>
+<p>I recently added some features to the rendering in Pom. It now supports volume rendering as well the old as isosurface rendering, and it can generate and display .gif's with a 360 degree rotating view. I released this too late for it to be available in the workshop version of Pom, but if you want you can update the code with: <code>pip install --user --force-reinstall --no-deps --no-cache-dir "git+https://github.com/bionanopatterning/Pom@main"</code></p>
+<h4 id="14-data-subsets">14. Data subsets</h4>
+<p>When you're working with a very large dataset (imagine 10,000 tomograms), it would be prohibitively expensive to run segmentation, template matching, or compute-heavy feature detection tools on the whole set. </p>
+<p>Depending on the target you're after, you can almost always use prior knowledge about its biology to restrict the search to a subset of tomograms - or even to sub-tomogram regions. For this example, let's pretend we are looking for the mitochondrial Hsp60-Hsp10 complex (see <a href="https://www.science.org/doi/10.1126/sciadv.aed3579">this paper</a> for some nice examples). Since Hsp60-Hsp10 sits inside mitochondria, the mitochondrion segmentation output also tells us where to look for Hsp60-Hsp10 particles.</p>
+<p>In the Pom gallery, sort the dataset by mitochondrion content and open the first tomogram in the list - the one with the most mitochondrion volume (<code>250531_l15p5_2_10.00Apx</code>). On its detail page you can create a new tomogram subset; we'll call it <code>Hsp60-Hsp10</code> and add this tomogram to it. You can add as many or as few tomograms as you like - we'll use the 4 top-mitochondrion tomograms here (note: that was top 4 out of 50 - since we're only using 5 tilt series for the tutorial that choice now makes less sense. Let's do 1 instead.). </p>
+<p><img alt="Creating the Hsp60-Hsp10 subset on a tomogram detail page" src="../../../assets/umich_pom_2.png" /></p>
+<p>Back in the gallery, you can now view just the Hsp60-Hsp10 subset:</p>
+<p><img alt="Gallery filtered to the Hsp60-Hsp10 subset" src="../../../assets/umich_pom_3.png" /></p>
+<h4 id="15-segmenting-membranes-ribosomes-and-microtubules">15. Segmenting membranes, ribosomes, and microtubules</h4>
+<p>To dig further into these tomograms, we segment a few more features - we'll do membranes and ribosomes - but only within the data subset, which is much faster than running on the full dataset. These networks operate at 10 Å/px (rather than 50 Å/px for the mitochondrion network) so they are significantly slower per tomogram. To save further time, we also drop the default 4-fold test-time augmentation to 2-fold.</p>
+<p>When segmenting or picking particles in easymode, you can use a Pom subset as the <code>--data</code> argument. Some WarpTools functions also take .txt files with lists of tomograms as the input, allowing you to process data subsets in Warp as well. For example in <code>WarpTools ts_export_particles</code>, the <code>--input_data</code> command allows you to point at a .txt file with one tomogram name per line.</p>
+<div class="highlight"><pre><span></span><code>easymode segment membrane ribosome --data pom/subsets/Hsp60-Hsp10.txt --tta 2
+</code></pre></div>
+<p>This should cost roughly 1 minute per tomogram per feature on a single GPU for this dataset. When done, update the database:</p>
+<div class="highlight"><pre><span></span><code>pom summarize
+pom projections
+</code></pre></div>
+<p>Before we render, let's head to the Pom app's <em>visualization settings</em> page. Here you can edit the composition of the thumbnail image, define additional images to be rendered, and change some visualization parameters. Set up the thumbnail composition to feature membrane, ribosome, microtubule, and mitochondrion.</p>
+<p><img alt="Pom visualization settings page" src="../../../assets/umich_pom_4.png" /></p>
+<div class="highlight"><pre><span></span><code>pom render --overwrite
+</code></pre></div>
+<p>Now the gallery (for the Hsp60-Hsp10 subset) should look like this:</p>
+<video autoplay loop muted playsinline controls style="width:100%; aspect-ratio:16/9; background:#fff; border-radius:8px;">
+  <source src="../../../assets/umich_pom_movie_0.mp4" type="video/mp4">
+  Video failed to load.
+</video>
+
+<h4 id="16-exploring-a-full-pom-app">16. Exploring a full Pom app</h4>
+<p>Because we don't have enough time to apply all easymode networks to every tomogram, there's a pre-calculated Pom database available in the tutorial data. Remove your local <code>pom</code> directory and then copy the <code>pom</code> directory from the tutorial dataset over to your project root instead, then run the app with <code>pom browse</code>. In this one we have segmentations for actin, intermediate filaments, microtubules, ribosomes, TRiC, IMPDH, membranes, mitochondrial granules, prohibitin, mitochondria, cytoplasm, nucleus, nuclear envelope, nuclear pore complexes, lipid droplets, ice particles, and void (= lamella boundaries). They're not perfect - actin, for example, remains difficult to trace in cellular tomograms - but they offer a reliable way to navigate the dataset and search for specific structures. For example, try to find the tomogram with a lipid droplet, or the 3 tomograms containing IMPDH filaments. </p>
+<video autoplay loop muted playsinline controls style="width:100%; aspect-ratio:16/9; background:#fff; border-radius:8px;">
+  <source src="../../../assets/umich_pom_movie_1.mp4" type="video/mp4">
+  Video failed to load.
+</video>
+
+<h3 id="optional-tutorials">🚀 Optional tutorials</h3>
+<p>If you're done with all the above and would like to explore some further topics, please see the below three optional tutorials. They are a little bit less detailed, so if you run in to any issues or if anything is unclear, just raise your hand and someone will be over to assist. </p>
+<h4 id="a-segmentation-based-picking-and-subtomogram-averaging">A. Segmentation-based picking and subtomogram averaging</h4>
+<details>
+<summary><strong>A. Segmentation-based picking &amp; subtomogram averaging of ribosomes (Warp/RELION/M)</strong></summary>
+<video autoplay="autoplay" controls="controls" loop="loop" muted="muted" playsinline="playsinline" style="display:block; margin:0 auto; width:50%; aspect-ratio:518/494; background:#fff; border-radius:8px;">
+  <source src="../../../assets/umich_ribosome_sta.mp4" type="video/mp4">
+  Video failed to load.
+</video>
+<p>Segmentation and particle picking are essentially the same thing, except that in segmentation you end up with a volume whereas after picking you end up with a coordinate list. Segmentation volumes can be converted to coordinate lists relatively straightforwardly (in some cases - but you can also <a href="../picking_yturc/">complicate it a bit more</a> if you like). In this tutorial we'll use the ribosome segmentation output to pick particles and try subtomogram averaging (STA) in RELION/M. The <a href="../ribosome/">Ribosomes tutorial</a> walks through this pipeline (on a different dataset) and ends at a 3.4 Å reconstruction. That's with 100,000+ particles; the current dataset contains only a couple thousand, but following the same tutorial you can still end up with a sub-nanometer resolution ribosome map. (I got to 7.5 Å with 2655 particles and stopped there; it should be possible to beat.)</p>
+<p>To save time, the pre-computed ribosome segmentations are available in the tutorial data directory <code>segmented</code>; copy these over to your project directory, then follow the instructions <a href="../ribosome/">here</a> but skip the segmentation step. A reference ribosome map is available in <code>various/ribosome.mrc</code> and a mask in <code>various/ribosome_mask.mrc</code>.</p>
+<details class="note">
+<summary>STA command reference</summary>
+<p>For reference, here is a quick overview of the commands we ran to produce the STA. I don't recommend just pasting these into the terminal - that makes it difficult to learn what's going on - but in case you get stuck, here they are:</p>
+<div class="highlight"><pre><span></span><code>easymode pick ribosome \
+    --data segmented \
+    --size 2000000 \
+    --spacing 180 \
+    --output coordinates/ribosome
+
+WarpTools ts_export_particles \
+    --settings warp_tiltseries.settings \
+    --input_directory coordinates/ribosome \
+    --coords_angpix 10.0 \
+    --output_star relion/ribosome/particles.star \
+    --output_angpix 5.0 \
+    --box 64 \
+    --diameter 250 \
+    --relative_output_paths \
+    --3d
+
+cd relion/ribosome
+cp /work/data/various/ribosome.mrc reference.mrc
+
+mkdir Refine3D
+mkdir Refine3D/job001
+
+mpirun -n 5 --oversubscribe `which relion_refine_mpi` \
+    --o Refine3D/job001/run \
+    --auto_refine \
+    --split_random_halves \
+    --i particles.star \
+    --ref reference.mrc \
+    --firstiter_cc \
+    --trust_ref_size \
+    --ini_high 60 \
+    --pool 3 \
+    --pad 2 \
+    --ctf \
+    --particle_diameter 320 \
+    --flatten_solvent \
+    --zero_mask \
+    --oversampling 1 \
+    --healpix_order 2 \
+    --auto_local_healpix_order 4 \
+    --offset_range 5 \
+    --offset_step 2 \
+    --sym C1 \
+    --low_resol_join_halves 40 \
+    --norm \
+    --scale \
+    --j 14 \
+    --gpu &quot;&quot; \
+    --pipeline_control Refine3D/job001/
+
+cp /work/data/various/ribosome_mask.mrc mask.mrc
+cd ../../
+
+MTools create_population --directory m --name easymode
+
+MTools create_source --population m/easymode.population --processing_settings warp_tiltseries.settings --name easymode
+
+MTools create_species \
+    --half1 relion/ribosome/Refine3D/job001/run_half1_class001_unfil.mrc \
+    --half2 relion/ribosome/Refine3D/job001/run_half2_class001_unfil.mrc \
+    --mask relion/ribosome/mask.mrc \
+    --particles_relion relion/ribosome/Refine3D/job001/run_data.star \
+    -p m/easymode.population \
+    -n ribosome \
+    -d 300 \
+    --angpix_resample 2.5
+
+MCore \
+    --population m/easymode.population \
+    --perdevice_refine 2 \
+    --refine_particles \
+    --refine_imagewarp 2x2
+</code></pre></div>
+<p>For me the map reached 10.6 Å in RELION5, then refined down to 7.5 Å after three iterations of that last MCore command. I stopped it there, but there are some tricks you could try to use to improve further; lower the pixel size, tighten or focus the map on the large subunit, refine the CTF defocus, or use a more fine-grained image and volume warp. Beware of overfitting though.</p>
+</details>
+</details>
+<h4 id="b-particle-set-contextualization">B. Particle set contextualization</h4>
+<details>
+<summary><strong>B. Particle set contextualization</strong></summary>
+<p>The goal of easymode is to make the biological content of tomograms straightforwardly computationally accessible. Given segmentations of many different features, you can quantitatively answer all sorts of questions about the cellular context surrounding particles of interest - how close each particle of one class sits to a structure of another, what fraction of a population falls inside a given organelle, and so on. In this brief tutorial we'll do that for ribosomes: starting from a particle <code>.star</code> file, we will measure the distance from every ribosome to the nearest membrane and use that to classify membrane-bound versus cytosolic ribosomes. We'll also measure the distance from each ribosome to the nearest lamella surface. </p>
+<p>To begin, copy over the ribosome and membrane segmentations from <code>various/</code> into your local segmentation directory. Also copy <code>various/ribosomes.star</code> over into the project root directory. Using this data you can follow the <a href="../lamella_surface_distance/">Lamella surface distance</a> tutorial. To do the membrane distance measurement, the sampler you'll need is <code>membrane:0.5:1000000</code>. To make the starfile-wrangling a little bit more convenient you can use the <code>starutil.py</code> script in <code>/work/data/various/starutil.py</code>.</p>
+<p>After running the <code>pom contextualize</code> command described in the Lamella surface distance tutorial, you can use the <code>various/ribosome.mrc</code> map, the output .star file, and the membrane segmentations to visualize the spatial distribution of the ribosomes in ChimeraX/ArtiaX.</p>
+</details>
+<h4 id="c-training-a-custom-network-in-ais">C. Training a custom network in Ais</h4>
+<details>
+<summary><strong>C. Training a custom network in Ais</strong></summary>
+<p style="text-align: center;">
+  <img src="../../../assets/ais_logo.png" alt="Ais logo" style="width: 200px;">
+</p>
+<p>The easymode model library currently contains models for 21 features - cells obviously contain a lot more features than that. For a non-standard protein of interest, there will probably never be a general pretrained network. Alongside other methods (<a href="https://github.com/SBC-Utrecht/pytom-match-pick">template matching</a> or embedding-based tools like <a href="https://www.nature.com/articles/s41592-023-01878-z">TomoTwin</a>), one option in such a scenario is to train a bespoke neural network on your own data. For this we would suggest using <a href="https://www.github.com/bionanopatterning/Ais">Ais</a>.</p>
+<p>Depending on how hectic things have gotten by now in the practicals, you can either watch <a href="https://www.youtube.com/watch?v=ES4tsIt-DCQ&amp;list=PL_lGdEIRskGb5-vwuuGN9QJZxRvvl44Zd">this introduction video</a>, or hopefully you ask me (Mart) and I will quickly introduce the tool and get you started.</p>
+<p>When Pom recognizes that Ais is installed locally, the browser app will have a button 'open in Ais' available. In Ais, in the top menu bar, activate 'Settings' &gt; 'Pom' &gt; 'Synchronize Ais and Pom'. Now if you click 'open in Ais', that tomogram will pop up in Ais.</p>
+<video autoplay="autoplay" controls="controls" loop="loop" muted="muted" playsinline="playsinline" style="width:100%; aspect-ratio:16/9; background:#fff; border-radius:8px;">
+  <source src="../../../assets/ais_video.mp4" type="video/mp4">
+  Video failed to load.
+</video>
+</details>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      copyright © 2023 - 2024
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.expand", "navigation.sections", "search.highlight", "search.suggest", "content.tabs.link", "content.code.annotate", "content.code.copy"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

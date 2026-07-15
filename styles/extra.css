@@ -1,0 +1,10 @@
+/* Make bold nav section headers darker */
+.md-nav__link b {
+    color: var(--md-default-fg-color);
+    font-weight: 700;
+}
+
+/* Individual tutorial items (3+ levels deep): smaller and italic */
+.md-nav__item--nested .md-nav__item--nested .md-nav__item--nested .md-nav__item:not(.md-nav__item--nested) > .md-nav__link {
+    font-size: 0.9em;
+}
