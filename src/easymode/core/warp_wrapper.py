@@ -11,7 +11,7 @@ def _run(cmd, capture=False, ignore_error=False):
         print(f'\033[93mcontinuing despite error...\033[0m')
     return ret.stdout
 
-def _aretomo3_thread(tomo_list, gpu, force_align=False):
+def _aretomo3_thread(tomo_list, gpu, axis=None, force_align=False):
     t_start = time.time()
     print(f'{cfg.settings["ARETOMO3_ENV"]}')
     n_done = 0
@@ -26,6 +26,8 @@ def _aretomo3_thread(tomo_list, gpu, force_align=False):
         if not os.path.exists(lock_path):
             with open(lock_path, 'w') as f: f.write('')
             cmd = f'{cfg.settings["ARETOMO3_PATH"]} -InPrefix {tomo_dir}/ -InSuffix .st -OutDir {tomo_dir}/ -CorrCTF 0 -TiltCor 1 -Cmd 1 -Serial 1 -VolZ 0 -AtBin 8 -AlignZ 0 -SplitSum 0 -OutImod 1 -Gpu {gpu}'
+            if axis is not None:
+                cmd = f"{cmd} -TiltAxis {axis}"
             try:
                 print(f'GPU {gpu}: Running AreTomo for {tomo}')
                 ret = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
@@ -38,15 +40,16 @@ def _aretomo3_thread(tomo_list, gpu, force_align=False):
             n_done += 1
             etc = (time.time() - t_start) / n_done * (len(tomo_list) - (j + 1)) if n_done > 0 else 0
             etc_h = int(etc // 3600); etc_m = int((etc % 3600) // 60); etc_s = int(etc % 60)
-            print(f'{n_done}/{len(tomo_list)} (GPU {gpu}) - done aligning {tomo} - estimated time to completion: {etc_h}h {etc_m}m {etc_s}s')
+            print(f'{j+1}/{len(tomo_list)} (GPU {gpu}) - done aligning {tomo} - estimated time to completion: {etc_h}h {etc_m}m {etc_s}s')
     print(f'GPU {gpu} thread finished in {time.time() - t_start:.2f} seconds.')
 
 
 
-def _aretomo_dispatch(tomo_list, force_align=False):
+def _aretomo_dispatch(tomo_list, axis=None, force_align=False):
     t_start = time.time()
     tomo_dir = os.path.join('warp_tiltseries', 'tiltstack', os.path.splitext(os.path.basename(tomo_list[0]))[0])
-    print(f'Base command: \033[42m{cfg.settings["ARETOMO3_PATH"]} -InPrefix {tomo_dir}/ -InSuffix .st -OutDir {tomo_dir}/ -CorrCTF 0 -TiltCor 1 -Cmd 1 -FlipVol 1 -Serial 1 -VolZ 0 -AtBin 8 -AlignZ 0 -SplitSum 0 -OutImod 1\033[0m\n')
+    tilt_axis_tag = f"-TiltAxis {axis}" if axis is not None else ""
+    print(f'Base command: \033[42m{cfg.settings["ARETOMO3_PATH"]} -InPrefix {tomo_dir}/ -InSuffix .st -OutDir {tomo_dir}/ -CorrCTF 0 -TiltCor 1 -Cmd 1 -FlipVol 1 -Serial 1 -VolZ 0 -AtBin 8 -AlignZ 0 -SplitSum 0 -OutImod 1 {tilt_axis_tag}\033[0m\n')
 
     for t in tomo_list:
         if os.path.exists(os.path.join(t, '.lock')):
@@ -57,7 +60,7 @@ def _aretomo_dispatch(tomo_list, force_align=False):
     gpus = get_gpu_list()
     for gpu in gpus:
         for i in range(PER_DEVICE):
-            p = multiprocessing.Process(target=_aretomo3_thread, args=(tomo_list, gpu, force_align))
+            p = multiprocessing.Process(target=_aretomo3_thread, args=(tomo_list, gpu, axis, force_align))
             print(f'Launching AreTomo3 on GPU ID {gpu} (thread {i}).')
             processes.append(p)
             p.start()
@@ -123,7 +126,7 @@ def get_gpu_list():
         except:
             return []
 
-def reconstruct(frames, mdocs, apix=None, dose=None, extension=None, tomo_apix=10.0, thickness=3000, shape=None, steps='1111111', halfmaps=True, force_align=False):
+def reconstruct(frames, mdocs, apix=None, axis=None, dose=None, extension=None, tomo_apix=10.0, thickness=3000, shape=None, steps='1111111', halfmaps=True, force_align=False):
     root = os.getcwd()
     frames_path = frames if os.path.exists(frames) else os.path.join(root, frames)
     mdoc_path = mdocs if os.path.exists(mdocs) else os.path.join(root, mdocs)
@@ -167,7 +170,10 @@ def reconstruct(frames, mdocs, apix=None, dose=None, extension=None, tomo_apix=1
 
     if steps[1]:
         print(f'\n\033[96mImporting tiltseries\033[0m')
-        _run(f'WarpTools ts_import --mdocs {mdoc_path} --frameseries warp_frameseries --tilt_exposure {dose} --min_intensity 0.3 --dont_invert --output tomostar --override_axis')
+        if axis is None:
+            _run(f'WarpTools ts_import --mdocs {mdoc_path} --frameseries warp_frameseries --tilt_exposure {dose} --min_intensity 0.3 --dont_invert --output tomostar ')
+        else:
+            _run(f'WarpTools ts_import --mdocs {mdoc_path} --frameseries warp_frameseries --tilt_exposure {dose} --min_intensity 0.3 --dont_invert --output tomostar --override_axis {axis}')
 
     if steps[2]:
         print(f'\n\033[96mAssembling .st files\033[0m')
@@ -177,7 +183,7 @@ def reconstruct(frames, mdocs, apix=None, dose=None, extension=None, tomo_apix=1
     if steps[3]:
         print(f'\n\033[96mAligning with AreTomo (/public/EM/AreTomo/Aretomo)\033[0m')
         tomos = sorted([f for f in glob.glob(os.path.join(root, 'warp_tiltseries', 'tiltstack', '*')) if os.path.isdir(f)])
-        _aretomo_dispatch(tomos, force_align=force_align)
+        _aretomo_dispatch(tomos, axis=axis, force_align=force_align)
 
     if steps[4]:
         print(f'\n\033[96mOrganising alignment files\033[0m')

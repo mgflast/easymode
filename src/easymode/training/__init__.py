@@ -13,7 +13,7 @@ import os
 
 def run(method, sample_only=False, train_only=False,
         samples_per_dataset=500, box_size=96, workers=None,
-        exclude=(), flip_y_for=(),
+        exclude=(),
         epochs=100, batch_size=32, lr_start=1e-3, lr_end=1e-5,
         gpus='0,1,2,3'):
     """Sample (stage A) then fit (stage B) a denoiser for `method`.
@@ -31,8 +31,7 @@ def run(method, sample_only=False, train_only=False,
                 samples_per_dataset=samples_per_dataset,
                 box_size=box_size,
                 num_workers=workers,
-                exclude=exclude,
-                flip_y_for=flip_y_for).generate()
+                exclude=exclude).generate()
 
     if do_train:
         os.environ['CUDA_VISIBLE_DEVICES'] = gpus

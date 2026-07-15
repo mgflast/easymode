@@ -14,6 +14,7 @@ tf.config.optimizer.set_experimental_options({'layout_optimizer': False})
 TILE_SIZE = [160, 256, 256]
 OVERLAP = [48, 32, 32]
 MAX_CHUNK_SIZE = 1
+DEFAULT_TILE_SIZE = (160, 160, 160)
 
 
 def tile_volume(volume, patch_size, overlap):
@@ -104,8 +105,10 @@ def _pad_volume(volume, min_pad=16, div=32):
     return padded, tuple(pads)
 
 
-def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, model_apix=10.0, input_apix=None, model_apix_z=None, use_depth=1.0, xy_margin=0):
+def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, model_apix=10.0, input_apix=None, model_apix_z=None, use_depth=1.0, xy_margin=0, tile_size=None):
     global TILE_SIZE, OVERLAP
+    if tile_size is None:
+        tile_size = DEFAULT_TILE_SIZE
 
     # model_apix_z=None means isotropic model (apix_z == apix_xy)
     if model_apix_z is None:
@@ -164,7 +167,7 @@ def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, model_apix=10.0,
     volume, padding = _pad_volume(volume)
     segmented_volume = np.zeros((oj, ok, ol), dtype=np.float32)
 
-    TILE_SIZE = (min(256, volume.shape[0]), min(256, volume.shape[1]), min(256, volume.shape[2]))
+    TILE_SIZE = tuple(int(min(t, s)) for t, s in zip(tile_size, volume.shape))
     OVERLAP[0] = 0 if TILE_SIZE[0] == volume.shape[0] else 48
     OVERLAP[1] = 0 if TILE_SIZE[1] == volume.shape[1] else 48
     OVERLAP[2] = 0 if TILE_SIZE[2] == volume.shape[2] else 48
@@ -212,7 +215,7 @@ def save_mrc(pxd, path, data_format, voxel_size=10.0):
         m.set_data(pxd)
         m.voxel_size = voxel_size
 
-def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, batch_size, tta, overwrite, data_format, model_apix, model_apix_z=None, input_apix=None, use_depth=1.0, xy_margin=0):
+def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, batch_size, tta, overwrite, data_format, model_apix, model_apix_z=None, input_apix=None, use_depth=1.0, xy_margin=0, tile_size=None):
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
 
     for device in tf.config.list_physical_devices('GPU'):
@@ -239,7 +242,7 @@ def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, bat
                 m.voxel_size = 10.0
                 wrote_temporary = True
 
-            segmented_volume, segmented_volume_apix = segment_tomogram(model, tomogram_path, tta, batch_size, model_apix, input_apix, model_apix_z, use_depth, xy_margin)
+            segmented_volume, segmented_volume_apix = segment_tomogram(model, tomogram_path, tta, batch_size, model_apix, input_apix, model_apix_z, use_depth, xy_margin, tile_size)
 
             save_mrc(segmented_volume, output_file, data_format, segmented_volume_apix)
 
@@ -253,7 +256,9 @@ def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, bat
                 os.remove(output_file)
             print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {feature} - {os.path.basename(tomogram_path)} - ERROR: {e}")
 
-def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_size=8, overwrite=False, data_format='int8', gpus=None, data_apix=None, use_depth=1.0, xy_margin=0):
+def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_size=8, overwrite=False, data_format='int8', gpus=None, data_apix=None, use_depth=1.0, xy_margin=0, tile_size=None):
+    if tile_size is None:
+        tile_size = DEFAULT_TILE_SIZE
     if isinstance(data_directory, (list, tuple)):
         patterns = list(data_directory)
     else:
@@ -281,6 +286,7 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
         f'tta: {tta}\n'
         f'overwrite: {overwrite}\n'
         f'batch_size: {batch_size}\n'
+        f'tile_size: {tuple(tile_size)}\n'
     )
 
     # Collect tomograms from all patterns / paths
@@ -343,7 +349,8 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
                 model_apix_z,
                 data_apix,
                 use_depth,
-                xy_margin
+                xy_margin,
+                tile_size
             )
         )
         processes.append(p)

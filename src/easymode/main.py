@@ -3,6 +3,16 @@ import easymode.core.config as cfg
 import os
 
 
+def _parse_zyx(s):
+    parts = s.lower().split('x')
+    if len(parts) != 3:
+        raise argparse.ArgumentTypeError(f"tile size must be ZxYxX (e.g. 160x256x256), got {s!r}")
+    try:
+        return tuple(int(p) for p in parts)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"tile size dimensions must be integers, got {s!r}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="easymode: pretrained general networks for cellular cryoET.")
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
@@ -53,6 +63,7 @@ def main():
     reconstruct.add_argument('--frames', type=str, required=True, help="Directory containing raw frames.")
     reconstruct.add_argument('--mdocs', type=str, required=True, help="Directory containing mdocs.")
     reconstruct.add_argument('--apix', type=float, required=False, default=None, help="Pixel size of the frames in Angstrom. Leave empty to infer from mdoc.")
+    reconstruct.add_argument('--axis', type=float, required=False, default=None, help="Orientation of the tilt axis in degrees. Leave empty to infer from mdoc (often wrong with Tomo5).")
     reconstruct.add_argument('--dose', type=float, required=False, default=None, help="Dose per frame in e-/A^2. Leave empty to infer from mdoc.")
     reconstruct.add_argument('--extension', type=str, default=None, help="File extension of the frames (default: auto).")
     reconstruct.add_argument('--tomo_apix', type=float, default=10.0, help="Pixel size of the tomogram in Angstrom (default: 10.0). Easymode networks were all trained at 10.0 A/px.")
@@ -68,7 +79,7 @@ def main():
     segment.add_argument('--tta', required=False, type=int, default=4, help="Integer between 1 and 16. For values > 1, test-time augmentation is performed by averaging the predictions of several transformed versions of the input. Higher values can yield better results but increase computation time. (default: 4)")
     segment.add_argument('--output', required=False, type=str, default="segmented", help="Directory to save the output (default: ./segmented/)")
     segment.add_argument('--overwrite', action='store_true', help='If set, overwrite existing segmentations in the output directory.')
-    segment.add_argument('--batch', type=int, default=1, help='Batch size for segmentation (default 1). Volumes are processed in batches of 160x160x160 shaped tiles. In/decrease batch size depending on available GPU memory.')
+    segment.add_argument('--tile', type=_parse_zyx, default=None, help="Inference tile size as ZxYxX (default 160x160x160). Each dim is capped at the volume size. Decrease if you run out of GPU memory; only affects 3D models.")
     segment.add_argument('--format', type=str, choices=['float32', 'uint16', 'int8'], default='int8', help='Output format for the segmented volumes (default: int8).')
     segment.add_argument('--gpu', type=str, default=None, help="Comma-separated list of GPU ids to use (leave empty to use all available devices).")
     segment.add_argument('--apix', type=float, default=None, help="Override the pixel size stored in the .mrc header (in Angstrom). Use this if the pixel size is missing or incorrect. Set to 0.0 to disallow any scaling.")
@@ -101,8 +112,8 @@ def main():
     denoise = subparsers.add_parser('denoise', help='Denoise or enhance contrast of tomograms.')
     denoise.add_argument('--data', type=str, required=True, help="Directory containing tomograms to denoise.")
     denoise.add_argument('--output', type=str, required=True, help="Directory to save denoised tomograms to.")
-    denoise.add_argument('--method', type=str, choices=['n2n', 'ddw'], default='n2n',
-                         help="Denoising method (default 'n2n'). 'n2n' is the classic noise2noise model trained on even/odd half-map pairs. 'ddw' is the distilled DeepDeWedge model that also fills the missing wedge -- requires only the raw tomogram (no halves needed).")
+    denoise.add_argument('--method', type=str, choices=['n2n', 'ddw', 'iso'], default='n2n',
+                         help="Denoising method (default 'n2n'). 'n2n' is the classic noise2noise model trained on even/odd half-map pairs. 'ddw' is the distilled DeepDeWedge model that also fills the missing wedge. 'iso' is the distilled IsoNet2 student (also fills the wedge).")
     denoise.add_argument('--tta', type=int, default=1, help="Test-time augmentation factor (default 1). Higher values increase computation time. Maximum is 16.")
     denoise.add_argument('--overwrite', action='store_true', help='If set, overwrite existing denoised tomograms in the output directory.')
     denoise.add_argument('--batch', type=int, default=1, help='Batch size (default 1). Volumes are processed in batches of 128x128x128 shaped tiles.')
@@ -129,21 +140,33 @@ def main():
 
     if os.path.exists('/lmb/home/mlast/easymode_dev'):
         denoise_train = subparsers.add_parser('denoise_train',
-            description='Sample subtomograms and train a denoiser. Two stages: (1) walk datasets/ and write matched (x, y) box pairs to training/{method}/volumes_*/; (2) fit the n2n UNet on those boxes. The method picks which flavour pair to sample (n2n: even/odd; ddw: raw/ddw-corrected).')
-        denoise_train.add_argument('--method', type=str, choices=['n2n', 'ddw'], required=True,
-                                   help="Which (x, y) flavour pair to train on. 'n2n': (even, odd) -- classic noise2noise on half-map pairs. 'ddw': (raw, ddw) -- distillation from the per-dataset DDW2 teachers (requires volumes_ddw/ pool to exist; populate with training/ddw2/flatten_corrected.py).")
+            description='Sample subtomograms and train a denoiser. Two stages: (1) walk datasets/ and write matched (x, y) box pairs to training/{method}/volumes_*/; (2) fit the n2n UNet on those boxes. The method picks which flavour pair to sample (n2n: even/odd; ddw: raw/ddw-corrected; iso: raw/isonet2-corrected).')
+        denoise_train.add_argument('--method', type=str, choices=['n2n', 'ddw', 'iso'], required=True,
+                                   help="Which (x, y) flavour pair to train on. 'n2n': (even, odd) -- classic noise2noise on half-map pairs. 'ddw': (raw, ddw) -- distillation from the per-dataset DDW2 teachers (requires volumes_ddw/). 'iso': (raw, isonet2-corrected) -- distillation from the per-dataset IsoNet2 teachers in training/isonet2/per_dataset/*/corrected/; gated by training/isonet2/qa_decisions.json if present, otherwise ALL corrected tomograms are sampled.")
         denoise_train.add_argument('--sample-only', action='store_true', help="Run only the sampling stage (write boxes to training/{method}/volumes_*/) and exit.")
         denoise_train.add_argument('--train-only',  action='store_true', help="Run only the training stage; assumes boxes already exist on disk.")
         denoise_train.add_argument('--samples-per-dataset', type=int, default=500, help="Boxes per dataset (default 500, matches DDW2 per-dataset budget).")
         denoise_train.add_argument('--box-size', type=int, default=96, help="Box edge in voxels (default 96).")
         denoise_train.add_argument('--workers', type=int, default=None, help="Sampling-stage worker processes (default: min(16, n_cpus)).")
         denoise_train.add_argument('--exclude', type=str, default='', help="Comma-separated dataset names/prefixes to skip entirely (e.g. '013_DIAT,024_TAN'). Prefix-match: '013' matches '013_DIAT'.")
-        denoise_train.add_argument('--flip-y-for', type=str, default='', help="Comma-separated dataset names/prefixes whose y (target) box should be sign-flipped at sample time. For datasets whose per-dataset DDW2 teacher converged to inverted contrast.")
         denoise_train.add_argument('-e', '--epochs', type=int, default=100)
         denoise_train.add_argument('-b', '--batch_size', type=int, default=32, help="Must be divisible by n_gpus.")
         denoise_train.add_argument('-ls', '--lr_start', type=float, default=1e-3, help="Initial LR. Default kept identical to the calibrated value.")
         denoise_train.add_argument('-le', '--lr_end',   type=float, default=1e-5, help="Final LR. Default kept identical to the calibrated value.")
         denoise_train.add_argument('--gpus', type=str, default='0,1,2,3', help="Comma-separated GPU ids for the training stage (default '0,1,2,3').")
+
+    if os.path.exists('/lmb/home/mlast/easymode_dev'):
+        score_train = subparsers.add_parser('score_train', description='Train the tomogram quality scorer: a pairwise (Bradley-Terry) ranker fed your labelled pairs (pairs.csv, from `easymode score_label`) plus free synthetic-corruption pairs.')
+        score_train.add_argument('-e', '--epochs', type=int, default=40)
+        score_train.add_argument('--pairs', type=str, default=None, help="Labelled pairs CSV from `easymode score_label` (default <ROOT>/score/pairs.csv).")
+
+        score = subparsers.add_parser('score', description='Score every tomogram with a trained scorer and write the global ranking to <ROOT>/score/ranking.csv.')
+        score.add_argument('--model', type=str, default=None, help="Trained scorer directory (default <ROOT>/score/runs/scorer_best).")
+        score.add_argument('--out', type=str, default=None, help="Output ranking.csv (default <ROOT>/score/ranking.csv).")
+
+    score_label = subparsers.add_parser('score_label', help='Launch the pairwise quality labeling applet (writes <ROOT>/score/pairs.csv).')
+    score_label.add_argument('--out', type=str, default=None, help="pairs.csv path (default <ROOT>/score/pairs.csv).")
+    score_label.add_argument('--seed', type=int, default=0)
 
 
     args = parser.parse_args()
@@ -175,7 +198,6 @@ def main():
     elif args.command == 'denoise_train':
         from easymode.training import run as denoise_train_run
         excl = tuple(s.strip() for s in args.exclude.split(',') if s.strip())
-        flip = tuple(s.strip() for s in args.flip_y_for.split(',') if s.strip())
         denoise_train_run(method=args.method,
                           sample_only=args.sample_only,
                           train_only=args.train_only,
@@ -183,12 +205,20 @@ def main():
                           box_size=args.box_size,
                           workers=args.workers,
                           exclude=excl,
-                          flip_y_for=flip,
                           epochs=args.epochs,
                           batch_size=args.batch_size,
                           lr_start=args.lr_start,
                           lr_end=args.lr_end,
                           gpus=args.gpus)
+    elif args.command == 'score_train':
+        from easymode.score.train import train_model
+        train_model(pairs=args.pairs, epochs=args.epochs)
+    elif args.command == 'score':
+        from easymode.score.inference import dispatch as score_dispatch
+        score_dispatch(model=args.model, out=args.out)
+    elif args.command == 'score_label':
+        from easymode.score.label import label
+        label(out=args.out, seed=args.seed)
     elif args.command == 'tilt_train':
         from easymode.tiltfilter.train import train_model
         train_model(batch_size=args.batch_size,
@@ -230,16 +260,19 @@ def main():
                 mode = get_preferred_mode(feature)
             print(f'{feature}: using {mode.upper()} model')
             dispatch = dispatch_segment_2d if mode == '2d' else dispatch_segment_3d
-            dispatch(
+            kwargs = dict(
                 feature=feature,
                 data_directory=args.data,
                 output_directory=args.output,
                 tta=args.tta,
-                batch_size=args.batch,
+                batch_size=1,
                 overwrite=args.overwrite,
                 data_format=args.format,
                 gpus=args.gpu,
             )
+            if mode != '2d':
+                kwargs['tile_size'] = args.tile
+            dispatch(**kwargs)
     elif args.command == 'report':
         from easymode.core.reporting import report
         report(volume_path=args.tomogram,
@@ -268,6 +301,7 @@ def main():
         reconstruct(frames=args.frames,
                     mdocs=args.mdocs,
                     apix=args.apix,
+                    axis=args.axis,
                     dose=args.dose,
                     extension=args.extension,
                     tomo_apix=args.tomo_apix,

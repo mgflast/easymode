@@ -115,7 +115,9 @@ def _denoise_tomogram_instance(volume, model, batch_size):
 
 
 def denoise_tomogram(model, tomogram_path, tta=1, batch_size=2, iter=1):
-    volume = mrcfile.read(tomogram_path).astype(np.float32)
+    with mrcfile.open(tomogram_path) as m:
+        volume = m.data.astype(np.float32)
+        volume_apix = float(m.voxel_size.x)
     volume = np.pad(volume, pad_width=16, mode='reflect')
 
     # Below: all 16 combinations of right angle rotations and flips that respect the anisotropy of the data.
@@ -141,7 +143,7 @@ def denoise_tomogram(model, tomogram_path, tta=1, batch_size=2, iter=1):
         volume = denoised_volume
 
     volume = volume[16:-16, 16:-16, 16:-16]
-    return volume
+    return volume, volume_apix
 
 def save_mrc(pxd, path, data_format, voxel_size=10.0):
     if data_format == 'float32':
@@ -154,6 +156,7 @@ def save_mrc(pxd, path, data_format, voxel_size=10.0):
 METHOD_TO_WEIGHTS = {
     'n2n': 'n2n_direct',                          # noise2noise direct-input student (the deployed default)
     'ddw': 'ddw_direct',                          # distilled DeepDeWedge student (new; also fills the wedge)
+    'iso': 'iso_direct',                          # distilled IsoNet2 student (also fills the wedge; not distributed yet -- use --weights)
 }
 
 
@@ -184,8 +187,8 @@ def denoiser_thread(tomogram_list, model_path, output_dir, gpu, batch_size, tta,
                 m.set_data(-1.0 * np.ones((10, 10, 10), dtype=np.float32))
                 wrote_temporary = True
 
-            denoised_volume = denoise_tomogram(model, tomo_path, tta, batch_size, iter=iter)
-            save_mrc(denoised_volume, output_file, data_format='float32')
+            denoised_volume, volume_apix = denoise_tomogram(model, tomo_path, tta, batch_size, iter=iter)
+            save_mrc(denoised_volume, output_file, data_format='float32', voxel_size=volume_apix)
 
             etc = time.strftime('%H:%M:%S', time.gmtime((time.time() - process_start_time) / j * (len(tomogram_list) - j)))
             print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {os.path.basename(output_file)} - etc: {etc}")

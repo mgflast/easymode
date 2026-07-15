@@ -13,6 +13,7 @@ Layout assumed by the flavour resolvers:
   datasets/{dataset}/warp_tiltseries/reconstruction/odd/{stem}.mrc     (odd)
   volumes_cryocare/{stem}.mrc                                          (cryocare)
   volumes_ddw/{stem}.mrc                                               (ddw)
+  training/isonet2/per_dataset/{dataset}/corrected/_isonet2-n2n_{ARCH}_{stem}.mrc  (iso)
 
 Output layout (one directory per mode, written to ROOT/training/{mode}/):
 
@@ -30,7 +31,7 @@ Parallelism: tomograms are processed by a ProcessPoolExecutor. cephfs is
 bottlenecked on file-create metadata ops; parallelising the writes is what
 makes this finish in minutes rather than hours.
 """
-import glob, hashlib, os, random, shutil
+import glob, hashlib, os, random, shutil, time
 from concurrent.futures import ProcessPoolExecutor
 import numpy as np
 import mrcfile
@@ -40,6 +41,9 @@ ROOT = "/cephfs/mlast/compu_projects/easymode"
 if os.name == "nt":
     DEBUG = True
     ROOT = "C:/Users/Mart Last/Desktop/easymode"
+
+# arch tag baked into the IsoNet2 corrected/ filenames (must match training/isonet2/train.py ARCH)
+ISONET2_ARCH = "unet-medium"
 
 
 # ----- flavour resolvers -------------------------------------------------------
@@ -64,12 +68,18 @@ def _path_ddw(dataset, stem):
     return f"{ROOT}/volumes_ddw/{stem}.mrc"
 
 
+def _path_iso(dataset, stem):
+    return (f"{ROOT}/training/isonet2/per_dataset/{dataset}/corrected/"
+            f"_isonet2-n2n_{ISONET2_ARCH}_{stem}.mrc")
+
+
 FLAVOURS = {
     "raw":      _path_raw,
     "even":     _path_even,
     "odd":      _path_odd,
     "cryocare": _path_cryocare,
     "ddw":      _path_ddw,
+    "iso":      _path_iso,
 }
 
 
@@ -82,6 +92,11 @@ MODES = {
     # distillation of the per-dataset DDW2 teachers into one fast general student:
     # raw full tomogram -> wedge-filled, denoised target produced by `ddw refine-tomogram`.
     "ddw": ("raw", "ddw"),
+
+    # distillation of the per-dataset IsoNet2 teachers into one general student:
+    # raw full tomogram -> IsoNet2-corrected target (training/isonet2/per_dataset/*/corrected/).
+    # No per-tomogram curation here -- every tomogram with both flavours is sampled.
+    "iso": ("raw", "iso"),
 }
 
 
@@ -135,7 +150,7 @@ def _worker(task):
     boxes, write them under hash-derived filenames. Returns a (status, records)
     pair so the parent can aggregate into the manifest .star file."""
     (dataset, stem, n_samples, x_flavour, y_flavour, box_size, mode,
-     val_every, seed, flip_y) = task
+     val_every, seed) = task
 
     x_path = FLAVOURS[x_flavour](dataset, stem)
     y_path = FLAVOURS[y_flavour](dataset, stem)
@@ -161,18 +176,20 @@ def _worker(task):
             return (dataset, stem, split, 0, f"volume too small {sx}", [])
 
         coords = sample_coordinates(sx, bs, n_samples, rng)
+        # Propagate the source pixel size to the boxes: mrcfile.new() defaults voxel_size to 0,
+        # so without this the boxes carry 0 A/px. Reconstructions are 10 A/px -- fall back to that
+        # if the source header is unset.
+        apix = float(mx.voxel_size.x) or 10.0
         n_written = 0
         for (j, yy, xx) in coords:
             box_x = np.asarray(mx.data[j:j+bs, yy:yy+bs, xx:xx+bs]).astype(np.float32)
             box_y = np.asarray(my.data[j:j+bs, yy:yy+bs, xx:xx+bs]).astype(np.float32)
-            if flip_y:
-                box_y = -box_y                   # sign-flip target for datasets the user marked as inverted
             bid = _box_id(mode, dataset, stem, j, yy, xx)
             with mrcfile.new(f"{out_x}/{bid}.mrc", overwrite=True) as f:
-                f.set_data(box_x)
+                f.set_data(box_x); f.voxel_size = apix
             with mrcfile.new(f"{out_y}/{bid}.mrc", overwrite=True) as f:
-                f.set_data(box_y)
-            records.append((bid, dataset, stem, split, int(j), int(yy), int(xx), bool(flip_y)))
+                f.set_data(box_y); f.voxel_size = apix
+            records.append((bid, dataset, stem, split, int(j), int(yy), int(xx)))
             n_written += 1
     return (dataset, stem, split, n_written, None, records)
 
@@ -186,7 +203,7 @@ class Sampler:
 
     def __init__(self, mode, samples_per_dataset=500, box_size=96,
                  val_every=10, seed=42, num_workers=None,
-                 exclude=(), flip_y_for=()):
+                 exclude=()):
         if mode not in MODES:
             raise ValueError(f"unknown mode {mode!r}; known: {sorted(MODES)}")
         self.mode = mode
@@ -195,21 +212,16 @@ class Sampler:
         self.box_size = box_size
         self.val_every = val_every
         self.seed = seed
-        self.num_workers = num_workers if num_workers else min(16, os.cpu_count() or 8)
+        self.num_workers = num_workers if num_workers else min(32, os.cpu_count() or 8)
         # Datasets the user wants skipped entirely (bad teacher quality).
-        # Datasets whose y boxes should be sign-flipped (teacher learned inverted).
-        # Both lists are matched as PREFIXES: '013' matches '013_DIAT'.
+        # Matched as PREFIXES: '013' matches '013_DIAT'.
         self.exclude = tuple(s.strip() for s in exclude if s.strip())
-        self.flip_y_for = tuple(s.strip() for s in flip_y_for if s.strip())
 
     def _matches_any(self, dataset, prefixes):
         return any(dataset == p or dataset.startswith(p + "_") or dataset.startswith(p) for p in prefixes)
 
     def _should_exclude(self, dataset):
         return self._matches_any(dataset, self.exclude)
-
-    def _should_flip_y(self, dataset):
-        return self._matches_any(dataset, self.flip_y_for)
 
     def _output_root(self):
         return f"{ROOT}/training/{self.mode}"
@@ -231,7 +243,6 @@ class Sampler:
         splits or indices -- the worker decides those locally from hashes."""
         tasks = []
         for dataset, stems in inventory:
-            flip_y = self._should_flip_y(dataset)
             base, rem = divmod(self.samples_per_dataset, len(stems))
             # alphabetised so the budget distribution is deterministic across reruns
             for j, stem in enumerate(sorted(stems)):
@@ -240,7 +251,7 @@ class Sampler:
                     continue
                 tasks.append((dataset, stem, n,
                               self.x_flavour, self.y_flavour, self.box_size,
-                              self.mode, self.val_every, self.seed, flip_y))
+                              self.mode, self.val_every, self.seed))
         return tasks
 
     def generate(self):
@@ -256,8 +267,6 @@ class Sampler:
         print(f"[sampler] target {self.samples_per_dataset} boxes/dataset, box={self.box_size}")
         if self.exclude:
             print(f"[sampler] excluding datasets matching: {', '.join(self.exclude)}")
-        if self.flip_y_for:
-            print(f"[sampler] sign-flipping y for datasets matching: {', '.join(self.flip_y_for)}")
 
         inventory = list(self._enumerate_datasets())
         if not inventory:
@@ -273,14 +282,21 @@ class Sampler:
 
         all_records = []
         done = 0
+        total = len(tasks)
+        t0 = time.time()
+        step = max(1, total // 50)                       # ~50 flushed progress lines over the run
         with ProcessPoolExecutor(max_workers=self.num_workers) as ex:
             for ds, stem, split, n, err, recs in ex.map(_worker, tasks):
                 done += 1
-                if err:
-                    print(f"  [{done}/{len(tasks)}] {ds}/{stem}: SKIP ({err})")
-                else:
-                    print(f"  [{done}/{len(tasks)}] {ds}/{stem} -> {n} boxes ({split})")
                 all_records.extend(recs)
+                if err:                                  # always surface skips
+                    print(f"  SKIP [{done}/{total}] {ds}/{stem}: {err}", flush=True)
+                elif done % step == 0 or done == total:
+                    el = time.time() - t0
+                    rate = done / max(el, 1e-9)
+                    eta = (total - done) / max(rate, 1e-9)
+                    print(f"  [{done}/{total}] {done*100//total}%  {len(all_records)} boxes  "
+                          f"{rate:.1f} tomo/s  {el:.0f}s elapsed  ETA {eta:.0f}s", flush=True)
 
         # Count boxes actually on disk -- single source of truth, handles skips.
         n_train_boxes = len(glob.glob(f"{out}/volumes_training/x/*.mrc"))
@@ -298,7 +314,7 @@ class Sampler:
             return
         df = pd.DataFrame(records, columns=[
             "hash", "dataset", "tomogram", "split",
-            "z", "y", "x", "y_flipped",
+            "z", "y", "x",
         ])
         manifest = f"{out}/manifest.star"
         starfile.write(df, manifest, overwrite=True)
@@ -306,7 +322,7 @@ class Sampler:
 
 
 def generate(mode, samples_per_dataset=500, box_size=96, num_workers=None,
-             exclude=(), flip_y_for=()):
+             exclude=()):
     """Convenience entry point."""
     Sampler(mode=mode, samples_per_dataset=samples_per_dataset, box_size=box_size,
-            num_workers=num_workers, exclude=exclude, flip_y_for=flip_y_for).generate()
+            num_workers=num_workers, exclude=exclude).generate()

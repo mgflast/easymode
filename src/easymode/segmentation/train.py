@@ -20,7 +20,7 @@ if os.name == 'nt':
 
 
 class Sample:
-    FLAVOURS = ['cryocare', 'odd', 'even', 'raw', 'cryocare']
+    FLAVOURS = ['n2n', 'iso', 'ddw', 'raw']
     def __init__(self, idx, datagroup):
         self.idx = idx
         self.datagroup = datagroup
@@ -61,18 +61,21 @@ class Sample:
 
     def load(self, validation=False):
         if validation:
-            img = mrcfile.read(self.flavours['cryocare'])
+            img = mrcfile.read(self.flavours['n2n'])
             label = mrcfile.read(self.label_path)
             validity = mrcfile.read(self.validity_path)
         else:
             available_flavours = list(self.flavours.keys())
-            if 'cryocare' in available_flavours:
-                available_flavours.append('cryocare')  # double odds of selecting denoised tomo
+
             flavours = random.sample(available_flavours, 2)
             mixing_factor = random.uniform(0.0, 1.0)
 
             img_a = mrcfile.read(self.flavours[flavours[0]])
+            img_a -= np.mean(img_a)
+            img_a /= np.std(img_a) + 1e-7
             img_b = mrcfile.read(self.flavours[flavours[1]])
+            img_b -= np.mean(img_b)
+            img_b /= np.std(img_b) + 1e-7
             img = img_a * mixing_factor + img_b * (1 - mixing_factor)
 
             label = mrcfile.read(self.label_path)
@@ -189,11 +192,7 @@ class DataLoader:
         invalid_voxels_mask = validity == 0
         img[invalid_voxels_mask] = np.random.normal(img_mu, img_std, int(np.sum(invalid_voxels_mask)))  # 260227: for data sampled at large A/px, much of box has label == 2, where img == 0, throwing off batch normalization. try replacing these voxel values with noise matching valid image statistics
 
-        img = img - img_mu
-        img /= img_std + 1e-7
-
         label = label.astype(np.float32)
-
         return img, label
 
     def sample_generator(self):

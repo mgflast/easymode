@@ -154,9 +154,9 @@ def get_preferred_mode(feature):
 def load_model_weights(weights_path):
     import tensorflow as tf
     base = os.path.basename(weights_path)
-    # n2n and ddw share the same UNet architecture -- they differ only in the
+    # n2n, ddw and iso share the same UNet architecture -- they differ only in the
     # (x, y) supervision used to train them (even/odd vs raw/teacher-corrected).
-    if "n2n" in base or "ddw" in base:
+    if "n2n" in base or "ddw" in base or "iso" in base:
         from easymode.n2n.model import create
         dummy_input = tf.zeros((1, 160, 160, 160, 1))
     elif "tilt" in base:
