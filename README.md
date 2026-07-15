@@ -1,3 +1,5 @@
+![easymode](assets/easymode_banner.png)
+
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/mgflast/easymode/LICENSE.txt)
 [![Downloads](https://img.shields.io/pypi/dm/easymode)](https://pypi.org/project/easymode/)
 [![Documentation Status](https://img.shields.io/website?url=https%3A%2F%2Fmgflast.github.io%2Feasymode)](https://mgflast.github.io/easymode)
@@ -56,3 +58,10 @@ All networks were trained on a dataset of over 4000 tilt series from 50+ sources
 6. Buchholz et al., 'Content-aware image restoration for electron microscopy', IEEE (2019): https://doi.org/10.1109/ISBI.2019.8759519
 7. Wiedemann & Heckel, 'A deep learning method for simultaneous denoising and missing wedge reconstruction in cryogenic electron tomography', Nature Communications (2024): https://doi.org/10.1038/s41467-024-51438-y
 8. Last et al., 'Streamlining segmentation of cryo-electron tomography datasets with Ais', eLife (2024): https://doi.org/10.7554/eLife.98552.3
+
+## See our other tools
+
+<p align="center">
+  <a href="https://github.com/bionanopatterning/Ais"><img src="https://github.com/bionanopatterning/Ais/raw/master/docs/res/ais_banner.png" width="49%"></a>
+  <a href="https://github.com/bionanopatterning/Pom"><img src="https://github.com/bionanopatterning/Pom/raw/main/docs/res/pom_banner.png" width="49%"></a>
+</p>
