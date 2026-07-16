@@ -54,3 +54,5 @@ All networks were trained on a dataset of over 4500 tilt series from 68+ sources
   <a href="https://github.com/bionanopatterning/Ais"><img src="https://github.com/bionanopatterning/Ais/raw/master/docs/res/ais_banner.png" width="49%"></a>
   <a href="https://github.com/bionanopatterning/Pom"><img src="https://github.com/bionanopatterning/Pom/raw/main/docs/res/pom_banner.png" width="49%"></a>
 </p>
+
+Mart So-Last, 2026 | mgflast@gmail.com
