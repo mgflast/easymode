@@ -11,10 +11,15 @@ from skimage.transform import resize
 tf.get_logger().setLevel('ERROR')
 tf.config.optimizer.set_experimental_options({'layout_optimizer': False})
 
-TILE_SIZE = [160, 256, 256]
-OVERLAP = [48, 32, 32]
 MAX_CHUNK_SIZE = 1
 DEFAULT_TILE_SIZE = (160, 160, 160)
+DEFAULT_OVERLAP = 48
+
+
+def _max_overlap(tile):
+    # tiling strides by (tile - 2*overlap), so the overlap must stay below tile/2 or the stride
+    # goes <= 0 and tiling breaks. Cap at tile//3 to keep the stride at a workable >= tile/3.
+    return max(0, int(tile) // 3)
 
 
 def tile_volume(volume, patch_size, overlap):
@@ -105,10 +110,11 @@ def _pad_volume(volume, min_pad=16, div=32):
     return padded, tuple(pads)
 
 
-def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, model_apix=10.0, input_apix=None, model_apix_z=None, use_depth=1.0, xy_margin=0, tile_size=None):
-    global TILE_SIZE, OVERLAP
+def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, model_apix=10.0, input_apix=None, model_apix_z=None, use_depth=1.0, xy_margin=0, tile_size=None, overlap=None):
     if tile_size is None:
         tile_size = DEFAULT_TILE_SIZE
+    if overlap is None:
+        overlap = DEFAULT_OVERLAP
 
     # model_apix_z=None means isotropic model (apix_z == apix_xy)
     if model_apix_z is None:
@@ -167,10 +173,8 @@ def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, model_apix=10.0,
     volume, padding = _pad_volume(volume)
     segmented_volume = np.zeros((oj, ok, ol), dtype=np.float32)
 
-    TILE_SIZE = tuple(int(min(t, s)) for t, s in zip(tile_size, volume.shape))
-    OVERLAP[0] = 0 if TILE_SIZE[0] == volume.shape[0] else 48
-    OVERLAP[1] = 0 if TILE_SIZE[1] == volume.shape[1] else 48
-    OVERLAP[2] = 0 if TILE_SIZE[2] == volume.shape[2] else 48
+    tile = tuple(int(min(t, s)) for t, s in zip(tile_size, volume.shape))
+    tile_overlap = tuple(0 if tile[i] == volume.shape[i] else min(overlap, _max_overlap(tile[i])) for i in range(3))
 
     # Below: all 16 combinations of 90-degree rotations and flips that respect the anisotropy of the data.
     k_xy = [0, 2, 2, 0, 1, 3, 0, 1, 2, 3, 0, 1, 2, 3, 1, 3]
@@ -183,7 +187,7 @@ def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, model_apix=10.0,
         tta_vol = np.rot90(tta_vol, k=k_xy[j], axes=(1, 2))
         tta_vol = tta_vol if not k_fx[j] else np.flip(tta_vol, axis=1)
         tta_vol = np.rot90(tta_vol, k=2 * k_yz[j], axes=(0, 1))
-        segmented_tta_vol = _segment_tomogram_instance(tta_vol, model, batch_size, TILE_SIZE, OVERLAP)
+        segmented_tta_vol = _segment_tomogram_instance(tta_vol, model, batch_size, tile, tile_overlap)
         segmented_tta_vol = np.rot90(segmented_tta_vol, k=-2 * k_yz[j], axes=(0, 1))
         segmented_tta_vol = segmented_tta_vol if not k_fx[j] else np.flip(segmented_tta_vol, axis=1)
         segmented_tta_vol = np.rot90(segmented_tta_vol, k=-k_xy[j], axes=(1, 2))
@@ -215,7 +219,7 @@ def save_mrc(pxd, path, data_format, voxel_size=10.0):
         m.set_data(pxd)
         m.voxel_size = voxel_size
 
-def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, batch_size, tta, overwrite, data_format, model_apix, model_apix_z=None, input_apix=None, use_depth=1.0, xy_margin=0, tile_size=None):
+def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, batch_size, tta, overwrite, data_format, model_apix, model_apix_z=None, input_apix=None, use_depth=1.0, xy_margin=0, tile_size=None, overlap=None):
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
 
     for device in tf.config.list_physical_devices('GPU'):
@@ -242,7 +246,7 @@ def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, bat
                 m.voxel_size = 10.0
                 wrote_temporary = True
 
-            segmented_volume, segmented_volume_apix = segment_tomogram(model, tomogram_path, tta, batch_size, model_apix, input_apix, model_apix_z, use_depth, xy_margin, tile_size)
+            segmented_volume, segmented_volume_apix = segment_tomogram(model, tomogram_path, tta, batch_size, model_apix, input_apix, model_apix_z, use_depth, xy_margin, tile_size, overlap)
 
             save_mrc(segmented_volume, output_file, data_format, segmented_volume_apix)
 
@@ -256,9 +260,24 @@ def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, bat
                 os.remove(output_file)
             print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {feature} - {os.path.basename(tomogram_path)} - ERROR: {e}")
 
-def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_size=8, overwrite=False, data_format='int8', gpus=None, data_apix=None, use_depth=1.0, xy_margin=0, tile_size=None):
+def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_size=8, overwrite=False, data_format='int8', gpus=None, data_apix=None, use_depth=1.0, xy_margin=0, tile_size=None, overlap=None):
     if tile_size is None:
         tile_size = DEFAULT_TILE_SIZE
+    if overlap is None:
+        overlap = DEFAULT_OVERLAP
+
+    if any(t < 1 for t in tile_size):
+        print(f'Tile size {tuple(tile_size)} must be positive in every dimension! Exiting.')
+        return
+    if overlap < 0:
+        print(f'Overlap {overlap} cannot be negative! Exiting.')
+        return
+
+    capped = min(_max_overlap(t) for t in tile_size)
+    if overlap > capped:
+        print("\033[93m" + f'warning: an overlap of {overlap} is too large for a tile size of '
+              f'{tuple(tile_size)} (the tiling stride would be <= 0). Reducing the overlap to {capped}. '
+              f'Use a larger tile or a smaller overlap to avoid this.' + "\033[0m")
     if isinstance(data_directory, (list, tuple)):
         patterns = list(data_directory)
     else:
@@ -287,6 +306,7 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
         f'overwrite: {overwrite}\n'
         f'batch_size: {batch_size}\n'
         f'tile_size: {tuple(tile_size)}\n'
+        f'overlap: {overlap}\n'
     )
 
     # Collect tomograms from all patterns / paths
@@ -350,7 +370,8 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
                 data_apix,
                 use_depth,
                 xy_margin,
-                tile_size
+                tile_size,
+                overlap
             )
         )
         processes.append(p)

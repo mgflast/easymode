@@ -80,6 +80,7 @@ def main():
     segment.add_argument('--output', required=False, type=str, default="segmented", help="Directory to save the output (default: ./segmented/)")
     segment.add_argument('--overwrite', action='store_true', help='If set, overwrite existing segmentations in the output directory.')
     segment.add_argument('--tile', type=_parse_zyx, default=None, help="Inference tile size as ZxYxX (default 160x160x160). Each dim is capped at the volume size. Decrease if you run out of GPU memory; only affects 3D models.")
+    segment.add_argument('--overlap', type=int, default=None, help="Overlap between neighbouring inference tiles, in voxels (default 48). Tiles stride by (tile - 2*overlap), so the overlap is reduced automatically if it is too large for the tile size. Only affects 3D models.")
     segment.add_argument('--format', type=str, choices=['float32', 'uint16', 'int8'], default='int8', help='Output format for the segmented volumes (default: int8).')
     segment.add_argument('--gpu', type=str, default=None, help="Comma-separated list of GPU ids to use (leave empty to use all available devices).")
     segment.add_argument('--apix', type=float, default=None, help="Override the pixel size stored in the .mrc header (in Angstrom). Use this if the pixel size is missing or incorrect. Set to 0.0 to disallow any scaling.")
@@ -272,6 +273,7 @@ def main():
             )
             if mode != '2d':
                 kwargs['tile_size'] = args.tile
+                kwargs['overlap'] = args.overlap
             dispatch(**kwargs)
     elif args.command == 'report':
         from easymode.core.reporting import report
