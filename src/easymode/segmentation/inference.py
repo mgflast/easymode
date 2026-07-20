@@ -1,4 +1,4 @@
-import os, glob, time, multiprocessing, psutil
+import os, glob, time, multiprocessing, psutil, traceback
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # suppress TF C++ INFO and WARNING before import
 import tensorflow as tf
 import gc
@@ -14,6 +14,7 @@ tf.config.optimizer.set_experimental_options({'layout_optimizer': False})
 MAX_CHUNK_SIZE = 1
 DEFAULT_TILE_SIZE = (160, 160, 160)
 DEFAULT_OVERLAP = 48
+STREAMING_SEGMENTATION_MODE = "streaming-legacy-3d"
 
 
 def _max_overlap(tile):
@@ -90,13 +91,171 @@ def _segment_tile_list(tiles, model, batch_size=MAX_CHUNK_SIZE):
     return segmented_tiles
 
 
-def _segment_tomogram_instance(volume, model, batch_size, tile_size, overlap):
-    tiles, positions, original_shape = tile_volume(volume, tile_size, overlap)
-    segmented_tiles = _segment_tile_list(tiles, model, batch_size=1)
-    segmented_tiles = np.array(segmented_tiles)
-    segmented_volume = detile_volume(segmented_tiles, positions, original_shape, tile_size, overlap)
+def _streaming_geometry(original_shape, patch_size, overlap):
+    """Return the exact legacy tile geometry, with explicit validation."""
+    d, h, w = (int(v) for v in original_shape)
+    pz, py, px = (int(v) for v in patch_size)
+    oz, oy, ox = (int(v) for v in overlap)
 
-    return segmented_volume.astype(np.float32)
+    if min(d, h, w, pz, py, px) <= 0:
+        raise ValueError(
+            f"Volume and tile dimensions must be positive; "
+            f"volume={(d, h, w)}, tile={(pz, py, px)}."
+        )
+    if min(oz, oy, ox) < 0:
+        raise ValueError(
+            f"Overlap values must be non-negative; overlap={(oz, oy, ox)}."
+        )
+
+    sz, sy, sx = pz - 2 * oz, py - 2 * oy, px - 2 * ox
+    if min(sz, sy, sx) <= 0:
+        raise ValueError(
+            "Invalid 3-D segmentation tile geometry: "
+            f"tile={(pz, py, px)}, overlap={(oz, oy, ox)}, "
+            f"stride={(sz, sy, sx)}. Each active tile dimension must be "
+            "larger than twice its overlap."
+        )
+
+    boxes = (
+        max(1, (d + sz - 1) // sz),
+        max(1, (h + sy - 1) // sy),
+        max(1, (w + sx - 1) // sx),
+    )
+    return (pz, py, px), (oz, oy, ox), (sz, sy, sx), boxes
+
+
+def _extract_streaming_tile(volume, tile_buffer, position, patch_size, overlap):
+    """Fill ``tile_buffer`` exactly as legacy ``tile_volume`` filled one tile."""
+    z_pos, y_pos, x_pos = (int(v) for v in position)
+    pz, py, px = patch_size
+    oz, oy, ox = overlap
+    d, h, w = volume.shape
+
+    z_start, y_start, x_start = z_pos - oz, y_pos - oy, x_pos - ox
+    vz0, vy0, vx0 = max(0, z_start), max(0, y_start), max(0, x_start)
+    vz1 = min(d, z_start + pz)
+    vy1 = min(h, y_start + py)
+    vx1 = min(w, x_start + px)
+
+    tile_buffer.fill(0)
+    tz0, ty0, tx0 = vz0 - z_start, vy0 - y_start, vx0 - x_start
+    extracted = volume[vz0:vz1, vy0:vy1, vx0:vx1]
+    tile_buffer[
+        0,
+        tz0:tz0 + extracted.shape[0],
+        ty0:ty0 + extracted.shape[1],
+        tx0:tx0 + extracted.shape[2],
+        0,
+    ] = extracted
+    return tile_buffer
+
+
+def _prediction_as_3d(prediction, patch_size):
+    """Validate and remove the batch/channel axes from one model prediction."""
+    if hasattr(prediction, 'numpy'):
+        prediction = prediction.numpy()
+    prediction = np.asarray(prediction)
+
+    if prediction.ndim == 5:
+        if prediction.shape[0] != 1 or prediction.shape[-1] != 1:
+            raise RuntimeError(
+                f"Unexpected segmentation output shape {prediction.shape}; "
+                "expected (1, Z, Y, X, 1)."
+            )
+        prediction = prediction[0, ..., 0]
+    elif prediction.ndim == 4 and prediction.shape[-1] == 1:
+        prediction = prediction[..., 0]
+    else:
+        raise RuntimeError(
+            f"Unexpected segmentation output shape {prediction.shape}; "
+            "expected (1, Z, Y, X, 1) or (Z, Y, X, 1)."
+        )
+
+    if tuple(prediction.shape) != tuple(patch_size):
+        raise RuntimeError(
+            f"Model output spatial shape {prediction.shape} does not match "
+            f"tile shape {tuple(patch_size)}. Use tile dimensions compatible "
+            "with the model architecture."
+        )
+    if not np.isfinite(prediction).all():
+        raise RuntimeError("Model returned NaN or infinite values.")
+    return prediction
+
+
+def _segment_tomogram_instance(volume, model, batch_size, tile_size, overlap):
+    """Segment one volume with bounded tile memory and exact legacy assembly.
+
+    Tile coordinates, zero padding, one-tile model calls, central-core crop,
+    traversal order, and hard placement are identical to the legacy path. The
+    only change is that each prediction is placed immediately instead of
+    retaining every input tile and prediction for the full volume.
+    """
+    del batch_size  # The 3-D command already forces model batch size 1.
+
+    patch_size, overlap, stride, boxes = _streaming_geometry(
+        volume.shape, tile_size, overlap
+    )
+    pz, py, px = patch_size
+    oz, oy, ox = overlap
+    sz, sy, sx = stride
+    z_boxes, y_boxes, x_boxes = boxes
+    n_tiles = z_boxes * y_boxes * x_boxes
+
+    print(
+        "Streaming-legacy 3-D segmentation: "
+        f"{n_tiles} tiles; tile={patch_size}; overlap={overlap}; "
+        f"core/stride={stride}; model_batch=1.",
+        flush=True,
+    )
+
+    output = np.zeros(volume.shape, dtype=np.float32)
+    tile_buffer = np.zeros((1, pz, py, px, 1), dtype=volume.dtype)
+    report_every = max(1, (n_tiles + 19) // 20)
+    processed = 0
+
+    for zi in range(z_boxes):
+        for yi in range(y_boxes):
+            for xi in range(x_boxes):
+                position = (zi * sz, yi * sy, xi * sx)
+                _extract_streaming_tile(
+                    volume, tile_buffer, position, patch_size, overlap
+                )
+
+                prediction = _prediction_as_3d(
+                    model(tile_buffer, training=False), patch_size
+                )
+                center = prediction[
+                    oz:oz + sz,
+                    oy:oy + sy,
+                    ox:ox + sx,
+                ]
+
+                z_pos, y_pos, x_pos = position
+                z_end = min(z_pos + sz, volume.shape[0])
+                y_end = min(y_pos + sy, volume.shape[1])
+                x_end = min(x_pos + sx, volume.shape[2])
+                actual_z = z_end - z_pos
+                actual_y = y_end - y_pos
+                actual_x = x_end - x_pos
+
+                # The retained-core size equals the stride, so legacy cores do
+                # not overlap and direct placement is equivalent to out / wgt.
+                output[z_pos:z_end, y_pos:y_end, x_pos:x_end] = center[
+                    :actual_z, :actual_y, :actual_x
+                ]
+
+                processed += 1
+                if processed == n_tiles or processed % report_every == 0:
+                    print(
+                        f"Streaming-legacy progress: {processed}/{n_tiles} tiles",
+                        flush=True,
+                    )
+
+    if processed != n_tiles:
+        raise RuntimeError(
+            f"Streaming segmentation processed {processed} of {n_tiles} tiles."
+        )
+    return output
 
 def _pad_volume(volume, min_pad=16, div=32):
     j, k, l = volume.shape
@@ -229,7 +388,8 @@ def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, bat
     model = load_model(model_path)
 
     process_start_time = psutil.Process().create_time()
-    print(f'GPU {gpu} - starting inference.')
+    print(f'GPU {gpu} - starting inference.', flush=True)
+    failure_count = 0
 
     for j, tomogram_path in enumerate(tomogram_list, 1):
         tomo_name = os.path.splitext(os.path.basename(tomogram_path))[0]
@@ -256,9 +416,41 @@ def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, bat
             per_tomo = f"{avg_secs // 60:02d}:{avg_secs % 60:02d}"
             print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {feature} - {os.path.basename(tomogram_path)} - etc {eta} ({per_tomo} per tomo)")
         except Exception as e:
-            if wrote_temporary:
+            failure_count += 1
+            if wrote_temporary and os.path.exists(output_file):
                 os.remove(output_file)
-            print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {feature} - {os.path.basename(tomogram_path)} - ERROR: {e}")
+            print(
+                f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {feature} - "
+                f"{os.path.basename(tomogram_path)} - ERROR: {e}",
+                flush=True,
+            )
+            traceback.print_exc()
+
+    if failure_count:
+        raise RuntimeError(
+            f"{failure_count} tomogram(s) failed during {feature} segmentation "
+            f"on GPU {gpu}."
+        )
+
+
+def _remove_failure_placeholders(output_directory, feature):
+    """Remove only Easymode's exact 10x10x10 all-minus-one sentinels."""
+    removed = []
+    for path in glob.glob(os.path.join(output_directory, f'*__{feature}.mrc')):
+        try:
+            with mrcfile.open(path, permissive=True) as m:
+                is_placeholder = (
+                    m.data.shape == (10, 10, 10)
+                    and m.data.dtype == np.float32
+                    and np.all(m.data == -1.0)
+                )
+            if is_placeholder:
+                os.remove(path)
+                removed.append(path)
+        except Exception:
+            pass
+    return removed
+
 
 def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_size=8, overwrite=False, data_format='int8', gpus=None, data_apix=None, use_depth=1.0, xy_margin=0, tile_size=None, overlap=None):
     if tile_size is None:
@@ -307,6 +499,7 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
         f'batch_size: {batch_size}\n'
         f'tile_size: {tuple(tile_size)}\n'
         f'overlap: {overlap}\n'
+        f'inference_mode: {STREAMING_SEGMENTATION_MODE}\n'
     )
 
     # Collect tomograms from all patterns / paths
@@ -390,6 +583,30 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
             if os.path.getsize(path) < 10_000:
                 os.remove(path)
         return
+
+    worker_failures = [
+        (p.pid, p.exitcode)
+        for p in processes
+        if p.exitcode not in (0, None)
+    ]
+    if worker_failures:
+        removed = _remove_failure_placeholders(output_directory, feature)
+        descriptions = []
+        for pid, exitcode in worker_failures:
+            if exitcode < 0:
+                descriptions.append(
+                    f"PID {pid}: terminated by signal {-exitcode}"
+                )
+            else:
+                descriptions.append(f"PID {pid}: exit status {exitcode}")
+        if removed:
+            print("Removed temporary failure sentinel(s):", flush=True)
+            for path in removed:
+                print(f"  {path}", flush=True)
+        raise RuntimeError(
+            "One or more 3-D segmentation workers failed: "
+            + "; ".join(descriptions)
+        )
 
     print()
     print(f'\033[92mSegmentation finished!\033[0m')
