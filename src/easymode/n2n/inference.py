@@ -1,149 +1,227 @@
-import os, glob, time, multiprocessing, psutil
-import tensorflow as tf
 import gc
+import glob
+import multiprocessing
+import os
+import time
+import traceback
+
+os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '2')
+
 import mrcfile
 import numpy as np
-from easymode.core.distribution import get_model, load_model
+import psutil
+import tensorflow as tf
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+from easymode.core.distribution import get_model, load_model
+from easymode.n2n.streaming_legacy import (
+    iter_legacy_tile_chunks,
+    legacy_tile_count,
+    place_legacy_predictions,
+)
+
+
 tf.get_logger().setLevel('ERROR')
 tf.config.optimizer.set_experimental_options({'layout_optimizer': False})
 
 TILE_SIZE = 160
 OVERLAP = 32
-MAX_CHUNK_SIZE = 64
+DEFAULT_CHUNK_SIZE = 16
 
-def tile_volume(volume, patch_size=TILE_SIZE, overlap=OVERLAP):
-    d, h, w = volume.shape
-    stride = patch_size - 2 * overlap
 
-    z_boxes = max(1, (d + stride - 1) // stride)
-    y_boxes = max(1, (h + stride - 1) // stride)
-    x_boxes = max(1, (w + stride - 1) // stride)
+def _predict_adaptively(model, tiles, positions, batch_size):
+    """Yield predictions in order, splitting a VRAM-limited chunk as needed."""
 
-    tiles = []
-    positions = []
+    try:
+        prediction = np.asarray(
+            model.predict(tiles, verbose=0, batch_size=batch_size)
+        )
+    except tf.errors.ResourceExhaustedError:
+        number_of_tiles = int(tiles.shape[0])
+        if number_of_tiles <= 1:
+            raise
 
-    for z_idx in range(z_boxes):
-        for y_idx in range(y_boxes):
-            for x_idx in range(x_boxes):
-                z_start = z_idx * stride - overlap
-                y_start = y_idx * stride - overlap
-                x_start = x_idx * stride - overlap
+        fallback_chunk_size = max(1, number_of_tiles // 4)
+        print(
+            f"Memory error with streaming chunk size {number_of_tiles}, "
+            f"retrying in chunks of at most {fallback_chunk_size}",
+            flush=True,
+        )
+        gc.collect()
 
-                vol_z_start = max(0, z_start)
-                vol_y_start = max(0, y_start)
-                vol_x_start = max(0, x_start)
+        for start in range(0, number_of_tiles, fallback_chunk_size):
+            end = min(start + fallback_chunk_size, number_of_tiles)
+            yield from _predict_adaptively(
+                model,
+                tiles[start:end],
+                positions[start:end],
+                batch_size,
+            )
+        return
 
-                vol_z_end = min(d, z_start + patch_size)
-                vol_y_end = min(h, y_start + patch_size)
-                vol_x_end = min(w, x_start + patch_size)
+    if prediction.shape[0] != tiles.shape[0]:
+        raise RuntimeError(
+            f"model returned {prediction.shape[0]} predictions for "
+            f"{tiles.shape[0]} input tiles"
+        )
+    if not np.isfinite(prediction).all():
+        raise RuntimeError("model returned NaN or infinite values")
 
-                extracted = volume[vol_z_start:vol_z_end, vol_y_start:vol_y_end, vol_x_start:vol_x_end]
+    yield prediction, positions
 
-                tile = np.zeros((patch_size, patch_size, patch_size), dtype=volume.dtype)
 
-                tile_z_start = vol_z_start - z_start
-                tile_y_start = vol_y_start - y_start
-                tile_x_start = vol_x_start - x_start
+def _denoise_tomogram_instance(
+    volume,
+    model,
+    batch_size,
+    chunk_size=DEFAULT_CHUNK_SIZE,
+):
+    """Denoise one transformed volume with exact legacy hard-core assembly.
 
-                tile[tile_z_start:tile_z_start + extracted.shape[0],
-                tile_y_start:tile_y_start + extracted.shape[1],
-                tile_x_start:tile_x_start + extracted.shape[2]] = extracted
+    Tile extraction, zero padding, traversal order, 96^3 centre selection, and
+    edge truncation are identical to upstream Easymode.  The only change is
+    that input tiles and predictions are held in a bounded chunk and written to
+    the output immediately instead of retaining every tile for the full volume.
+    """
 
-                tiles.append(tile)
-                positions.append((z_idx * stride, y_idx * stride, x_idx * stride))
+    original_shape = tuple(int(value) for value in volume.shape)
+    number_of_tiles = legacy_tile_count(
+        original_shape,
+        patch_size=TILE_SIZE,
+        overlap=OVERLAP,
+    )
 
-    tiles = np.array(tiles)
-    tiles = np.expand_dims(tiles, axis=-1)
+    print(
+        "Streaming-legacy inference: "
+        f"{number_of_tiles} tiles; "
+        f"tile=({TILE_SIZE}, {TILE_SIZE}, {TILE_SIZE}); "
+        f"core=({TILE_SIZE - 2 * OVERLAP}, "
+        f"{TILE_SIZE - 2 * OVERLAP}, "
+        f"{TILE_SIZE - 2 * OVERLAP}); "
+        f"stride=({TILE_SIZE - 2 * OVERLAP}, "
+        f"{TILE_SIZE - 2 * OVERLAP}, "
+        f"{TILE_SIZE - 2 * OVERLAP}); "
+        f"chunk<={chunk_size}.",
+        flush=True,
+    )
 
-    return tiles, positions, volume.shape
+    denoised_volume = np.zeros(original_shape, dtype=np.float32)
+    processed = 0
+    progress_step = max(1, number_of_tiles // 20)
+    next_progress = progress_step
 
-def detile_volume(denoised_tiles, positions, original_shape, patch_size=TILE_SIZE, overlap=OVERLAP):
-    d, h, w = original_shape
-    output_volume = np.zeros((d, h, w), dtype=np.float32)
-    stride = patch_size - 2 * overlap
+    for tile_chunk, positions in iter_legacy_tile_chunks(
+        volume,
+        patch_size=TILE_SIZE,
+        overlap=OVERLAP,
+        chunk_size=chunk_size,
+    ):
+        for prediction, prediction_positions in _predict_adaptively(
+            model,
+            tile_chunk,
+            positions,
+            batch_size,
+        ):
+            place_legacy_predictions(
+                denoised_volume,
+                prediction,
+                prediction_positions,
+                patch_size=TILE_SIZE,
+                overlap=OVERLAP,
+            )
+            processed += len(prediction_positions)
 
-    if denoised_tiles.ndim == 5:
-        denoised_tiles = denoised_tiles.squeeze(-1)
+            if processed >= next_progress or processed == number_of_tiles:
+                print(
+                    f"Streaming-legacy progress: "
+                    f"{processed}/{number_of_tiles} tiles",
+                    flush=True,
+                )
+                while next_progress <= processed:
+                    next_progress += progress_step
 
-    for tile, (z_pos, y_pos, x_pos) in zip(denoised_tiles, positions):
-        center_region = tile[overlap:overlap + stride, overlap:overlap + stride, overlap:overlap + stride]
-
-        z_end = min(z_pos + stride, d)
-        y_end = min(y_pos + stride, h)
-        x_end = min(x_pos + stride, w)
-
-        actual_z = z_end - z_pos
-        actual_y = y_end - y_pos
-        actual_x = x_end - x_pos
-
-        output_volume[z_pos:z_end, y_pos:y_end, x_pos:x_end] = center_region[:actual_z, :actual_y, :actual_x]
-
-    return output_volume
-
-def _denoise_tile_list(tiles, model, batch_size=8, max_chunk_size=MAX_CHUNK_SIZE):
-    num_tiles = len(tiles)
-    denoised_tiles = []
-    for i in range(0, num_tiles, max_chunk_size):
-        chunk_end = min(i + max_chunk_size, num_tiles)
-        chunk = tiles[i:chunk_end]
-
-        try:
-            chunk_result = model.predict(chunk, verbose=0, batch_size=batch_size)
-            denoised_tiles.extend(chunk_result)
-
-        except tf.errors.ResourceExhaustedError:
-            print(f"Memory error with chunk size {len(chunk)}, falling back to smaller chunks")
-            fallback_chunk_size = max(1, len(chunk) // 4)
-            for j in range(i, chunk_end, fallback_chunk_size):
-                small_chunk = tiles[j:min(j + fallback_chunk_size, chunk_end)]
-                small_result = model.predict(small_chunk, verbose=0, batch_size=batch_size)
-                denoised_tiles.extend(small_result)
-
-    return denoised_tiles
-
-def _denoise_tomogram_instance(volume, model, batch_size):
-    tiles, positions, original_shape = tile_volume(volume)
-    denoised_tiles = _denoise_tile_list(tiles, model, batch_size=batch_size, max_chunk_size=MAX_CHUNK_SIZE)
-    denoised_tiles = np.array(denoised_tiles)
-    denoised_volume = detile_volume(denoised_tiles, positions, original_shape)
+    if processed != number_of_tiles:
+        raise RuntimeError(
+            f"processed {processed} tiles, expected {number_of_tiles}"
+        )
 
     tf.keras.backend.clear_session()
     gc.collect()
-    return denoised_volume.astype(np.float32)
+    return denoised_volume
 
 
-def denoise_tomogram(model, tomogram_path, tta=1, batch_size=2, iter=1):
+def denoise_tomogram(
+    model,
+    tomogram_path,
+    tta=1,
+    batch_size=2,
+    iter=1,
+    chunk_size=DEFAULT_CHUNK_SIZE,
+):
+    if not 1 <= int(tta) <= 16:
+        raise ValueError(f"tta must be between 1 and 16, received {tta}")
+    if int(batch_size) <= 0:
+        raise ValueError(f"batch_size must be positive, received {batch_size}")
+    if int(iter) <= 0:
+        raise ValueError(f"iter must be positive, received {iter}")
+    if int(chunk_size) <= 0:
+        raise ValueError(f"chunk_size must be positive, received {chunk_size}")
+
     with mrcfile.open(tomogram_path) as m:
         volume = m.data.astype(np.float32)
         volume_apix = float(m.voxel_size.x)
     volume = np.pad(volume, pad_width=16, mode='reflect')
 
-    # Below: all 16 combinations of right angle rotations and flips that respect the anisotropy of the data.
+    # All 16 combinations of right-angle rotations and flips that respect the
+    # anisotropy of the data.
     k_xy = [0, 2, 2, 0, 1, 3, 0, 1, 2, 3, 0, 1, 2, 3, 1, 3]
     k_fx = [0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1]
     k_yz = [0, 1, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1]
 
-    for i in range(iter):
+    for _ in range(iter):
         volume -= np.mean(volume)
         volume /= np.std(volume) + 1e-6
         denoised_volume = np.zeros_like(volume)
+
         for j in range(tta):
             tta_vol = volume.copy()
             tta_vol = np.rot90(tta_vol, k=k_xy[j], axes=(1, 2))
             tta_vol = tta_vol if not k_fx[j] else np.flip(tta_vol, axis=1)
             tta_vol = np.rot90(tta_vol, k=2 * k_yz[j], axes=(0, 1))
-            denoised_tta_vol = _denoise_tomogram_instance(tta_vol, model, batch_size)
-            denoised_tta_vol = np.rot90(denoised_tta_vol, k=-2 * k_yz[j], axes=(0, 1))
-            denoised_tta_vol = denoised_tta_vol if not k_fx[j] else np.flip(denoised_tta_vol, axis=1)
-            denoised_tta_vol = np.rot90(denoised_tta_vol, k=-k_xy[j], axes=(1, 2))
+
+            denoised_tta_vol = _denoise_tomogram_instance(
+                tta_vol,
+                model,
+                batch_size,
+                chunk_size=chunk_size,
+            )
+
+            denoised_tta_vol = np.rot90(
+                denoised_tta_vol,
+                k=-2 * k_yz[j],
+                axes=(0, 1),
+            )
+            denoised_tta_vol = (
+                denoised_tta_vol
+                if not k_fx[j]
+                else np.flip(denoised_tta_vol, axis=1)
+            )
+            denoised_tta_vol = np.rot90(
+                denoised_tta_vol,
+                k=-k_xy[j],
+                axes=(1, 2),
+            )
             denoised_volume += denoised_tta_vol
+
+            del tta_vol
+            del denoised_tta_vol
+            gc.collect()
+
         denoised_volume /= tta
         volume = denoised_volume
 
     volume = volume[16:-16, 16:-16, 16:-16]
     return volume, volume_apix
+
 
 def save_mrc(pxd, path, data_format, voxel_size=10.0):
     if data_format == 'float32':
@@ -153,30 +231,65 @@ def save_mrc(pxd, path, data_format, voxel_size=10.0):
         m.set_data(pxd)
         m.voxel_size = voxel_size
 
+
 METHOD_TO_WEIGHTS = {
-    'n2n': 'n2n_direct',                          # noise2noise direct-input student (the deployed default)
-    'ddw': 'ddw_direct',                          # distilled DeepDeWedge student (new; also fills the wedge)
-    'iso': 'iso_direct',                          # distilled IsoNet2 student (also fills the wedge; not distributed yet -- use --weights)
+    'n2n': 'n2n_direct',
+    'ddw': 'ddw_direct',
+    'iso': 'iso_direct',
 }
 
 
-def denoiser_thread(tomogram_list, model_path, output_dir, gpu, batch_size, tta, overwrite, iter):
-    os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
+def _remove_temporary_markers(output_dir):
+    """Remove only Easymode's 10^3 all-minus-one failure placeholders."""
+
+    removed = []
+    for path in glob.glob(os.path.join(output_dir, '*.mrc')):
+        try:
+            if os.path.getsize(path) > 10_000:
+                continue
+            with mrcfile.open(path, permissive=True) as m:
+                is_marker = (
+                    m.data.shape == (10, 10, 10)
+                    and m.data.dtype == np.float32
+                    and np.all(m.data == -1.0)
+                )
+            if is_marker:
+                os.remove(path)
+                removed.append(path)
+        except Exception:
+            continue
+    return removed
+
+
+def denoiser_thread(
+    tomogram_list,
+    model_path,
+    output_dir,
+    gpu,
+    batch_size,
+    tta,
+    overwrite,
+    iter,
+    chunk_size,
+):
+    os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu)
 
     for device in tf.config.list_physical_devices('GPU'):
         tf.config.experimental.set_memory_growth(device, True)
 
     process_start_time = psutil.Process().create_time()
 
-    print(f'GPU {gpu} - loading model ({model_path}).')
+    print(f'GPU {gpu} - loading model ({model_path}).', flush=True)
     model = load_model(model_path)
 
-    print(f'GPU {gpu} - starting inference.')
+    print(f'GPU {gpu} - starting inference.', flush=True)
+    failures = []
 
     for j, tomo_path in enumerate(tomogram_list, start=1):
         tomo_name = os.path.splitext(os.path.basename(tomo_path))[0]
-        output_file = os.path.join(output_dir, f"{tomo_name}.mrc")
+        output_file = os.path.join(output_dir, f'{tomo_name}.mrc')
         wrote_temporary = False
+
         try:
             if os.path.exists(output_file):
                 file_age = os.path.getmtime(output_file)
@@ -187,64 +300,162 @@ def denoiser_thread(tomogram_list, model_path, output_dir, gpu, batch_size, tta,
                 m.set_data(-1.0 * np.ones((10, 10, 10), dtype=np.float32))
                 wrote_temporary = True
 
-            denoised_volume, volume_apix = denoise_tomogram(model, tomo_path, tta, batch_size, iter=iter)
-            save_mrc(denoised_volume, output_file, data_format='float32', voxel_size=volume_apix)
+            denoised_volume, volume_apix = denoise_tomogram(
+                model,
+                tomo_path,
+                tta,
+                batch_size,
+                iter=iter,
+                chunk_size=chunk_size,
+            )
+            save_mrc(
+                denoised_volume,
+                output_file,
+                data_format='float32',
+                voxel_size=volume_apix,
+            )
 
-            etc = time.strftime('%H:%M:%S', time.gmtime((time.time() - process_start_time) / j * (len(tomogram_list) - j)))
-            print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {os.path.basename(output_file)} - etc: {etc}")
-        except Exception as e:
-            if wrote_temporary:
+            etc = time.strftime(
+                '%H:%M:%S',
+                time.gmtime(
+                    (time.time() - process_start_time)
+                    / j
+                    * (len(tomogram_list) - j)
+                ),
+            )
+            print(
+                f"{j}/{len(tomogram_list)} (on GPU {gpu}) - "
+                f"{os.path.basename(output_file)} - etc: {etc}",
+                flush=True,
+            )
+        except Exception as error:
+            failures.append((tomo_path, str(error)))
+            if wrote_temporary and os.path.exists(output_file):
                 os.remove(output_file)
-            print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {os.path.basename(output_file)} - ERROR: {e}")
+            print(
+                f"{j}/{len(tomogram_list)} (on GPU {gpu}) - "
+                f"{os.path.basename(output_file)} - ERROR: {error}",
+                flush=True,
+            )
+            traceback.print_exc()
+
+    if failures:
+        raise RuntimeError(
+            f"{len(failures)} tomogram(s) failed during denoising on GPU {gpu}"
+        )
 
 
-def dispatch(input_directory, output_directory, method='n2n', tta=1, batch_size=8, overwrite=False, iter=1, gpus="0"):
-    if output_directory == input_directory:
-        print("Please choose an output directory that is different from the input directory - we dont want to overwrite your original volumes.")
-        exit()
+def dispatch(
+    input_directory,
+    output_directory,
+    method='n2n',
+    tta=1,
+    batch_size=8,
+    overwrite=False,
+    iter=1,
+    gpus='0',
+    chunk_size=DEFAULT_CHUNK_SIZE,
+):
+    if os.path.abspath(output_directory) == os.path.abspath(input_directory):
+        raise ValueError(
+            'Please choose an output directory that is different from the '
+            'input directory; original volumes must not be overwritten.'
+        )
 
     if method not in METHOD_TO_WEIGHTS:
-        raise ValueError(f"unknown denoising method {method!r}; available: {sorted(METHOD_TO_WEIGHTS)}")
+        raise ValueError(
+            f"unknown denoising method {method!r}; "
+            f"available: {sorted(METHOD_TO_WEIGHTS)}"
+        )
+    if not 1 <= int(tta) <= 16:
+        raise ValueError(f"tta must be between 1 and 16, received {tta}")
+    if int(batch_size) <= 0:
+        raise ValueError(f"batch_size must be positive, received {batch_size}")
+    if int(iter) <= 0:
+        raise ValueError(f"iter must be positive, received {iter}")
+    if int(chunk_size) <= 0:
+        raise ValueError(f"chunk_size must be positive, received {chunk_size}")
 
     if gpus is None:
-        gpus = list(range(0, len(tf.config.list_physical_devices('GPU'))))
+        gpus = list(range(len(tf.config.list_physical_devices('GPU'))))
     else:
         gpus = [int(g) for g in gpus.split(',') if g.strip().isdigit()]
 
     if len(gpus) == 0:
-        print("\033[93m" + "warning: no GPUs detected. processing will continue, but using CPUs only!" + "\033[0m")
+        print(
+            '\033[93mwarning: no GPUs detected. Processing will continue '
+            'using CPUs only.\033[0m'
+        )
         gpus = [-1]
 
-    print(f'easymode denoise\n'
-          f'method: {method}\n'
-          f'data_directory: {input_directory}\n'
-          f'output_directory: {output_directory}\n'
-          f'gpus: {gpus}\n'
-          f'tta: {tta}\n'
-          f'overwrite: {overwrite}\n'
-          f'batch_size: {batch_size}\n')
+    print(
+        f'easymode denoise\n'
+        f'method: {method}\n'
+        f'data_directory: {input_directory}\n'
+        f'output_directory: {output_directory}\n'
+        f'inference_mode: streaming-legacy\n'
+        f'gpus: {gpus}\n'
+        f'tta: {tta}\n'
+        f'overwrite: {overwrite}\n'
+        f'batch_size: {batch_size}\n'
+        f'chunk_size: {chunk_size}\n'
+    )
 
     tomograms = sorted(glob.glob(os.path.join(input_directory, '*.mrc')))
     print(f'Found {len(tomograms)} tomograms to denoise in {input_directory}.')
 
     model_path = get_model(METHOD_TO_WEIGHTS[method])[0]
+    if model_path is None:
+        raise RuntimeError(
+            f"could not locate or download weights for {METHOD_TO_WEIGHTS[method]}"
+        )
 
     os.makedirs(output_directory, exist_ok=True)
-
     multiprocessing.set_start_method('spawn', force=True)
 
     processes = []
     for gpu in gpus:
-        p = multiprocessing.Process(target=denoiser_thread, args=(tomograms, model_path, output_directory, gpu, batch_size, tta, overwrite, iter))
-        processes.append(p)
-        p.start()
+        process = multiprocessing.Process(
+            target=denoiser_thread,
+            args=(
+                tomograms,
+                model_path,
+                output_directory,
+                gpu,
+                batch_size,
+                tta,
+                overwrite,
+                iter,
+                chunk_size,
+            ),
+        )
+        processes.append(process)
+        process.start()
         time.sleep(2)
 
-    for p in processes:
-        p.join()
+    for process in processes:
+        process.join()
 
+    failed_processes = [
+        process
+        for process in processes
+        if process.exitcode not in (0, None)
+    ]
+    if failed_processes:
+        removed = _remove_temporary_markers(output_directory)
+        for path in removed:
+            print(f'Removed temporary failure marker: {path}', flush=True)
 
-
-
-
-
+        details = []
+        for process in failed_processes:
+            if process.exitcode is not None and process.exitcode < 0:
+                details.append(
+                    f'pid={process.pid}, signal={-process.exitcode}'
+                )
+            else:
+                details.append(
+                    f'pid={process.pid}, exitcode={process.exitcode}'
+                )
+        raise RuntimeError(
+            'denoising worker failure(s): ' + ', '.join(details)
+        )
