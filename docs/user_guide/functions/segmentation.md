@@ -32,7 +32,12 @@ Optional arguments:
 --tta <int>             Test-time augmentation factor (default: 4). The model will segment multiple augmented versions of the input and average the results.
 --overwrite             If used, if output tomograms already exist in --output, they will be overwritten.
 --format                Output format for the segmented volumes. Choices are 'float32', 'uint16', or 'int8' (default).
+--tile ZxYxX            Inference tile size for 3-D models (default 160x160x160).
+--overlap <int>         Context discarded from each side of a 3-D tile (default 48; reduced automatically when required by the tile size).
+--2d / --3d             Force the 2-D or 3-D model path.
 ```
+
+For 3-D models, Easymode extracts, predicts, and reconstructs one tile at a time. This bounds host-memory use while preserving the existing tile coordinates, zero padding, retained central core, and hard placement of the legacy implementation. The Ais-backed 2-D path is unchanged.
 !!! note
     easymode uses almost exactly the same network architecture as [Membrain](https://github.com/CellArchLab/MemBrain-v2). If your hardware can handle Membrain, it should also work for easymode.
 
