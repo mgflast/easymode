@@ -117,8 +117,9 @@ def main():
                          help="Denoising method (default 'n2n'). 'n2n' is the classic noise2noise model trained on even/odd half-map pairs. 'ddw' is the distilled DeepDeWedge model that also fills the missing wedge. 'iso' is the distilled IsoNet2 student (also fills the wedge).")
     denoise.add_argument('--tta', type=int, default=1, help="Test-time augmentation factor (default 1). Higher values increase computation time. Maximum is 16.")
     denoise.add_argument('--overwrite', action='store_true', help='If set, overwrite existing denoised tomograms in the output directory.')
-    denoise.add_argument('--batch', type=int, default=1, help='Batch size (default 1). Volumes are processed in batches of 128x128x128 shaped tiles.')
+    denoise.add_argument('--batch', type=int, default=1, help='Model batch size (default 1). Denoising uses 160x160x160 tiles and preserves the original hard 96x96x96 legacy assembly.')
     denoise.add_argument('--iter', type=int, default=1, help="Number of denoising iterations (default 1). Increasing may help contrast but beware of artifacts.")
+    denoise.add_argument('--chunk-size', type=int, default=16, help='Maximum number of 160x160x160 tiles held for one streaming prediction call (default 16). Automatically reduced further after a TensorFlow memory error. This changes memory use, not tile geometry.')
     denoise.add_argument('--gpu', type=str, default=None, help="Comma-separated list of GPU ids to use (default '0').")
 
     select_tilts = subparsers.add_parser('select_tilts', help='Automatic marking of tilt images to be excluded from tomogram reconstruction')
@@ -235,7 +236,8 @@ def main():
                      batch_size=args.batch,
                      overwrite=args.overwrite,
                      iter=args.iter,
-                     gpus=args.gpu)
+                     gpus=args.gpu,
+                     chunk_size=args.chunk_size)
     elif args.command == 'select_tilts':
             import easymode.tiltfilter.inference as tiltfilter
             tiltfilter.dispatch(input_tiltstack=args.tiltstack,
