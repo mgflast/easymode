@@ -8,13 +8,16 @@ easymode denoise --data warp_tiltseries/reconstruction --output warp_tiltseries/
 
 Optional arguments:
 ```
---method {'n2n', 'ddw'}        Which pretrained network to use (default 'n2n'). See below.
+--method {'n2n', 'ddw', 'iso'} Which pretrained network to use (default 'n2n'). See below.
 --tta <int>                    Test-time augmentation factor (default: 1). When set to >1, the model denoises multiple augmented versions of the input and averages the results.
 --iter <int>                   Number of denoising iterations to perform (default: 1). The denoiser can be re-applied to its own output to enhance contrast further -- at the risk of introducing artifacts.
---batch <int>                  Batch size (default 1). Volumes are processed in batches of 128x128x128 tiles.
+--batch <int>                  Model batch size (default 1). Denoising uses 160x160x160 tiles and preserves the original hard 96x96x96 assembly.
+--chunk-size <int>             Maximum number of tiles held for one streaming prediction call (default 16). This changes memory use, not tile geometry, and is reduced automatically after a TensorFlow memory error.
 --overwrite                    If used, existing tomograms in --output are overwritten.
 --gpu <string>                 Comma-separated list of GPU ids to use (default '0').
 ```
+
+Denoising tiles are generated and reconstructed incrementally. This bounds the memory used by tile collections while preserving the original tile coordinates, zero padding, central-core crop, and hard placement of the legacy implementation.
 
 !!! note "When to train your own denoiser"
     Both n2n and wedge-inpainting models learn to adapt to the specifics of your acquisition -- in n2n's case, to the particular noise statistics; for wedge inpainting, additionally to the missing-wedge geometry and the structural priors of your sample. A single general network can only approximate this, so for optimal denoising performance you should train a new network on your own data. And because denoising is unsupervised -- there is nothing to label, only compute to spend -- the cost of going custom is just GPU time.
