@@ -328,7 +328,7 @@ Back in the Pom gallery, you can now sort the dataset by how much mitochondrion 
 ![Pom gallery sorted by mitochondrion content](../../assets/umich_pom_1.png)
 
 !!! note "Volume rendering and spinny moves"
-I recently added some features to the rendering in Pom. It now supports volume rendering as well the old as isosurface rendering, and it can generate and display .gif's with a 360 degree rotating view. I released this too late for it to be available in the workshop version of Pom, but if you want you can update the code with: `pip install --user --force-reinstall --no-deps --no-cache-dir "git+https://github.com/bionanopatterning/Pom@main"`
+I recently added some features to the rendering in Pom. It now supports volume rendering as well the old as isosurface rendering, and it can generate and display .gif's with a 360 degree rotating view. I released this too late for it to be available in the workshop version of Pom, but if you want you can update the code with: `pip install --user --force-reinstall --no-deps --no-cache-dir "git+https://github.com/mgflast/Pom@main"`
 
 #### 14. Data subsets
 
@@ -509,7 +509,7 @@ After running the `pom contextualize` command described in the Lamella surface d
   <img src="../../../assets/ais_logo.png" alt="Ais logo" style="width: 200px;">
 </p>
 
-The easymode model library currently contains models for 21 features - cells obviously contain a lot more features than that. For a non-standard protein of interest, there will probably never be a general pretrained network. Alongside other methods ([template matching](https://github.com/SBC-Utrecht/pytom-match-pick) or embedding-based tools like [TomoTwin](https://www.nature.com/articles/s41592-023-01878-z)), one option in such a scenario is to train a bespoke neural network on your own data. For this we would suggest using [Ais](https://www.github.com/bionanopatterning/Ais).
+The easymode model library currently contains models for 21 features - cells obviously contain a lot more features than that. For a non-standard protein of interest, there will probably never be a general pretrained network. Alongside other methods ([template matching](https://github.com/SBC-Utrecht/pytom-match-pick) or embedding-based tools like [TomoTwin](https://www.nature.com/articles/s41592-023-01878-z)), one option in such a scenario is to train a bespoke neural network on your own data. For this we would suggest using [Ais](https://www.github.com/mgflast/Ais).
 
 Depending on how hectic things have gotten by now in the practicals, you can either watch [this introduction video](https://www.youtube.com/watch?v=ES4tsIt-DCQ&list=PL_lGdEIRskGb5-vwuuGN9QJZxRvvl44Zd), or hopefully you ask me (Mart) and I will quickly introduce the tool and get you started.
 

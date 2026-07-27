@@ -9,7 +9,7 @@ conda activate easymode
 
 # Install packages
 pip install tensorflow==2.11.0 protobuf==3.19.0
-pip install git+https://github.com/bionanopatterning/Ais.git
+pip install git+https://github.com/mgflast/Ais.git
 pip install git+https://github.com/mgflast/easymode.git
 
 # Set up CUDA library paths (one-time setup)

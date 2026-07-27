@@ -2,13 +2,12 @@ site_name: easymode
 site_url: https://mgflast.github.io/easymode/
 repo_name: mgflast/easymode
 repo_url: https://github.com/mgflast/easymode
-copyright: copyright © 2023 - 2024
+copyright: © Mart So-Last, 2026, mgflast@gmail.com
 nav:
    - "🏠 Home":
        - index.md
        - "easymode + Ais & Pom": ais_and_pom.md
        - "easymode + Warp/RELION/M": warp_relion_m.md
-       - "easymode training data collection": training_collection.md
    - "📖 User Guide":
        - user_guide/overview.md
        - "<b>Functions</b>":
@@ -32,6 +31,8 @@ nav:
               - "9. easymode + Pom": user_guide/examples/easymode_and_pom.md
           - "🎓 Workshops":
               - "10. Michigan 2026": user_guide/examples/workshop_2026.md
+       - "<b>Ais</b>":
+          - "Overview": user_guide/ais/overview.md
        - "<b>Pom</b>":
           - user_guide/pom/installation.md
           - user_guide/pom/data_browser.md
@@ -67,6 +68,8 @@ nav:
 
    - "📜 Papers": papers.md
    - "🐞 Submit a bug": https://github.com/mgflast/easymode/issues
+   - "🐱 Ais": https://mgflast.github.io/Ais/
+   - "🤖 Pom": https://github.com/mgflast/Pom
 theme:
    name: material
    logo: assets/Logo_small.png
@@ -110,5 +113,7 @@ markdown_extensions:
       toc_depth: 5
 extra_css:
   - styles/extra.css
+extra_javascript:
+  - javascripts/banner-switch.js
 plugins:
   - search

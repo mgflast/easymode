@@ -1,6 +1,6 @@
 # Picking
 
-easymode wraps around [Ais](https://github.com/bionanopatterning/Ais) to turn segmented volumes into coordinate .star files.
+easymode wraps around [Ais](https://github.com/mgflast/Ais) to turn segmented volumes into coordinate .star files.
 
 ## Globular particles
 For approximately globular particles (such as ribosomes) use:

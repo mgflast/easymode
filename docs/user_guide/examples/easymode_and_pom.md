@@ -53,7 +53,7 @@ And you can open the app in your browser by going to either the local URL (on th
 At this point the only content in the app will be the previews of the tomograms themselves. The Gallery page will look like this:
 ![Pom gallery view](../../assets/pom_gallery.png)
 
-Click on any of the tomogram names to enter that tomogram's overview page. And you'll see the thumbnail is missing, because nothing has been segmented yet. You can already start making tomogram subsets - in this example we've included the tomogram in a subset called 'mitochondrion'. Later on, you can run particle picking or segmentation functions on the entire dataset, or on specific subsets only. If you have [Ais](https://github.com/bionanopatterning/Ais) installed, a button 'open in Ais' will be available to open the (annotated) tomogram in Ais. This can be useful is you want to improve a training dataset and are using Pom to inspect preliminary segmentation results.
+Click on any of the tomogram names to enter that tomogram's overview page. And you'll see the thumbnail is missing, because nothing has been segmented yet. You can already start making tomogram subsets - in this example we've included the tomogram in a subset called 'mitochondrion'. Later on, you can run particle picking or segmentation functions on the entire dataset, or on specific subsets only. If you have [Ais](https://github.com/mgflast/Ais) installed, a button 'open in Ais' will be available to open the (annotated) tomogram in Ais. This can be useful is you want to improve a training dataset and are using Pom to inspect preliminary segmentation results.
 ![Pom tomogram detail page](../../assets/pom_tomogram_detail.png)
 
 

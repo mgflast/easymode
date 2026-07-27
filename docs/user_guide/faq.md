@@ -42,7 +42,7 @@
 
     <b>3)</b> As much as we'd like for easymode to work every time, segmentation quality is super dependent on tomogram quality — sometimes a bit too much so. Actin segmentation, for example, is currently good when tomograms are very crisp, but can get pretty bad even for otherwise-decent-but-a-bit-on-the-high-thickness-side tomograms. As a rule of thumb: if you think you would be able to straightforwardly annotate the feature, segmentation should work, and if it doesn't that's our failure. If you yourself struggle to detect the feature, we still wish we could help, but sometimes the best way forward is to acquire clearer data. As always: no processing tricks ever beat going back to the bench and improving sample quality.
 
-    <b>4)</b> If your data is (somewhat) clear and the output is very poor, that's the most interesting case and we would love to help out — please consider [submitting a tomogram](../training_collection.md), [posting on GitHub](https://github.com/mgflast/easymode/issues), or reaching out directly (mlast@mrclmb.ac.uk).
+    <b>4)</b> If your data is (somewhat) clear and the output is very poor, that's the most interesting case and we would love to help out — please consider [submitting a tomogram](../index.md#training-data-collection), [posting on GitHub](https://github.com/mgflast/easymode/issues), or reaching out directly (mlast@mrclmb.ac.uk).
 
     !!! tip
         You can always try the alternative model — run `easymode list` to see which models are available. In many cases there is both a 3D and a 2D model. For actin, for example, the 2D model can be useful, but the downside is that the filament shape is worse: elongated in Z, making adjacent filaments overlap often.
@@ -51,7 +51,7 @@
 
     We plan to expand the model library over time, but it does take quite a bit of work to train and validate a model. We try to focus on features that are of common interest to many users — for example, we plan to add networks to segment vesicles, Golgi, and virus-like particles, features that we expect are relevant to many different projects. If the feature you would like to segment is common to many species or cell types and you have some example data, we might be able to generate a (preliminary) network for it. Please reach out!
 
-    In many cryoET projects, however, the target of interest is something very particular and a bit niche, and realistically we will never have a network for that. If you do specifically want to segment such a feature, we suggest trying out [Ais](https://github.com/bionanopatterning/Ais).
+    In many cryoET projects, however, the target of interest is something very particular and a bit niche, and realistically we will never have a network for that. If you do specifically want to segment such a feature, we suggest trying out [Ais](https://github.com/mgflast/Ais).
 
 ??? question "6. I can't download weights, because my GPU node is not connected to the internet."
 
@@ -73,7 +73,7 @@
 
 ??? question "9. Can I retrain or fine-tune a model on my own data?"
 
-    In principle the required tools are available in easymode (`easymode train`, `easymode extract`) so you could do it, but this is explicitly not what easymode was designed for. If you are interested in segmenting some specific feature for which there is no pretrained network available, we would recommend using [Ais](https://github.com/bionanopatterning/Ais) to train a bespoke network instead. You can train 2D, 2.5D, or shallow 3D networks in Ais, and training something up just for your own data is much easier than training a general network with a much larger architecture.
+    In principle the required tools are available in easymode (`easymode train`, `easymode extract`) so you could do it, but this is explicitly not what easymode was designed for. If you are interested in segmenting some specific feature for which there is no pretrained network available, we would recommend using [Ais](https://github.com/mgflast/Ais) to train a bespoke network instead. You can train 2D, 2.5D, or shallow 3D networks in Ais, and training something up just for your own data is much easier than training a general network with a much larger architecture.
 
 ??? question "10. easymode picked thousands of false positives — how do I tune the picking threshold?"
 

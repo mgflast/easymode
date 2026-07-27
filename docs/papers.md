@@ -4,11 +4,11 @@
 
 **Ais** — Iterative 2D/2.5D segmentation training for cryoET. Ais provides the interactive annotation and training workflow that we used to prepare easymode's training labels at scale. If easymode doesn't cover your feature of interest, Ais is the tool to train your own network.
 
-- Last et al. (2024) *Streamlining segmentation of cryo-electron tomography datasets with Ais* eLife. [Paper](https://elifesciences.org/articles/98552) · [GitHub](https://github.com/bionanopatterning/Ais)
+- Last et al. (2024) *Streamlining segmentation of cryo-electron tomography datasets with Ais* eLife. [Paper](https://elifesciences.org/articles/98552) · [GitHub](https://github.com/mgflast/Ais)
 
 **Pom** — Dataset-scale visualization for segmented cryoET data. After segmenting with easymode or Ais, Pom turns a large dataset into a searchable, browsable collection and helps with particle contextualization and filtering.
 
-- Last et al. (2025). *Scaling data analyses in cellular cryoET using comprehensive segmentation* bioRxiv. [Paper](https://www.biorxiv.org/content/10.1101/2025.01.16.633326v1) · [GitHub](https://github.com/bionanopatterning/Pom)
+- Last et al. (2025). *Scaling data analyses in cellular cryoET using comprehensive segmentation* bioRxiv. [Paper](https://www.biorxiv.org/content/10.1101/2025.01.16.633326v1) · [GitHub](https://github.com/mgflast/Pom)
 
 ## Related tools we like
 
