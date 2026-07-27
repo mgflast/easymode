@@ -239,14 +239,13 @@ class DataLoader:
 def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, lr_end=1e-5, weights_path=None, bce_weight=0.3, dice_weight=0.7, arch='unet-membrain-groupnorm', crop_shape=(160, 160, 160)):
     import json
     from easymode.segmentation.models import get_arch, resolve_arch
+    from easymode.segmentation.metrics import MaskedPrecision, MaskedRecall
 
     arch = resolve_arch(arch)
     m = get_arch(arch)['module']
     create = m.create
     masked_bce_loss = m.masked_bce_loss
     masked_dice_loss = m.masked_dice_loss
-    masked_precision = m.masked_precision
-    masked_recall = m.masked_recall
     masked_dice = m.masked_dice
 
     crop_shape = tuple(crop_shape)
@@ -262,7 +261,9 @@ def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, 
 
     with tf.distribute.MirroredStrategy().scope():
         model = create()
-        model.compile(optimizer=model.optimizer, loss=combined_loss, metrics=[masked_precision, masked_recall, masked_bce_loss, masked_dice], run_eagerly=False)
+        # Streaming, dataset-level precision/recall (threshold 0.5) for every arch; bce/dice stay arch-specific.
+        eval_metrics = [MaskedPrecision(name='masked_precision'), MaskedRecall(name='masked_recall'), masked_bce_loss, masked_dice]
+        model.compile(optimizer=model.optimizer, loss=combined_loss, metrics=eval_metrics, run_eagerly=False)
         if weights_path is not None:
             dummy = tf.zeros((1, cz, cy, cx, 1))
             model(dummy)
@@ -271,7 +272,10 @@ def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, 
                 if weights_path is None:
                     raise ValueError(f'No checkpoint found in {weights_path}')
             model.load_weights(weights_path)
-    model.optimizer.learning_rate.assign(lr_start)
+    if hasattr(m, 'lr_schedule'):
+        model.optimizer.learning_rate.assign(m.lr_schedule(0, epochs))
+    else:
+        model.optimizer.learning_rate.assign(lr_start)
 
     # data loaders
     training_ds, training_steps = DataLoader(features, batch_size=batch_size, validation=False, crop_shape=crop_shape).as_generator(batch_size=batch_size)
@@ -294,8 +298,13 @@ def train_model(title='', features='', batch_size=8, epochs=100, lr_start=1e-3, 
                                                              mode='min',
                                                              verbose=1)
 
-    def lr_decay(epoch, _):
-        return float(lr_start + (lr_end - lr_start) * (epoch / epochs))
+    if hasattr(m, 'lr_schedule'):
+        # Arch owns its LR schedule (e.g. nnU-Net PolyLR); CLI lr_start/lr_end ignored.
+        def lr_decay(epoch, _):
+            return m.lr_schedule(epoch, epochs)
+    else:
+        def lr_decay(epoch, _):
+            return float(lr_start + (lr_end - lr_start) * (epoch / epochs))
 
     cb_lr = tf.keras.callbacks.LearningRateScheduler(lr_decay, verbose=1)
 

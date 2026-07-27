@@ -24,10 +24,10 @@ def main():
         train_parser.add_argument('-e', "--epochs", type=int, help="Number of epochs to train for (default 200).", default=200)
         train_parser.add_argument('-b', "--batch_size", type=int, help="Batch size for training (default 8).", default=8)
         train_parser.add_argument('-ls', "--lr_start", type=float, help="Initial learning rate for the optimizer (default 5e-3).", default=5e-3)
-        train_parser.add_argument('-le', "--lr_end", type=float, help="Final learning rate for the optimizer (default 5e-5).", default=5e-5)
+        train_parser.add_argument('-le', "--lr_end", type=float, help="Final learning rate for the optimizer (default 5e-4).", default=5e-4)
         train_parser.add_argument('--weights', type=str, default=None, help="Path to a .h5 weights file to initialize training from.")
-        train_parser.add_argument('--bce', type=float, default=0.3, help="Weight of the BCE component of the loss (default 0.3). Set to 1.0 and --dice 0.0 for BCE-only training.")
-        train_parser.add_argument('--dice', type=float, default=0.7, help="Weight of the dice component of the loss (default 0.7). Set to 0.0 for BCE-only training.")
+        train_parser.add_argument('--bce', type=float, default=1.0, help="Weight of the BCE component of the loss (default 1.0).")
+        train_parser.add_argument('--dice', type=float, default=1.0, help="Weight of the dice component of the loss (default 1.0).")
         from easymode.segmentation.models import list_archs
         train_parser.add_argument('--arch', type=str, default='unet-membrain-groupnorm', choices=list_archs(), help="Network architecture. Default: unet-membrain-groupnorm.")
         def _parse_size(s):
