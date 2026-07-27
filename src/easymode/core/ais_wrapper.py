@@ -114,10 +114,14 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
 
     patterns = data_directory if isinstance(data_directory, (list, tuple)) else [data_directory]
 
-    # collect tomograms from dirs/files/patterns
+    # collect tomograms from dirs/files/patterns/.txt subset files
     tomograms = []
     for p in patterns:
-        if os.path.isdir(p):
+        if p.endswith('.txt') and os.path.isfile(p):
+            # .txt file with one tomogram path per line (e.g. a pom subset)
+            with open(p) as fh:
+                tomograms.extend(line.strip() for line in fh if line.strip())
+        elif os.path.isdir(p):
             tomograms.extend(glob.glob(os.path.join(p, '*.mrc')))
         else:
             tomograms.extend(glob.glob(p))
