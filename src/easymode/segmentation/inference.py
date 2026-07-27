@@ -11,7 +11,6 @@ from skimage.transform import resize
 tf.get_logger().setLevel('ERROR')
 tf.config.optimizer.set_experimental_options({'layout_optimizer': False})
 
-MAX_CHUNK_SIZE = 1
 DEFAULT_TILE_SIZE = (160, 160, 160)
 DEFAULT_OVERLAP = 48
 
@@ -22,8 +21,14 @@ def _max_overlap(tile):
     return max(0, int(tile) // 3)
 
 
-def tile_volume(volume, patch_size, overlap):
-    (pz, py, px) = patch_size; (oz, oy, ox) = overlap
+def _segment_tomogram_instance(volume, model, batch_size, tile_size, overlap):
+    # Stream one tile at a time: the tomogram stays in RAM but tiles/predictions
+    # are never all materialised at once. Geometry, zero-padding, central-core crop
+    # and hard placement are identical to the previous tile/detile behaviour (the
+    # cores stride by their own size, so they never overlap). batch_size is ignored;
+    # the 3-D path always runs one tile per model call.
+    (pz, py, px) = tile_size
+    (oz, oy, ox) = overlap
     d, h, w = volume.shape
     sz, sy, sx = pz - 2*oz, py - 2*oy, px - 2*ox
 
@@ -31,72 +36,27 @@ def tile_volume(volume, patch_size, overlap):
     y_boxes = max(1, (h + sy - 1) // sy)
     x_boxes = max(1, (w + sx - 1) // sx)
 
-    tiles, positions = [], []
+    out = np.zeros((d, h, w), dtype=np.float32)
     for zi in range(z_boxes):
         for yi in range(y_boxes):
             for xi in range(x_boxes):
-                z_start = zi*sz - oz; y_start = yi*sy - oy; x_start = xi*sx - ox
-                vz0 = max(0, z_start); vy0 = max(0, y_start); vx0 = max(0, x_start)
+                z_pos, y_pos, x_pos = zi*sz, yi*sy, xi*sx
+                z_start, y_start, x_start = z_pos - oz, y_pos - oy, x_pos - ox
+                vz0, vy0, vx0 = max(0, z_start), max(0, y_start), max(0, x_start)
                 vz1 = min(d, z_start + pz); vy1 = min(h, y_start + py); vx1 = min(w, x_start + px)
-                extracted = volume[vz0:vz1, vy0:vy1, vx0:vx1]
 
                 tile = np.zeros((pz, py, px), dtype=volume.dtype)
-                tz0 = vz0 - z_start; ty0 = vy0 - y_start; tx0 = vx0 - x_start
+                tz0, ty0, tx0 = vz0 - z_start, vy0 - y_start, vx0 - x_start
+                extracted = volume[vz0:vz1, vy0:vy1, vx0:vx1]
                 tile[tz0:tz0+extracted.shape[0], ty0:ty0+extracted.shape[1], tx0:tx0+extracted.shape[2]] = extracted
-                tiles.append(tile)
-                positions.append((zi*sz, yi*sy, xi*sx))
 
-    tiles = np.expand_dims(np.array(tiles), axis=-1)
-    return tiles, positions, volume.shape
+                prediction = model(tile[None, ..., None], training=False).numpy()[0, ..., 0]
 
-def detile_volume(segmented_tiles, positions, original_shape, patch_size, overlap):
-    (pz, py, px) = patch_size; (oz, oy, ox) = overlap
-    d, h, w = original_shape
-    sz, sy, sx = pz - 2*oz, py - 2*oy, px - 2*ox
+                center = prediction[oz:oz+sz, oy:oy+sy, ox:ox+sx]
+                z_end = min(z_pos+sz, d); y_end = min(y_pos+sy, h); x_end = min(x_pos+sx, w)
+                out[z_pos:z_end, y_pos:y_end, x_pos:x_end] = center[:z_end-z_pos, :y_end-y_pos, :x_end-x_pos]
 
-    out = np.zeros((d, h, w), dtype=np.float32)
-    wgt = np.zeros((d, h, w), dtype=np.float32)
-    if segmented_tiles.ndim == 5: segmented_tiles = segmented_tiles.squeeze(-1)
-
-    for tile, (z_pos, y_pos, x_pos) in zip(segmented_tiles, positions):
-        center = tile[oz:oz+sz, oy:oy+sy, ox:ox+sx]
-        z_end = min(z_pos+sz, d); y_end = min(y_pos+sy, h); x_end = min(x_pos+sx, w)
-        az, ay, ax = z_end - z_pos, y_end - y_pos, x_end - x_pos
-        out[z_pos:z_end, y_pos:y_end, x_pos:x_end] += center[:az, :ay, :ax]
-        wgt[z_pos:z_end, y_pos:y_end, x_pos:x_end] += 1.0
-
-    wgt[wgt == 0] = 1.0
-    return out / wgt
-
-def _segment_tile_list(tiles, model, batch_size=MAX_CHUNK_SIZE):
-    num_tiles = len(tiles)
-    segmented_tiles = []
-    for i in range(0, num_tiles, batch_size):
-        chunk = tiles[i:i + batch_size]
-
-        try:
-            chunk_result = model(chunk, training=False).numpy()
-            segmented_tiles.extend(chunk_result)
-
-        except tf.errors.ResourceExhaustedError:
-            if batch_size == 1:
-                raise
-            print(f"Memory error with batch size {len(chunk)}, falling back to single tiles")
-            for j in range(len(chunk)):
-                single = chunk[j:j + 1]
-                single_result = model(single, training=False).numpy()
-                segmented_tiles.extend(single_result)
-
-    return segmented_tiles
-
-
-def _segment_tomogram_instance(volume, model, batch_size, tile_size, overlap):
-    tiles, positions, original_shape = tile_volume(volume, tile_size, overlap)
-    segmented_tiles = _segment_tile_list(tiles, model, batch_size=1)
-    segmented_tiles = np.array(segmented_tiles)
-    segmented_volume = detile_volume(segmented_tiles, positions, original_shape, tile_size, overlap)
-
-    return segmented_volume.astype(np.float32)
+    return out.astype(np.float32)
 
 def _pad_volume(volume, min_pad=16, div=32):
     j, k, l = volume.shape

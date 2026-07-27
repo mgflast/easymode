@@ -11,107 +11,47 @@ tf.config.optimizer.set_experimental_options({'layout_optimizer': False})
 
 TILE_SIZE = 160
 OVERLAP = 32
-MAX_CHUNK_SIZE = 64
 
-def tile_volume(volume, patch_size=TILE_SIZE, overlap=OVERLAP):
-    d, h, w = volume.shape
+def _denoise_tomogram_instance(volume, model, batch_size):
+    # Stream one tile at a time: the tomogram stays in RAM but tiles/predictions
+    # are never all materialised at once. Geometry, zero-padding, central-core crop
+    # and hard placement are identical to the previous tile/detile behaviour (the
+    # cores stride by their own size, so they never overlap). batch_size is ignored;
+    # denoising always runs one tile per model call.
+    patch_size, overlap = TILE_SIZE, OVERLAP
     stride = patch_size - 2 * overlap
+    d, h, w = volume.shape
 
     z_boxes = max(1, (d + stride - 1) // stride)
     y_boxes = max(1, (h + stride - 1) // stride)
     x_boxes = max(1, (w + stride - 1) // stride)
 
-    tiles = []
-    positions = []
-
+    output_volume = np.zeros((d, h, w), dtype=np.float32)
     for z_idx in range(z_boxes):
         for y_idx in range(y_boxes):
             for x_idx in range(x_boxes):
-                z_start = z_idx * stride - overlap
-                y_start = y_idx * stride - overlap
-                x_start = x_idx * stride - overlap
+                z_pos, y_pos, x_pos = z_idx * stride, y_idx * stride, x_idx * stride
+                z_start, y_start, x_start = z_pos - overlap, y_pos - overlap, x_pos - overlap
 
-                vol_z_start = max(0, z_start)
-                vol_y_start = max(0, y_start)
-                vol_x_start = max(0, x_start)
-
-                vol_z_end = min(d, z_start + patch_size)
-                vol_y_end = min(h, y_start + patch_size)
-                vol_x_end = min(w, x_start + patch_size)
-
-                extracted = volume[vol_z_start:vol_z_end, vol_y_start:vol_y_end, vol_x_start:vol_x_end]
+                vz0, vy0, vx0 = max(0, z_start), max(0, y_start), max(0, x_start)
+                vz1 = min(d, z_start + patch_size)
+                vy1 = min(h, y_start + patch_size)
+                vx1 = min(w, x_start + patch_size)
 
                 tile = np.zeros((patch_size, patch_size, patch_size), dtype=volume.dtype)
+                tz0, ty0, tx0 = vz0 - z_start, vy0 - y_start, vx0 - x_start
+                extracted = volume[vz0:vz1, vy0:vy1, vx0:vx1]
+                tile[tz0:tz0 + extracted.shape[0], ty0:ty0 + extracted.shape[1], tx0:tx0 + extracted.shape[2]] = extracted
 
-                tile_z_start = vol_z_start - z_start
-                tile_y_start = vol_y_start - y_start
-                tile_x_start = vol_x_start - x_start
+                prediction = model(tile[None, ..., None], training=False).numpy()[0, ..., 0]
 
-                tile[tile_z_start:tile_z_start + extracted.shape[0],
-                tile_y_start:tile_y_start + extracted.shape[1],
-                tile_x_start:tile_x_start + extracted.shape[2]] = extracted
-
-                tiles.append(tile)
-                positions.append((z_idx * stride, y_idx * stride, x_idx * stride))
-
-    tiles = np.array(tiles)
-    tiles = np.expand_dims(tiles, axis=-1)
-
-    return tiles, positions, volume.shape
-
-def detile_volume(denoised_tiles, positions, original_shape, patch_size=TILE_SIZE, overlap=OVERLAP):
-    d, h, w = original_shape
-    output_volume = np.zeros((d, h, w), dtype=np.float32)
-    stride = patch_size - 2 * overlap
-
-    if denoised_tiles.ndim == 5:
-        denoised_tiles = denoised_tiles.squeeze(-1)
-
-    for tile, (z_pos, y_pos, x_pos) in zip(denoised_tiles, positions):
-        center_region = tile[overlap:overlap + stride, overlap:overlap + stride, overlap:overlap + stride]
-
-        z_end = min(z_pos + stride, d)
-        y_end = min(y_pos + stride, h)
-        x_end = min(x_pos + stride, w)
-
-        actual_z = z_end - z_pos
-        actual_y = y_end - y_pos
-        actual_x = x_end - x_pos
-
-        output_volume[z_pos:z_end, y_pos:y_end, x_pos:x_end] = center_region[:actual_z, :actual_y, :actual_x]
-
-    return output_volume
-
-def _denoise_tile_list(tiles, model, batch_size=8, max_chunk_size=MAX_CHUNK_SIZE):
-    num_tiles = len(tiles)
-    denoised_tiles = []
-    for i in range(0, num_tiles, max_chunk_size):
-        chunk_end = min(i + max_chunk_size, num_tiles)
-        chunk = tiles[i:chunk_end]
-
-        try:
-            chunk_result = model.predict(chunk, verbose=0, batch_size=batch_size)
-            denoised_tiles.extend(chunk_result)
-
-        except tf.errors.ResourceExhaustedError:
-            print(f"Memory error with chunk size {len(chunk)}, falling back to smaller chunks")
-            fallback_chunk_size = max(1, len(chunk) // 4)
-            for j in range(i, chunk_end, fallback_chunk_size):
-                small_chunk = tiles[j:min(j + fallback_chunk_size, chunk_end)]
-                small_result = model.predict(small_chunk, verbose=0, batch_size=batch_size)
-                denoised_tiles.extend(small_result)
-
-    return denoised_tiles
-
-def _denoise_tomogram_instance(volume, model, batch_size):
-    tiles, positions, original_shape = tile_volume(volume)
-    denoised_tiles = _denoise_tile_list(tiles, model, batch_size=batch_size, max_chunk_size=MAX_CHUNK_SIZE)
-    denoised_tiles = np.array(denoised_tiles)
-    denoised_volume = detile_volume(denoised_tiles, positions, original_shape)
+                center = prediction[overlap:overlap + stride, overlap:overlap + stride, overlap:overlap + stride]
+                z_end = min(z_pos + stride, d); y_end = min(y_pos + stride, h); x_end = min(x_pos + stride, w)
+                output_volume[z_pos:z_end, y_pos:y_end, x_pos:x_end] = center[:z_end - z_pos, :y_end - y_pos, :x_end - x_pos]
 
     tf.keras.backend.clear_session()
     gc.collect()
-    return denoised_volume.astype(np.float32)
+    return output_volume.astype(np.float32)
 
 
 def denoise_tomogram(model, tomogram_path, tta=1, batch_size=2, iter=1):
