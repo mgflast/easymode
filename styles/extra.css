@@ -1,0 +1,57 @@
+/* Make bold nav section headers darker */
+.md-nav__link b {
+    color: var(--md-default-fg-color);
+    font-weight: 700;
+}
+
+/* Individual tutorial items (3+ levels deep): smaller and italic */
+.md-nav__item--nested .md-nav__item--nested .md-nav__item--nested .md-nav__item:not(.md-nav__item--nested) > .md-nav__link {
+    font-size: 0.9em;
+}
+
+/* Header text/icons are dark because the header uses a light banner background. */
+[data-md-color-scheme="default"] {
+    --md-primary-bg-color:        rgba(0, 0, 0, 0.85);
+    --md-primary-bg-color--light: rgba(0, 0, 0, 0.54);
+}
+
+/* Header background: a light bokeh strip instead of the solid green bar.
+   background-attachment: fixed + background-size: 100% auto makes the header bar and
+   the tabs bar show one continuous slice. easymode banner by default; the Pom banner
+   when viewing the Pom docs section (body gets .pom-docs from banner-switch.js). */
+.md-header,
+.md-tabs {
+    background-color: #eaf1e6;
+    background-image: linear-gradient(rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.15)),
+                      url("../assets/easymode_header.png");
+    background-size: 100% auto;
+    background-position: center top;
+    background-attachment: fixed;
+}
+
+body.pom-docs .md-header,
+body.pom-docs .md-tabs {
+    background-color: #f6efe6;
+    background-image: linear-gradient(rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.15)),
+                      url("../assets/pom_header.png");
+}
+
+/* Push the tool links (the last two tabs) to the far right of the tabs bar */
+.md-tabs__list {
+    width: 100%;
+}
+.md-tabs__item:nth-last-child(2) {
+    margin-left: auto;
+}
+
+/* Hide the auto-injected page-title heading (the site name) on the home page */
+body.home .md-content__inner > h1:first-of-type {
+    display: none;
+}
+
+/* Narrower content column on the home page (where the nav sidebar is hidden) */
+body.home .md-content {
+    max-width: 42rem;
+    margin-left: auto;
+    margin-right: auto;
+}
