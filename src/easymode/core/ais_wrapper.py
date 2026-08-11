@@ -10,9 +10,10 @@ def _run(cmd, capture=False):
         exit()
     return ret.stdout
 
-def pick(data_directory, target, output_directory, threshold, spacing, size, binning=2, tomostar=True, filament=False, per_filament_star_file=False, filament_length=500, centroid=False, min_particles=0, rotation_per_sample=0.0, subset=None):
+def pick(data_directory, target, output_directory, threshold, spacing, size, binning=2, tomostar=True, filament=False, per_filament_star_file=False, filament_length=500, centroid=False, min_particles=0, rotation_per_sample=0.0, subset=None, processes=None):
     if output_directory is None:
         output_directory = f'coordinates/{target}'
+    n_processes = cpu_count() if processes is None else processes
 
     print(f'easymode pick\n'
           f'feature: {target}\n'
@@ -24,14 +25,14 @@ def pick(data_directory, target, output_directory, threshold, spacing, size, bin
           f'spacing: {spacing} Å\n'
           f'size: {size} Å^3\n'
           f'binning: {binning}\n'
-          f'n_processes: {cpu_count()}\n'
+          f'n_processes: {n_processes}\n'
           f'rename to .tomostar: {tomostar}\n'
           f'per_filament_star_file: {per_filament_star_file}\n'
           f'filament_length: {filament_length} Å\n'
           f'rotation_per_sample: {rotation_per_sample} degrees\n'
           f'centroid: {centroid}\n')
 
-    command = f'ais pick -t {target} -d {data_directory} -ou {output_directory} -threshold {threshold} -spacing {spacing} -size {size} -b {binning} -p {cpu_count()} -min-particles {min_particles}'
+    command = f'ais pick -t {target} -d {data_directory} -ou {output_directory} -threshold {threshold} -spacing {spacing} -size {size} -b {binning} -p {n_processes} -min-particles {min_particles}'
     if filament:
         command += f' -filament -length {filament_length} --twist {rotation_per_sample}'
     if centroid:

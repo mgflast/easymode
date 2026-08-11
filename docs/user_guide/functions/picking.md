@@ -31,6 +31,7 @@ Arguments:
 --no_tomostar           Include this flag in order NOT to convert Warp-style tomogram names (tomogram_10.00Apx.mrc) into Warp-style tomogram starfile names (tomogram.tomostar). 
 --centroid              Include this flag in order to pick the centroid of connected components, rather than maxima in the distance transform. Useful for irregularly shaped particles. Use only if individual particles are well separated in the segmentation!
 --min_particles <int>   Save .star files only for tomograms containing at least this number of particles.   
+--processes <int>       Number of parallel Ais picking processes (default: detected CPU count).
 ```
 
 !!! note
