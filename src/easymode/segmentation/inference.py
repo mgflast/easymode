@@ -1,4 +1,4 @@
-import os, glob, time, multiprocessing, psutil
+import os, sys, glob, time, atexit, signal, multiprocessing, psutil
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # suppress TF C++ INFO and WARNING before import
 import tensorflow as tf
 import gc
@@ -6,13 +6,47 @@ from tensorflow.keras import mixed_precision
 import mrcfile
 import numpy as np
 from easymode.core.distribution import get_model, load_model
+from easymode.segmentation.normalization import global_stats, NORM_GLOBAL_STD, NORM_GLOBAL_MAD, NORM_LOCAL
 from skimage.transform import resize
 
 tf.get_logger().setLevel('ERROR')
 tf.config.optimizer.set_experimental_options({'layout_optimizer': False})
 
-DEFAULT_TILE_SIZE = (160, 160, 160)
-DEFAULT_OVERLAP = 48
+DEFAULT_TILE_SIZE = (160, 256, 256)  # (Z, Y, X); capped per-axis to the volume dims at tiling time
+DEFAULT_OVERLAP = 24
+
+
+_PLACEHOLDER_BYTES = 8192   # the 10x10x10 claim file is ~5 kB; a real segmentation is megabytes
+_claimed_outputs = set()    # claim files THIS process wrote and has not yet overwritten with real data
+
+
+def _claim_output(path):
+    _claimed_outputs.add(path)
+
+
+def _release_output(path):
+    _claimed_outputs.discard(path)
+
+
+def _drop_claimed_outputs():
+    """Remove the claim files this process is still holding, on cancellation. Only its own: sibling
+    jobs on other nodes segment into the same directory, and their claim files mark tomograms they
+    are still working on. The size check keeps a just-finished real segmentation safe."""
+    for path in list(_claimed_outputs):
+        _claimed_outputs.discard(path)
+        try:
+            if os.path.getsize(path) <= _PLACEHOLDER_BYTES:
+                os.remove(path)
+        except OSError:
+            pass
+
+
+def _install_claim_cleanup():
+    atexit.register(_drop_claimed_outputs)
+    try:   # terminate() / scancel would otherwise skip atexit and leak the claim file
+        signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))
+    except (ValueError, OSError):
+        pass
 
 
 def _max_overlap(tile):
@@ -21,7 +55,7 @@ def _max_overlap(tile):
     return max(0, int(tile) // 3)
 
 
-def _segment_tomogram_instance(volume, model, batch_size, tile_size, overlap):
+def _segment_tomogram_instance(volume, model, batch_size, tile_size, overlap, normalize_tiles=False):
     # Stream one tile at a time: the tomogram stays in RAM but tiles/predictions
     # are never all materialised at once. Geometry, zero-padding, central-core crop
     # and hard placement are identical to the previous tile/detile behaviour (the
@@ -50,6 +84,10 @@ def _segment_tomogram_instance(volume, model, batch_size, tile_size, overlap):
                 extracted = volume[vz0:vz1, vy0:vy1, vx0:vx1]
                 tile[tz0:tz0+extracted.shape[0], ty0:ty0+extracted.shape[1], tx0:tx0+extracted.shape[2]] = extracted
 
+                if normalize_tiles:
+                    _c, _s = global_stats(tile)
+                    tile = (tile - _c) / _s
+
                 prediction = model(tile[None, ..., None], training=False).numpy()[0, ..., 0]
 
                 center = prediction[oz:oz+sz, oy:oy+sy, ox:ox+sx]
@@ -70,7 +108,7 @@ def _pad_volume(volume, min_pad=16, div=32):
     return padded, tuple(pads)
 
 
-def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, model_apix=10.0, input_apix=None, model_apix_z=None, use_depth=1.0, xy_margin=0, tile_size=None, overlap=None):
+def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, model_apix=10.0, input_apix=None, model_apix_z=None, use_depth=1.0, xy_margin=0, tile_size=None, overlap=None, normalization=NORM_GLOBAL_STD):
     if tile_size is None:
         tile_size = DEFAULT_TILE_SIZE
     if overlap is None:
@@ -100,6 +138,13 @@ def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, model_apix=10.0,
         scale_xy = float(input_apix) / float(model_apix)
         scale_z = float(input_apix) / float(model_apix_z)
 
+    # New (global_mad) models normalize at NATIVE resolution, BEFORE rescaling, so extract
+    # and inference measure the statistic identically. Scheme comes from model metadata.
+    if normalization == NORM_GLOBAL_MAD:
+        _center, _scale = global_stats(volume, method=normalization)
+        volume -= _center
+        volume /= _scale
+
     # preprocess: scale to model apix.
     rescaled = False
     if abs(scale_xy - 1.0) > 0.05 or abs(scale_z - 1.0) > 0.05:
@@ -107,12 +152,13 @@ def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, model_apix=10.0,
         volume = resize(volume, new_size, order=3, anti_aliasing=True).astype(np.float32)
         rescaled = True
 
-    # preprocess: normalize & pad
-    _j, _k, _l = volume.shape
-    _k_margin = min(int(0.2*_k), 64)
-    _l_margin = min(int(0.2*_l), 64)
-    volume -= np.mean(volume[:, _k_margin:-_k_margin, _l_margin:-_l_margin])
-    volume /= np.std(volume[:, _k_margin:-_k_margin, _l_margin:-_l_margin]) + 1e-7
+    # Legacy (global_std) models keep the pre-2026 behaviour: mean/std normalization AFTER
+    # rescale (the stat is now sampled rather than full-volume, a <0.5% input-scale change
+    # the model's input norm absorbs). local models are normalized per tile instead, below.
+    if normalization not in (NORM_GLOBAL_MAD, NORM_LOCAL):
+        _center, _scale = global_stats(volume, method=normalization)
+        volume -= _center
+        volume /= _scale
 
     # Compute active Z range (in current/possibly-rescaled volume coords and in original coords)
     # Skip Z cropping if the active region would be too small (fewer than 32 slices)
@@ -147,7 +193,8 @@ def segment_tomogram(model, tomogram_path, tta=1, batch_size=2, model_apix=10.0,
         tta_vol = np.rot90(tta_vol, k=k_xy[j], axes=(1, 2))
         tta_vol = tta_vol if not k_fx[j] else np.flip(tta_vol, axis=1)
         tta_vol = np.rot90(tta_vol, k=2 * k_yz[j], axes=(0, 1))
-        segmented_tta_vol = _segment_tomogram_instance(tta_vol, model, batch_size, tile, tile_overlap)
+        segmented_tta_vol = _segment_tomogram_instance(tta_vol, model, batch_size, tile, tile_overlap,
+                                                       normalize_tiles=normalization == NORM_LOCAL)
         segmented_tta_vol = np.rot90(segmented_tta_vol, k=-2 * k_yz[j], axes=(0, 1))
         segmented_tta_vol = segmented_tta_vol if not k_fx[j] else np.flip(segmented_tta_vol, axis=1)
         segmented_tta_vol = np.rot90(segmented_tta_vol, k=-k_xy[j], axes=(1, 2))
@@ -179,8 +226,9 @@ def save_mrc(pxd, path, data_format, voxel_size=10.0):
         m.set_data(pxd)
         m.voxel_size = voxel_size
 
-def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, batch_size, tta, overwrite, data_format, model_apix, model_apix_z=None, input_apix=None, use_depth=1.0, xy_margin=0, tile_size=None, overlap=None):
+def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, batch_size, tta, overwrite, data_format, model_apix, model_apix_z=None, input_apix=None, use_depth=1.0, xy_margin=0, tile_size=None, overlap=None, normalization=NORM_GLOBAL_STD):
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
+    _install_claim_cleanup()
 
     for device in tf.config.list_physical_devices('GPU'):
         tf.config.experimental.set_memory_growth(device, True)
@@ -205,10 +253,12 @@ def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, bat
                 m.set_data(-1.0 * np.ones((10, 10, 10), dtype=np.float32))
                 m.voxel_size = 10.0
                 wrote_temporary = True
+            _claim_output(output_file)
 
-            segmented_volume, segmented_volume_apix = segment_tomogram(model, tomogram_path, tta, batch_size, model_apix, input_apix, model_apix_z, use_depth, xy_margin, tile_size, overlap)
+            segmented_volume, segmented_volume_apix = segment_tomogram(model, tomogram_path, tta, batch_size, model_apix, input_apix, model_apix_z, use_depth, xy_margin, tile_size, overlap, normalization)
 
             save_mrc(segmented_volume, output_file, data_format, segmented_volume_apix)
+            _release_output(output_file)
 
             elapsed = time.time() - process_start_time
             eta = time.strftime('%H:%M:%S', time.gmtime(elapsed / j * (len(tomogram_list) - j)))
@@ -217,10 +267,11 @@ def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, bat
             print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {feature} - {os.path.basename(tomogram_path)} - etc {eta} ({per_tomo} per tomo)")
         except Exception as e:
             if wrote_temporary:
+                _release_output(output_file)
                 os.remove(output_file)
             print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {feature} - {os.path.basename(tomogram_path)} - ERROR: {e}")
 
-def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_size=8, overwrite=False, data_format='int8', gpus=None, data_apix=None, use_depth=1.0, xy_margin=0, tile_size=None, overlap=None):
+def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_size=8, overwrite=False, data_format='int8', gpus=None, data_apix=None, use_depth=1.0, xy_margin=0, tile_size=None, overlap=None, model_path=None):
     if tile_size is None:
         tile_size = DEFAULT_TILE_SIZE
     if overlap is None:
@@ -295,12 +346,20 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
     if len(tomograms) == 0:
         return
 
-    model_path, metadata = get_model(feature)
     if model_path is None:
-        print(f'Could not find model for {feature}! Exiting.')
-        return
-    model_apix = metadata["apix"]
+        model_path, metadata = get_model(feature)
+        if model_path is None:
+            print(f'Could not find model for {feature}! Exiting.')
+            return
+    else:
+        from easymode.core.distribution import read_local_metadata
+        metadata = read_local_metadata(os.path.splitext(model_path)[0] + '.json')
+        if metadata is None:
+            print(f'No metadata found at {os.path.splitext(model_path)[0]}.json - a model needs its .json sidecar. Exiting.')
+            return
+    model_apix = metadata.get("apix", 10.0)
     model_apix_z = metadata.get("apix_z", None)  # None means isotropic
+    model_norm = metadata.get("normalization", NORM_GLOBAL_STD)  # untagged/old models -> legacy std
 
     if model_apix_z is not None:
         print(f'Using model: {model_path}, inference at {model_apix} Å/px (XY) / {model_apix_z} Å/px (Z). \n')
@@ -331,7 +390,8 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
                 use_depth,
                 xy_margin,
                 tile_size,
-                overlap
+                overlap,
+                model_norm
             )
         )
         processes.append(p)
@@ -346,9 +406,8 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
             p.terminate()
         for p in processes:
             p.join()
-        for path in glob.glob(os.path.join(output_directory, f'*__{feature}.mrc')):
-            if os.path.getsize(path) < 10_000:
-                os.remove(path)
+        # each worker drops its own claim files (_drop_claimed_outputs); the small files left in
+        # this directory by sibling jobs on other nodes are tomograms they are still segmenting.
         return
 
     print()

@@ -139,7 +139,7 @@ def denoiser_thread(tomogram_list, model_path, output_dir, gpu, batch_size, tta,
 
 
 def dispatch(input_directory, output_directory, method='n2n', tta=1, batch_size=8, overwrite=False, iter=1, gpus="0"):
-    if output_directory == input_directory:
+    if output_directory in (input_directory if isinstance(input_directory, (list, tuple)) else [input_directory]):
         print("Please choose an output directory that is different from the input directory - we dont want to overwrite your original volumes.")
         exit()
 
@@ -157,15 +157,32 @@ def dispatch(input_directory, output_directory, method='n2n', tta=1, batch_size=
 
     print(f'easymode denoise\n'
           f'method: {method}\n'
-          f'data_directory: {input_directory}\n'
+          f'data_patterns: {input_directory}\n'
           f'output_directory: {output_directory}\n'
           f'gpus: {gpus}\n'
           f'tta: {tta}\n'
           f'overwrite: {overwrite}\n'
           f'batch_size: {batch_size}\n')
 
-    tomograms = sorted(glob.glob(os.path.join(input_directory, '*.mrc')))
-    print(f'Found {len(tomograms)} tomograms to denoise in {input_directory}.')
+    patterns = input_directory if isinstance(input_directory, (list, tuple)) else [input_directory]
+
+    tomograms = []
+    for p in patterns:
+        if p.endswith('.txt') and os.path.isfile(p):
+            with open(p) as f:
+                for line in f:
+                    entry = line.strip()
+                    if entry and not entry.endswith('.mrc'):
+                        entry += '.mrc'
+                    if entry:
+                        tomograms.append(entry)
+        elif os.path.isdir(p):
+            tomograms.extend(glob.glob(os.path.join(p, '*.mrc')))
+        else:
+            tomograms.extend(glob.glob(p))
+
+    tomograms = [f for f in sorted(set(tomograms)) if os.path.splitext(f)[-1] == '.mrc']
+    print(f'Found {len(tomograms)} tomograms to denoise.')
 
     model_path = get_model(METHOD_TO_WEIGHTS[method])[0]
 

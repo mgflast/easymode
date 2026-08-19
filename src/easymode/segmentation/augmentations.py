@@ -21,10 +21,9 @@ def rotate_90_xz(img, label):
     return img, label
 
 def flip(img, label):
-    k = random.choice([None, 0, 1, 2])
-    if k is not None:
-        img = np.flip(img, axis=k)
-        label = np.flip(label, axis=k)
+    k = random.choice([0, 1, 2])
+    img = np.flip(img, axis=k)
+    label = np.flip(label, axis=k)
     return img, label
 
 def rotate_continuous_xz_or_yz(img, label):
@@ -55,29 +54,23 @@ def filter_gaussian(img, label):
 
 def scale(img, label):
     factor = np.random.uniform(0.9, 1.1)
-    box_size = img.shape[0]
+    shape = img.shape
+    new_shape = tuple(int(round(s * factor)) for s in shape)
 
-    new_size = int(round(box_size * factor))
-    zoomed_img = resize(img, (new_size,) * 3, order=3, anti_aliasing=True).astype(np.float32)
-    zoomed_label = resize(label, (new_size,) * 3, order=0, anti_aliasing=False).astype(np.float32)
+    zoomed_img = resize(img, new_shape, order=3, anti_aliasing=True).astype(np.float32)
+    zoomed_label = resize(label, new_shape, order=0, anti_aliasing=False).astype(np.float32)
 
     if factor < 1:
-        pad_width = (box_size - zoomed_img.shape[0]) // 2
-        remainder = box_size - zoomed_img.shape[0] - 2 * pad_width
-
-        img = np.pad(zoomed_img, [(pad_width, pad_width + remainder)] * 3, mode='reflect')
-        label = np.pad(zoomed_label, [(pad_width, pad_width + remainder)] * 3, mode='constant', constant_values=2)
+        pads = [((s - n) // 2, s - n - (s - n) // 2) for s, n in zip(shape, new_shape)]
+        img = np.pad(zoomed_img, pads, mode='reflect')
+        label = np.pad(zoomed_label, pads, mode='constant', constant_values=2)
     else:
-        center = zoomed_img.shape[0] // 2
-        start = center - 80
-        end = center + 80
-
-        img = zoomed_img[start:end, start:end, start:end]
-        label = zoomed_label[start:end, start:end, start:end]
-
+        crop = tuple(slice((n - s) // 2, (n - s) // 2 + s) for s, n in zip(shape, new_shape))
+        img = zoomed_img[crop]
+        label = zoomed_label[crop]
 
     return img, label
 
 def contrast_jitter(img, label):
-    img *= np.random.uniform(0.9, 1.1)
+    img *= np.random.uniform(0.8, 1.25)
     return img, label

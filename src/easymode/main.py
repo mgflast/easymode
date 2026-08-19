@@ -17,29 +17,44 @@ def main():
     parser = argparse.ArgumentParser(description="easymode: pretrained general networks for cellular cryoET.")
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
 
-    if os.path.exists('/lmb/home/mlast/easymode_dev'):
-        train_parser = subparsers.add_parser('train', description='Train an easymode network.')
-        train_parser.add_argument('-t', "--title", type=str, required=True, help="Title of the model.")
-        train_parser.add_argument('-f', "--features", nargs="+", required=True, help="List of features to train on, e.g. 'Ribosome3D Junk3D' - corresponding data directories are expected in /cephfs/mlast/compu_projects/easymode/training/3d/data/{features}")
-        train_parser.add_argument('-e', "--epochs", type=int, help="Number of epochs to train for (default 200).", default=200)
-        train_parser.add_argument('-b', "--batch_size", type=int, help="Batch size for training (default 8).", default=8)
-        train_parser.add_argument('-ls', "--lr_start", type=float, help="Initial learning rate for the optimizer (default 5e-3).", default=5e-3)
-        train_parser.add_argument('-le', "--lr_end", type=float, help="Final learning rate for the optimizer (default 5e-4).", default=5e-4)
-        train_parser.add_argument('--weights', type=str, default=None, help="Path to a .h5 weights file to initialize training from.")
-        train_parser.add_argument('--bce', type=float, default=1.0, help="Weight of the BCE component of the loss (default 1.0).")
-        train_parser.add_argument('--dice', type=float, default=1.0, help="Weight of the dice component of the loss (default 1.0).")
-        from easymode.segmentation.models import list_archs
-        train_parser.add_argument('--arch', type=str, default='unet-membrain-groupnorm', choices=list_archs(), help="Network architecture. Default: unet-membrain-groupnorm.")
-        def _parse_size(s):
-            parts = s.lower().split('x')
-            if len(parts) != 3:
-                raise argparse.ArgumentTypeError(f"--size must be ZxYxX (e.g. 96x96x96 or 64x128x128), got {s!r}")
-            try:
-                return tuple(int(p) for p in parts)
-            except ValueError:
-                raise argparse.ArgumentTypeError(f"--size dimensions must be integers, got {s!r}")
-        train_parser.add_argument('--size', type=_parse_size, default=None, help="Training crop shape as ZxYxX (e.g. 96x96x96 or 64x128x128). Each dim must be divisible by the arch's stride product (8 for unet-easymode, 16 for unet-easymode-deeper, 32 for unet-membrain*). Default: arch-specific cubic input size.")
-        train_parser.add_argument('--test', action='store_true', help="(debug) test augmentations and save to .../training/3d/test_samples/")
+    dev = os.path.exists('/lmb/home/mlast/easymode_dev')
+
+    train_parser = subparsers.add_parser('train', description='Train an easymode network.')
+    train_parser.add_argument('-t', "--title", type=str, required=True, help="Title of the model.")
+    train_parser.add_argument("--data", nargs="+", required=True, help="One or more training datasets: a directory, a .tar archive, an Ais .scnt, or a glob. Each holds x_<flavour>/<id>.mrc inputs, y/<id>.mrc labels (0 = negative, 1 = positive, 2 = ignore), an optional validity/<id>.mrc mask and an optional metadata.json.")
+    from easymode.segmentation.normalization import SCHEMES
+    train_parser.add_argument('--normalization', type=str, default=None, choices=list(SCHEMES), help="How the training boxes were normalized: 'global' (the whole tomogram scaled once, before the boxes were cut out of it) or 'local' (every box by its own statistic). The model is tagged with this, and inference measures tomograms the same way. Default: read from the dataset's metadata.json, else global.")
+    train_parser.add_argument('-o', "--output", type=str, default=None, help="Directory for checkpoints and the packaged model (default: ./{title}).")
+    train_parser.add_argument('-e', "--epochs", type=int, help="Number of epochs to train for (default 200).", default=200)
+    train_parser.add_argument('-b', "--batch_size", type=int, help="Batch size for training (default 8).", default=8)
+    train_parser.add_argument('-ls', "--lr_start", type=float, help="Initial learning rate for the optimizer (default 5e-3).", default=5e-3)
+    train_parser.add_argument('-le', "--lr_end", type=float, help="Final learning rate for the optimizer (default 5e-4).", default=5e-4)
+    train_parser.add_argument('--weights', type=str, default=None, help="Path to a .h5 weights file to initialize training from.")
+    train_parser.add_argument('--bce', type=float, default=1.0, help="Weight of the BCE component of the loss (default 1.0).")
+    train_parser.add_argument('--dice', type=float, default=1.0, help="Weight of the dice component of the loss (default 1.0).")
+    from easymode.segmentation.models import list_archs
+    train_parser.add_argument('--arch', type=str, default='unet-membrain-groupnorm', choices=list_archs(), help="Network architecture. Default: unet-membrain-groupnorm.")
+    def _parse_size(s):
+        parts = s.lower().split('x')
+        if len(parts) != 3:
+            raise argparse.ArgumentTypeError(f"--size must be ZxYxX (e.g. 96x96x96 or 64x128x128), got {s!r}")
+        try:
+            return tuple(int(p) for p in parts)
+        except ValueError:
+            raise argparse.ArgumentTypeError(f"--size dimensions must be integers, got {s!r}")
+    train_parser.add_argument('--size', type=_parse_size, default=None, help="Training crop shape as ZxYxX (e.g. 96x96x96 or 64x128x128). Each dim must be divisible by the arch's stride product (8 for unet-easymode, 32 for unet-membrain*). Default: arch-specific cubic input size.")
+    train_parser.add_argument('--apix', type=float, default=None, help="Pixel size of the training data in Angstrom. Default: read from metadata.json, else from the .mrc headers.")
+    train_parser.add_argument('--cache', action='store_true', help="Keep every volume in RAM after its first read, instead of re-reading from disk every epoch. Prints the projected footprint at startup - roughly (n_samples x (n_flavours + 2)) x box size.")
+    train_parser.add_argument('--aug_rot_xz_yz', type=float, default=0.2, help="Probability of a continuous rotation around the X or Y axis (default 0.2).")
+    train_parser.add_argument('--aug_rot_xy', type=float, default=0.2, help="Probability of a continuous rotation around the Z axis (default 0.2).")
+    train_parser.add_argument('--aug_flip', type=float, default=0.5, help="Probability of a mirror flip along a random axis (default 0.5). Set to 0.0 to respect chirality.")
+    train_parser.add_argument('--aug_blur', type=float, default=0.2, help="Probability of Gaussian blurring (default 0.2).")
+    train_parser.add_argument('--aug_scale', type=float, default=0.2, help="Probability of magnification jitter (default 0.2).")
+    train_parser.add_argument('--aug_mixup', type=float, default=0.2, help="Probability of mixing in a negative sample (default 0.2). Requires negative samples.")
+    train_parser.add_argument('--aug_contrast', type=float, default=0.5, help="Probability of contrast jitter (default 0.5).")
+    train_parser.add_argument('--aug_flavourmix', type=float, default=0.67, help="Fraction of samples served as a blend of two input flavours rather than one pure flavour (default 0.67). Requires 2+ flavours.")
+    train_parser.add_argument('--xla', action='store_true', help="Compile the training step with XLA. Typically 1.3-2x faster; the first steps are slow while the graph compiles.")
+    train_parser.add_argument('--preview', type=int, nargs='?', const=30, default=None, metavar='N', help="Instead of training, write N augmented training samples and their labels to {output}/, as .mrc files, so that you can inspect what the network is actually fed (default 30).")
 
     set_params = subparsers.add_parser('set', help='Set environment variables.')
     set_params.add_argument('--cache-directory', type=str, help="Path to the directory to store and search for easymode network weights in.")
@@ -48,13 +63,13 @@ def main():
 
     subparsers.add_parser('list', help='List the features for which pretrained general segmentation networks are available.')
 
-    if os.path.exists('/lmb/home/mlast/easymode_dev'):
+    if dev:
         package = subparsers.add_parser('package', description='Package model and weights. Note that this is used for 3D models only; 2D models are packaged and distributed with Ais.')
         package.add_argument('-c', "--checkpoint_directory", type=str, required=True, help="Path to the checkpoint directory to package from.")
         package.add_argument('-t', "--title", type=str, default=None, help="Title of the model to package. If not provided, the name of the checkpoint directory is used.")
         package.add_argument('--apix', type=float, default=10.0, help="Pixel size of the training data in Angstrom (default: 10.0). This is used to rescale the model to the correct physical pixel size during inference.")
 
-    if os.path.exists('/lmb/home/mlast/easymode_dev'):
+    if dev:
         extract_parser = subparsers.add_parser('extract', description='Extract subtomogram training data from annotated tomograms.')
         extract_parser.add_argument('-f', '--features', nargs='+', required=True, help="One or more feature names to extract, e.g. 'Mitochondrion3D NotMitochondrion3D'.")
         extract_parser.add_argument('--apix', type=float, required=True, help="Target XY pixel size in Angstrom. Z is always left at the native collection pixel size (10.0 A/px). XY binning factor is computed as apix / 10.0.")
@@ -74,7 +89,7 @@ def main():
     reconstruct.add_argument('--force_align', action='store_true', help="If set, force AreTomo3 alignment of tilt series even if alignment files are already present.")
 
     segment = subparsers.add_parser('segment', help='Segment data using pretrained easymode networks.')
-    segment.add_argument( "features", metavar='FEATURE', nargs="+", type=str, help="One or more features to segment (e.g. 'ribosome membrane microtubule'). Use 'easymode list' to see available features.")
+    segment.add_argument( "features", metavar='FEATURE', nargs="*", type=str, help="One or more features to segment (e.g. 'ribosome membrane microtubule'). Use 'easymode list' to see available features. Optional when --model is used.")
     segment.add_argument("--data", nargs="+", type=str, required=True, help="One or more directories, file paths, glob patterns, or .txt files containing one tomogram path per line. Examples: 'volumes', 'volumes/035*.mrc volumes/036*.mrc', 'pom/subsets/good.txt'.")
     segment.add_argument('--tta', required=False, type=int, default=4, help="Integer between 1 and 16. For values > 1, test-time augmentation is performed by averaging the predictions of several transformed versions of the input. Higher values can yield better results but increase computation time. (default: 4)")
     segment.add_argument('--output', required=False, type=str, default="segmented", help="Directory to save the output (default: ./segmented/)")
@@ -84,6 +99,7 @@ def main():
     segment.add_argument('--format', type=str, choices=['float32', 'uint16', 'int8'], default='int8', help='Output format for the segmented volumes (default: int8).')
     segment.add_argument('--gpu', type=str, default=None, help="Comma-separated list of GPU ids to use (leave empty to use all available devices).")
     segment.add_argument('--apix', type=float, default=None, help="Override the pixel size stored in the .mrc header (in Angstrom). Use this if the pixel size is missing or incorrect. Set to 0.0 to disallow any scaling.")
+    segment.add_argument('--model', type=str, default=None, help="Path to a local .h5 model, e.g. one you trained yourself with 'easymode train'. Its .json sidecar must sit next to it. Always 3D.")
     segment.add_argument('--2d', dest="force_2d", action='store_true', help='Force 2D segmentation for all features (overrides per-model preference).')
     segment.add_argument('--3d', dest="force_3d", action='store_true', help='Force 3D segmentation for all features (overrides per-model preference).')
 
@@ -111,7 +127,7 @@ def main():
     pick.add_argument('--subset', type=str, default=None, help="Path to a .txt file listing tomogram names (one per line), e.g. a Pom subset file. Only segmented volumes matching these tomograms will be picked.")
 
     denoise = subparsers.add_parser('denoise', help='Denoise or enhance contrast of tomograms.')
-    denoise.add_argument('--data', type=str, required=True, help="Directory containing tomograms to denoise.")
+    denoise.add_argument('--data', nargs="+", type=str, required=True, help="One or more directories, file paths, glob patterns, or .txt files containing one tomogram path per line. Examples: 'volumes', 'volumes/035*.mrc volumes/036*.mrc', 'pom/subsets/good.txt'.")
     denoise.add_argument('--output', type=str, required=True, help="Directory to save denoised tomograms to.")
     denoise.add_argument('--method', type=str, choices=['n2n', 'ddw', 'iso'], default='n2n',
                          help="Denoising method (default 'n2n'). 'n2n' is the classic noise2noise model trained on even/odd half-map pairs. 'ddw' is the distilled DeepDeWedge model that also fills the missing wedge. 'iso' is the distilled IsoNet2 student (also fills the wedge).")
@@ -132,14 +148,14 @@ def main():
     select_tilts.add_argument('--extension', type=str, default='*.tomostar', help='Filetype extension of the tomogram star files. Default: *.tomostar')
     select_tilts.add_argument('--threshold', type=float, default=0.5, help='Minimum score for a tilt to be kept. Network scores tilts 0.0 to 1.0, where 0 is bad and 1 is good. Default: 0.5')
 
-    if os.path.exists('/lmb/home/mlast/easymode_dev'):
+    if dev:
         tilt_train = subparsers.add_parser('tilt_train', description='Train tilt selection network.')
         tilt_train.add_argument('-e', "--epochs", type=int, help="Number of epochs to train for (default 200).", default=200)
         tilt_train.add_argument('-b', "--batch_size", type=int, help="Batch size for training (default 32).", default=32)
         tilt_train.add_argument('-ls', "--lr_start", type=float, help="Initial learning rate for the optimizer (default 5e-3).", default=1e-3)
         tilt_train.add_argument('-le', "--lr_end", type=float, help="Final learning rate for the optimizer (default 5e-5).", default=1e-5)
 
-    if os.path.exists('/lmb/home/mlast/easymode_dev'):
+    if dev:
         denoise_train = subparsers.add_parser('denoise_train',
             description='Sample subtomograms and train a denoiser. Two stages: (1) walk datasets/ and write matched (x, y) box pairs to training/{method}/volumes_*/; (2) fit the n2n UNet on those boxes. The method picks which flavour pair to sample (n2n: even/odd; ddw: raw/ddw-corrected; iso: raw/isonet2-corrected).')
         denoise_train.add_argument('--method', type=str, choices=['n2n', 'ddw', 'iso'], required=True,
@@ -156,7 +172,7 @@ def main():
         denoise_train.add_argument('-le', '--lr_end',   type=float, default=1e-5, help="Final LR. Default kept identical to the calibrated value.")
         denoise_train.add_argument('--gpus', type=str, default='0,1,2,3', help="Comma-separated GPU ids for the training stage (default '0,1,2,3').")
 
-    if os.path.exists('/lmb/home/mlast/easymode_dev'):
+    if dev:
         score_train = subparsers.add_parser('score_train', description='Train the tomogram quality scorer: a pairwise (Bradley-Terry) ranker fed your labelled pairs (pairs.csv, from `easymode score_label`) plus free synthetic-corruption pairs.')
         score_train.add_argument('-e', '--epochs', type=int, default=40)
         score_train.add_argument('--pairs', type=str, default=None, help="Labelled pairs CSV from `easymode score_label` (default <ROOT>/score/pairs.csv).")
@@ -173,19 +189,20 @@ def main():
     args = parser.parse_args()
 
     if args.command == 'train':
-        from easymode.segmentation.train import train_model
-        if args.test:
-            from easymode.segmentation.train import test_dataloader
-            test_dataloader(args.features)
+        from easymode.segmentation.models import get_arch
+        if args.size is not None:
+            crop_shape = args.size
         else:
-            from easymode.segmentation.models import get_arch
-            if args.size is not None:
-                crop_shape = args.size
-            else:
-                d = get_arch(args.arch)['input_shape'][0]
-                crop_shape = (d, d, d)
+            d = get_arch(args.arch)['input_shape'][0]
+            crop_shape = (d, d, d)
+        if args.preview is not None:
+            from easymode.segmentation.train import preview_samples
+            preview_samples(args.data, output=args.output or f'{args.title}_samples', crop_shape=crop_shape, n=args.preview)
+        else:
+            from easymode.segmentation.train import train_model, AugConfig
             train_model(title=args.title,
-                        features=args.features,
+                        data=args.data,
+                        output=args.output,
                         batch_size=args.batch_size,
                         epochs=args.epochs,
                         lr_start=args.lr_start,
@@ -195,6 +212,18 @@ def main():
                         dice_weight=args.dice,
                         arch=args.arch,
                         crop_shape=crop_shape,
+                        cache=args.cache,
+                        apix=args.apix,
+                        normalization=SCHEMES.get(args.normalization),
+                        xla=args.xla,
+                        aug=AugConfig(rot_xz_yz=args.aug_rot_xz_yz,
+                                      rot_xy=args.aug_rot_xy,
+                                      flip=args.aug_flip,
+                                      blur=args.aug_blur,
+                                      scale=args.aug_scale,
+                                      mixup=args.aug_mixup,
+                                      contrast=args.aug_contrast,
+                                      flavourmix=args.aug_flavourmix),
                         )
     elif args.command == 'denoise_train':
         from easymode.training import run as denoise_train_run
@@ -249,11 +278,24 @@ def main():
                                 threshold=args.threshold)
     elif args.command == 'segment':
         features = [f.lower() for f in args.features]
+        if args.model is not None:
+            if not args.model.endswith('.h5'):
+                parser.error(f'--model must point to a .h5 file, got {args.model!r}')
+            if not os.path.exists(args.model):
+                parser.error(f'{args.model}: no such file.')
+            if not os.path.exists(os.path.splitext(args.model)[0] + '.json'):
+                parser.error(f'{args.model}: missing its .json sidecar (metadata with apix, arch, normalization).')
+            if not features:
+                features = [os.path.splitext(os.path.basename(args.model))[0].lower()]
+        elif not features:
+            parser.error('name at least one feature to segment, or point at a local model with --model.')
         from easymode.core.distribution import get_preferred_mode
         from easymode.core.ais_wrapper import dispatch_segment as dispatch_segment_2d
         from easymode.segmentation.inference import dispatch_segment as dispatch_segment_3d
         for feature in features:
-            if args.force_2d:
+            if args.model is not None:
+                mode = '3d'   # a local 2D model is a .scnm, owned by Ais
+            elif args.force_2d:
                 mode = '2d'
             elif args.force_3d:
                 mode = '3d'
@@ -270,10 +312,12 @@ def main():
                 overwrite=args.overwrite,
                 data_format=args.format,
                 gpus=args.gpu,
+                data_apix=args.apix,
             )
             if mode != '2d':
                 kwargs['tile_size'] = args.tile
                 kwargs['overlap'] = args.overlap
+                kwargs['model_path'] = args.model
             dispatch(**kwargs)
     elif args.command == 'report':
         from easymode.core.reporting import report

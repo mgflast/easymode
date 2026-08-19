@@ -7,6 +7,7 @@ logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
 
 HF_REPO_ID = "mgflast/easymode"
 MODEL_CACHE_DIR = cfg.settings["MODEL_DIRECTORY"]
+NON_SEGMENTATION_MODELS = {"n2n_direct", "ddw_direct", "iso_direct", "tilt"}
 
 
 def get_model_info(model_title, _2d=False):
@@ -154,24 +155,19 @@ def get_preferred_mode(feature):
 def load_model_weights(weights_path):
     import tensorflow as tf
     base = os.path.basename(weights_path)
+    # The sidecar wins over the filename: a user model titled e.g. 'my_iso_run' would otherwise
+    # be built as the n2n denoiser. Fall back to the filename for models packaged without an arch.
+    arch_name = (read_local_metadata(os.path.splitext(weights_path)[0] + '.json') or {}).get('arch')
     # n2n, ddw and iso share the same UNet architecture -- they differ only in the
     # (x, y) supervision used to train them (even/odd vs raw/teacher-corrected).
-    if "n2n" in base or "ddw" in base or "iso" in base:
+    if arch_name in ("n2n", "ddw", "iso") or (arch_name is None and ("n2n" in base or "ddw" in base or "iso" in base)):
         from easymode.n2n.model import create
         dummy_input = tf.zeros((1, 160, 160, 160, 1))
-    elif "tilt" in base:
+    elif arch_name == "tilt" or (arch_name is None and "tilt" in base):
         from easymode.tiltfilter.model import create
         dummy_input = [tf.zeros((1, 256, 256, 1)), tf.zeros((1, 256, 256, 1))]
     else:
         from easymode.segmentation.models import get_arch
-        arch_name = None
-        metadata_path = os.path.splitext(weights_path)[0] + '.json'
-        if os.path.exists(metadata_path):
-            try:
-                with open(metadata_path) as f:
-                    arch_name = json.load(f).get('arch')
-            except Exception:
-                pass
         arch = get_arch(arch_name)
         create = arch['module'].create
         dummy_input = tf.zeros((1, *arch['input_shape']))
@@ -215,15 +211,15 @@ def list_remote_models():
         h5_bases = {
             os.path.splitext(os.path.basename(f))[0]
             for f in repo_files
-            if f.endswith(".h5") and "ddw" not in f and "n2n" not in f and not "tilt" in f
-        }
+            if f.endswith(".h5")
+        } - NON_SEGMENTATION_MODELS
 
         # collect bases from scnm (2d)
         scnm_bases = {
             os.path.splitext(os.path.basename(f))[0]
             for f in repo_files
             if f.endswith(".scnm")
-        }
+        } - NON_SEGMENTATION_MODELS
 
         # union of all bases
         all_bases = sorted(h5_bases | scnm_bases)

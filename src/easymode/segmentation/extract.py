@@ -10,6 +10,38 @@ def _init_worker(ctx):
     _ctx = ctx
 
 
+# --- global input normalization: each box is scaled by its parent-volume statistic --------
+from easymode.segmentation.normalization import global_stats, NORM_GLOBAL_MAD
+
+_ROOT = '/cephfs/mlast/compu_projects/easymode'
+_DATA_ROOT = f'{_ROOT}/training/3d/data'
+_stats_cache = {}   # (tomo, flavour) -> (center, scale); per-worker cache
+
+
+def _flavour_path(tomo, flavour, dataset):
+    if flavour == 'raw':
+        return f'{_ROOT}/datasets/{dataset}/warp_tiltseries/reconstruction/{tomo}'
+    if flavour == 'n2n':   # cryoCARE-denoised
+        return f'{_ROOT}/volumes_cryocare/{tomo}'
+    if flavour == 'iso':   # pre-generated IsoNet volume
+        return f'{_ROOT}/volumes_isonet/{tomo}'
+    if flavour == 'ddw':   
+            return f'{_ROOT}/volumes_ddw/{tomo}'
+    if flavour == 'even':
+        return f'{_ROOT}/datasets/{dataset}/warp_tiltseries/reconstruction/even/{tomo}'
+    if flavour == 'odd':
+            return f'{_ROOT}/datasets/{dataset}/warp_tiltseries/reconstruction/odd/{tomo}'
+    return None
+
+
+def _volume_stats(path, key):
+    if key not in _stats_cache:
+        import mrcfile
+        with mrcfile.mmap(path, permissive=True) as m:
+            _stats_cache[key] = global_stats(m.data, method=NORM_GLOBAL_MAD)
+    return _stats_cache[key]
+
+
 def _get_box(j, k, l, tomo, flavour):
     import mrcfile
     import numpy as np
@@ -18,23 +50,17 @@ def _get_box(j, k, l, tomo, flavour):
     BOX_XY = _ctx['BOX_XY']
     tomo_dataset_map = _ctx['tomo_dataset_map']
 
-    dataset = tomo_dataset_map[tomo]
-    if flavour == 'raw':
-        path = f'/cephfs/mlast/compu_projects/easymode/datasets/{dataset}/warp_tiltseries/reconstruction/{tomo}'
-    elif flavour == 'n2n':
-        # n2n flavour is the cryoCARE-denoised volume (formerly the 'cryocare' flavour)
-        path = f'/cephfs/mlast/compu_projects/easymode/volumes_cryocare/{tomo}'
-    else:
+    path = _flavour_path(tomo, flavour, tomo_dataset_map[tomo])
+    if path is None or not os.path.exists(path):
         return False, None, None
 
-    if not os.path.exists(path):
-        return False, None, None
+    center, scale = _volume_stats(path, (tomo, flavour))   # global norm by parent volume
 
     hz, hxy = BOX_Z // 2, BOX_XY // 2
     with mrcfile.mmap(path, permissive=True) as m:
         v = m.data
         Z, Y, X = v.shape
-        out = np.zeros((BOX_Z, BOX_XY, BOX_XY), dtype=v.dtype)
+        out = np.zeros((BOX_Z, BOX_XY, BOX_XY), dtype=np.float32)
         msk = np.zeros((BOX_Z, BOX_XY, BOX_XY), dtype=np.uint8)
 
         z0, z1 = j - hz, j + (BOX_Z - hz)
@@ -52,10 +78,14 @@ def _get_box(j, k, l, tomo, flavour):
             out[zd0:zd0 + dz, yd0:yd0 + dy, xd0:xd0 + dx] = v[zs0:zs1, ys0:ys1, xs0:xs1]
             msk[zd0:zd0 + dz, yd0:yd0 + dy, xd0:xd0 + dx] = 1
 
+        # global normalization by the parent-volume stat, at native resolution (before binning)
+        out = (out - center) / scale
+        out[msk == 0] = 0.0   # keep out-of-bounds padding at zero after normalization
+
         # Bin XY only, leave Z unbinned
         if binning_xy > 1:
             from skimage.transform import resize
-            out = resize(out, (160, 160, 160), anti_aliasing=True).astype(out.dtype)
+            out = resize(out, (160, 160, 160), anti_aliasing=True).astype(np.float32)
             msk = resize(msk.astype(np.float32), (160, 160, 160), anti_aliasing=False, order=0, preserve_range=True) > 0
 
     return True, out, msk
@@ -67,16 +97,16 @@ def _get_box_save_box(j, k, l, tomo, flavour, sample_id, feature):
     apix = _ctx['apix']
 
     if flavour == 'n2n':
-        with open(f'/cephfs/mlast/compu_projects/easymode/training/3d/data/{feature}/n2n/{sample_id}.aislink', 'w') as lf:
+        with open(f'{_DATA_ROOT}/{feature}/x_n2n/{sample_id}.aislink', 'w') as lf:
             lf.write(f'{tomo}')
     valid, vol, msk = _get_box(j, k, l, tomo, flavour)
     if not valid:
         return
-    with mrcfile.new(f'/cephfs/mlast/compu_projects/easymode/training/3d/data/{feature}/{flavour}/{sample_id}.mrc', overwrite=True) as m:
+    with mrcfile.new(f'{_DATA_ROOT}/{feature}/x_{flavour}/{sample_id}.mrc', overwrite=True) as m:
         m.set_data(vol.astype(np.float32))
         m.voxel_size = (apix, apix, TRAINING_COLLECTION_APIX)
     if flavour == 'n2n':
-        with mrcfile.new(f'/cephfs/mlast/compu_projects/easymode/training/3d/data/{feature}/validity/{sample_id}.mrc', overwrite=True) as m:
+        with mrcfile.new(f'{_DATA_ROOT}/{feature}/validity/{sample_id}.mrc', overwrite=True) as m:
             m.set_data(msk.astype(np.uint8))
             m.voxel_size = (apix, apix, TRAINING_COLLECTION_APIX)
 
@@ -90,8 +120,12 @@ def _process_particle(args):
 
     _get_box_save_box(j, l, k, tomo, 'raw', particle_id, feature)
     _get_box_save_box(j, l, k, tomo, 'n2n', particle_id, feature)
+    _get_box_save_box(j, l, k, tomo, 'iso', particle_id, feature)
+    _get_box_save_box(j, l, k, tomo, 'ddw', particle_id, feature)
+    _get_box_save_box(j, l, k, tomo, 'even', particle_id, feature)
+    _get_box_save_box(j, l, k, tomo, 'odd', particle_id, feature)
     if 'Junk' in feature or 'Not' in feature:
-        with mrcfile.new(f'/cephfs/mlast/compu_projects/easymode/training/3d/data/{feature}/label/{particle_id}.mrc', overwrite=True) as m:
+        with mrcfile.new(f'{_DATA_ROOT}/{feature}/y/{particle_id}.mrc', overwrite=True) as m:
             m.set_data(np.zeros((160, 160, 160), dtype=np.float32))
             m.voxel_size = (apix, apix, TRAINING_COLLECTION_APIX)
     return feature, tomo_dataset_map[tomo]
@@ -113,11 +147,8 @@ def extract_training_data(features, apix):
     BOX_Z = 160
     BOX_XY = 160 * binning_xy
 
-    # raw and n2n (the cryoCARE-denoised volume) are extracted directly from disk;
-    # iso and ddw are generated afterwards by running `easymode denoise` on the raw boxes.
-    extracted_flavours = ['raw', 'n2n']
-    generated_flavours = ['iso', 'ddw']
-    flavours = extracted_flavours + generated_flavours
+    extracted_flavours = ['raw', 'n2n', 'iso', 'ddw', 'even', 'odd']
+    flavours = extracted_flavours
     annotated_tomograms = glob.glob('/cephfs/mlast/compu_projects/easymode/volumes_cryocare/*.scns')
 
     with open('/cephfs/mlast/compu_projects/easymode/datasets/dataset_contents.json', 'r') as jf:
@@ -130,14 +161,14 @@ def extract_training_data(features, apix):
             feature_dataset_count_map[f][dataset] = 0
         # Wipe the feature's data tree so each run starts clean: this clears stale
         # flavours left by older versions (cryocare/even/odd) and orphaned boxes whose
-        # coordinates changed. Dropping label/ is safe -- Junk/Not labels are rewritten
+        # coordinates changed. Dropping y/ is safe -- Junk/Not labels are rewritten
         # below, and positive-feature labels are (re)generated by the later 2D step.
-        feature_dir = f'/cephfs/mlast/compu_projects/easymode/training/3d/data/{f}'
+        feature_dir = f'{_DATA_ROOT}/{f}'
         shutil.rmtree(feature_dir, ignore_errors=True)
-        os.makedirs(f'{feature_dir}/label', exist_ok=True)
+        os.makedirs(f'{feature_dir}/y', exist_ok=True)
         os.makedirs(f'{feature_dir}/validity', exist_ok=True)
         for flavour in flavours:
-            os.makedirs(f'{feature_dir}/{flavour}', exist_ok=True)
+            os.makedirs(f'{feature_dir}/x_{flavour}', exist_ok=True)
 
     tomo_dataset_map = dict()
     for dataset in dataset_tomo_map:
@@ -189,21 +220,22 @@ def extract_training_data(features, apix):
     for feature, dataset in results:
         feature_dataset_count_map[feature][dataset] += 1
 
+    for f in features:
+        feature_dir = f'{_DATA_ROOT}/{f}'
+        with open(f'{feature_dir}/metadata.json', 'w') as jf:
+            json.dump({'format_version': 1,
+                       'apix': apix,
+                       'apix_z': TRAINING_COLLECTION_APIX,
+                       'box_size': 160,
+                       'box_depth': 160,
+                       'features': [f],
+                       'n_samples': len(glob.glob(f'{feature_dir}/y/*.mrc')),
+                       'input_flavours': [f'x_{flavour}' for flavour in flavours],
+                       'annotated_flavour': 'x_n2n',   # n2n is the flavour Ais annotated on
+                       'normalization': NORM_GLOBAL_MAD,
+                       'negative': ('Junk' in f or 'Not' in f)}, jf, indent=4)
+
     with open('/cephfs/mlast/compu_projects/easymode/training/3d/n_annotations.json', 'w') as jf:
         json.dump(feature_dataset_count_map, jf, indent=4)
-
-    # Generate the iso/ddw flavours by denoising the extracted raw boxes with the
-    # direct (single-input) general denoisers. Shell out to the `easymode denoise`
-    # CLI so it runs with the documented defaults (batch=1, all GPUs) in its own process.
-    import subprocess
-    for f in features:
-        raw_dir = f'/cephfs/mlast/compu_projects/easymode/training/3d/data/{f}/raw'
-        for method in generated_flavours:
-            out_dir = f'/cephfs/mlast/compu_projects/easymode/training/3d/data/{f}/{method}'
-            print(f"Denoising {f}/raw -> {f}/{method} (method='{method}')")
-            subprocess.run(['easymode', 'denoise',
-                            '--method', method,
-                            '--data', raw_dir,
-                            '--output', out_dir], check=True)
 
     print("Done.")

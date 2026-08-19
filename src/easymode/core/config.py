@@ -1,6 +1,26 @@
-import os, shutil, json
+import os, shutil, json, re
+from importlib.metadata import version as _dist_version, PackageNotFoundError
 
-version = "0.0.1"
+
+def _package_version():
+    # Follow the packaged version: read it from the installed distribution metadata (which
+    # hatchling fills in from pyproject's [project].version). Falls back to parsing
+    # pyproject.toml directly when running from an uninstalled source tree.
+    try:
+        return _dist_version("easymode")
+    except PackageNotFoundError:
+        pyproject = os.path.join(os.path.dirname(__file__), "..", "..", "..", "pyproject.toml")
+        try:
+            with open(pyproject, "r", encoding="utf-8") as f:
+                match = re.search(r'^version\s*=\s*["\']([^"\']+)["\']', f.read(), re.MULTILINE)
+            if match:
+                return match.group(1)
+        except OSError:
+            pass
+        return "unknown"
+
+
+version = _package_version()
 license = "GNU GPL v3"
 
 root = os.path.dirname(os.path.dirname(__file__))

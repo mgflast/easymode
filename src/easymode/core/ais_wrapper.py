@@ -31,7 +31,7 @@ def pick(data_directory, target, output_directory, threshold, spacing, size, bin
           f'rotation_per_sample: {rotation_per_sample} degrees\n'
           f'centroid: {centroid}\n')
 
-    command = f'ais pick -t {target} -d {data_directory} -ou {output_directory} -threshold {threshold} -spacing {spacing} -size {size} -b {binning} -p {cpu_count()} -min-particles {min_particles}'
+    command = f'ais pick -t {target} -d {data_directory} -ou {output_directory} -threshold {threshold} -spacing {spacing} -size {size} -b {binning} -p {min(cpu_count(), 32)} -min-particles {min_particles}'
     if filament:
         command += f' -filament -length {filament_length} --twist {rotation_per_sample}'
     if centroid:
@@ -88,7 +88,7 @@ def pick(data_directory, target, output_directory, threshold, spacing, size, bin
           f"\033[0m")
 
 
-def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_size=8, overwrite=False, data_format='int8', gpus=None, stride=1, use_depth=1.0):
+def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_size=8, overwrite=False, data_format='int8', gpus=None, stride=1, use_depth=1.0, data_apix=None):
     import tensorflow as tf
 
     if output_directory is None:
@@ -141,6 +141,8 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
 
     data_arg = " ".join(patterns)
     command = f'ais segment -m {model_path} -apix {model_apix} -d {data_arg} -ou {output_directory} -tta {tta} -p 1 --overwrite {"1" if overwrite else "0"} -gpu {gpus} --stride {stride} --use-depth {use_depth}'
+    if data_apix is not None:
+        command += f' -data-apix {data_apix}'
     if model_apix > 20.0:
         command += f' -sigma {model_apix} {model_apix / 2.0} {model_apix / 2.0}'
 

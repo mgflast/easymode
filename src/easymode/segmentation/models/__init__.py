@@ -5,6 +5,7 @@ is derived from the filename (underscores → hyphens). Each module must expose:
   INPUT_SHAPE  — tuple, e.g. (96, 96, 96, 1)
   create()     — callable returning a fresh Keras Model
   masked_bce_loss / masked_dice_loss / masked_precision / masked_recall / masked_dice
+    — re-exported from easymode.segmentation.losses; shared by every arch
 
 Once an arch has been published with weights, its module is frozen — bug fixes
 only if they don't alter weight shapes or forward behaviour. New ideas go in
@@ -19,6 +20,7 @@ LEGACY_ALIASES = {
     'old': 'unet-membrain',
     'current': 'unet-membrain-groupnorm',
     'lite': 'unet-easymode',
+    'unet-membrain-groupnorm-sgd': 'unet-membrain-groupnorm',  # removed; same forward arch, weights load as-is
 }
 
 
