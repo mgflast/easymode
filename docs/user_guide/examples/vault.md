@@ -30,6 +30,6 @@ A single round of Relion5 Refine3D with D39 symmetry imposed, followed by refine
 
 
 <div style="text-align: center;">
-<img src="../../assets/vault_map.png" alt="Vault subtomogram average" style="max-width:600px; width:100%; border-radius:8px;">
+<img src="../../../assets/vault_map.png" alt="Vault subtomogram average" style="max-width:600px; width:100%; border-radius:8px;">
 <p>Subtomogram average of the <em>D. discoideum</em> vault complex at 13.6 Å resolution with D39 symmetry, obtained from 348 easymode-detected particles.</p>
 </div>

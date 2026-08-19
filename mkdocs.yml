@@ -16,21 +16,25 @@ nav:
           - user_guide/functions/general_denoisers.md
           - user_guide/functions/segmentation.md
           - user_guide/functions/picking.md
+          - user_guide/functions/training.md
        - "<b>Tutorials</b>":
           - "🎯 Picking and averaging":
               - "1. Ribosomes": user_guide/examples/ribosome.md
               - "2. Microtubules": user_guide/examples/microtubule.md
               - "3. Actin filaments": user_guide/examples/actin.md
               - "4. Vault complexes": user_guide/examples/vault.md
+              - "5. ATP synthase": user_guide/examples/atp_synthase.md
+              - "6. Nucleosomes": user_guide/examples/nucleosome.md
           - "🗺️ Particles in context":
-              - "5. NPC orientation": user_guide/examples/npc_orientation.md
-              - "6. Hsp60-Hsp10 filtering": user_guide/examples/colocalization_filtering.md
-              - "7. Lamella surface distance": user_guide/examples/lamella_surface_distance.md
-              - "8. Picking γTuRC": user_guide/examples/picking_yturc.md
-          - "🧮 Dataset management":
-              - "9. easymode + Pom": user_guide/examples/easymode_and_pom.md
+              - "7. NPC orientation": user_guide/examples/npc_orientation.md
+              - "8. Hsp60-Hsp10 filtering": user_guide/examples/colocalization_filtering.md
+              - "9. Lamella surface distance": user_guide/examples/lamella_surface_distance.md
+              - "10. Picking γTuRC": user_guide/examples/picking_yturc.md
+          - "🛠️ Beyond the basics":
+              - "11. easymode + Pom": user_guide/examples/easymode_and_pom.md
+              - "12. Training your own network": user_guide/examples/training.md
           - "🎓 Workshops":
-              - "10. Michigan 2026": user_guide/examples/workshop_2026.md
+              - "13. Michigan 2026": user_guide/examples/workshop_2026.md
        - "<b>Ais</b>":
           - "Overview": user_guide/ais/overview.md
        - "<b>Pom</b>":
@@ -49,8 +53,11 @@ nav:
           - "🟢 Nuclear pore complex": models/npc.md
           - "🟢 Actin": models/actin.md
           - "🟢 hfIMPDH": models/impdh.md
+          - "🟢 MIPs": models/mip.md
           - "🔵 Prohibitin": models/prohibitin.md
           - "🔵 Intermediate filament": models/intermediate_filament.md
+          - "🔵 Chromatin": models/chromatin.md
+          - "🔵 ATP synthase": models/atp_synthase.md
           - "🚧 Ferritin": models/ferritin.md
           - "🚧 Proteasome": models/proteasome.md
        - "🏞️ Biomes":
@@ -65,6 +72,10 @@ nav:
        - "⚙️ Utility":
           - "🟢 Void": models/void.md
           - "🟢 Ice particle": models/ice_particle.md
+       - "🪄 Preprocessing":
+          - "🟢 n2n denoiser": models/n2n_denoiser.md
+          - "🟢 ddw denoiser": models/ddw_denoiser.md
+          - "🟢 iso denoiser": models/iso_denoiser.md
 
    - "📜 Papers": papers.md
    - "🐞 Submit a bug": https://github.com/mgflast/easymode/issues

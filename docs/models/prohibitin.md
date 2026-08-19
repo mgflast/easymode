@@ -4,7 +4,7 @@ title: " "
 
 `easymode segment prohibitin`
 
-The ribosome model is a shape-based prohibitin segmentation model and was trained on manually selected 3D subtomograms that were labelled using a 2D Ais UNet + post-processing. It was trained at the default easymode pixel size of 10 Å/px. 
+The prohibitin model is a shape-based prohibitin segmentation model and was trained on manually selected 3D subtomograms that were labelled using a 2D Ais UNet + post-processing. It was trained at the default easymode pixel size of 10 Å/px. 
 
 **Example output**
 <br>

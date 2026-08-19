@@ -55,3 +55,12 @@ body.home .md-content {
     margin-left: auto;
     margin-right: auto;
 }
+
+/* Figure subtitles under images and videos */
+.subtitle {
+    text-align: center;
+    font-size: 0.75em;
+    line-height: 1.5;
+    color: var(--md-default-fg-color--light);
+    margin-top: 0.4em;
+}

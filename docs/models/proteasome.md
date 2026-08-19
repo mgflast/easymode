@@ -17,6 +17,6 @@ This page will be updated when the 3D network is ready and validation results (b
   <source src="../../assets/proteasome.mp4" type="video/mp4">
   Video failed to load.
 </video>
-<p>Example of <code>easymode segment proteasome</code> output overlaid on a tomogram of a D. discoideum cell (EMPIAR-13145).</p>
+<p>Example of <code>easymode segment proteasome</code> output overlaid on a tomogram of a human (HeLa) cell.</p>
 </div>
 </div>

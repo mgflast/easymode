@@ -2,13 +2,15 @@
 title: easymode model library
 ---
 
-This sections lists the features for which pretrained easymode models are currently available. We have split them up into three categories: 🐦 **species**, 🏞️ **biomes**, and ⚙️ **utility**. The distinction is purely descriptive.
+This sections lists the features for which pretrained easymode models are currently available. Most of them are segmentation models, which we have split up into three categories: 🐦 **species**, 🏞️ **biomes**, and ⚙️ **utility**. That distinction is purely descriptive. The fourth category, 🪄 **preprocessing**, is different in kind: it holds the general denoisers, which are applied to tomograms before segmentation rather than segmenting anything themselves.
 
 The 🐦**species** include ribosomes, microtubules, actin, vault complexes, and other well-defined macromolecular assemblies that you might consider averaging. They are what you would call species in [M](https://github.com/warpem/warp) as well. 
 
 The 🏞️ **biomes** category covers organelles and other cellular environments, such as mitochondria, the nuclear envelope, and the cytoplasm. These models can be used to sample the context within which the species are embedded; or in other words, the biomes are where the species live. 
 
 The ⚙️ **utility** category currently covers two models: one for 'void', which maps what is and isn't sample and can be used to detect lamella boundaries, and one for ice particles.
+
+The 🪄 **preprocessing** category covers the general denoisers, which are invoked via `easymode denoise --method` rather than `easymode segment`. Since there is nothing to average, their status markers indicate general availability rather than validation by subtomogram averaging.
 
 You can always run `easymode list` to see the most up-to-date list of available models.
 

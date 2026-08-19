@@ -23,5 +23,5 @@ For validation, we segmented, picked, and averaged microtubules in a large datas
     Video failed to load.
   </video>
 </p>
-Example of `easymode segment microtuble` output overlaid on a tomogram from EMPIAR-11899 (FIB-milled D. discoideum).
+Example of `easymode segment microtubule` output overlaid on a tomogram from EMPIAR-11899 (FIB-milled D. discoideum).
 

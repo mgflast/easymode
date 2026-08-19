@@ -73,7 +73,7 @@
 
 ??? question "9. Can I retrain or fine-tune a model on my own data?"
 
-    In principle the required tools are available in easymode (`easymode train`, `easymode extract`) so you could do it, but this is explicitly not what easymode was designed for. If you are interested in segmenting some specific feature for which there is no pretrained network available, we would recommend using [Ais](https://github.com/mgflast/Ais) to train a bespoke network instead. You can train 2D, 2.5D, or shallow 3D networks in Ais, and training something up just for your own data is much easier than training a general network with a much larger architecture.
+    In principle the required tools are available in easymode (see [training](functions/training.md)) so you could do it, but this is explicitly not what easymode was designed for. If you are interested in segmenting some specific feature for which there is no pretrained network available, we would recommend using [Ais](https://github.com/mgflast/Ais) to train a bespoke network instead. You can train 2D, 2.5D, or shallow 3D networks in Ais, and training something up just for your own data is much easier than training a general network with a much larger architecture.
 
 ??? question "10. easymode picked thousands of false positives — how do I tune the picking threshold?"
 

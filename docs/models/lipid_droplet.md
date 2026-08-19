@@ -15,4 +15,4 @@ This model segments lipid droplets (LDs) and works at 50 Å/px. We haven't valid
     Video failed to load.
   </video>
 </p>
-Example of `easymode segment ice_particle` output overlaid on a tomogram of a human (HeLa) cell (EMPIAR-13145).
+Example of `easymode segment lipid_droplet` output overlaid on a tomogram of a human (HeLa) cell (EMPIAR-13145).

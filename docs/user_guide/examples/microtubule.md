@@ -1,6 +1,6 @@
 ## Example 2: HeLa microtubule
 
-In this example we used **Warp**, **AreTomo3**, **easymode**, **Relion5**, and **M** to reconstruct, denoise, segment, pick, and average microtubules in HeLa cells
+In this example we used **Warp**, **AreTomo3**, **easymode**, **Relion5**, and **M** to reconstruct, denoise, segment, pick, and average microtubules in HeLa cells.
 
 ??? note "Dataset and computational resources"
 
@@ -45,6 +45,19 @@ easymode pick microtubule --data segmented --output coordinates/microtubule --le
 This created 699 star files, one per detected microtubule, listing coordinates with priors on the particle orientation based on the tangent to the filament. 
 
 ### Step 5: per-filament averaging
+??? note "Update 2026/06/19 - per-filament averaging is no longer necessary."
+    In previous versions of WarpTools, any custom columns in a particle .star file would get ignored during `ts_export_particles`. This meant that starfiles coming from `easymode pick --filament`, where every particle has an `aisFilamentID` tag that links it to its parent filament, would lose important information. Because of that, we did per-filament averaging. 
+
+    This issue has now been fixed and WarpTools will retain any custom headers. Rather than per-filament averaging, it is now possible and much easier to do the following:
+
+    1. Use a 3D classification job with two classes. With good picks, the one class will end up representing a microtubule running in `+z`, the other rotated 180° and running in `-z`.
+    2. Use a Python script to apply the per-filament orientation consensus:
+        - For every `aisFilamentID` value in the classification output starfile (e.g. `Class3D/run_it025_data.star`), measure whether `rlnClassNumber` 1 or `rlnClassNumber` 2 is the majority (e.g. >70% vote).
+        - In the original filament .starfile (from picking, before averaging): for every filament where `rlnClassNumber=2` was the majority, flip the rlnAngleTilt and rlnAnglePsi.
+        - Discard filaments where there is no `rlnClassNumber` consensus (e.g. neither class is >70%). In rare cases we've seen a 50:50 split; it can help to check the curvature of such filaments: when the overall curvature is low, but there are a few particles with `aisRadiusOfCurvature` high, it often means two separate microtubules accidentally got traced as a single one.
+    3. Output a new starfile, where the consensus has been applied such that `rlnAngleTilt` is now consistent with microtubule polarity. We prefer to adjust the angles in the original starfile resulting from picking, rather than in the output starfile from the classification. That gives you a fixed source of initial particles, respecting polarity, to enter STA processing with.
+
+
 A tricky thing about microtubules is that they have a distinct polarity, but when parsing euler angles from the tangent to the filament you can't yet take this polarity in to account. So when you use the resulting euler angles (which may be off by 180°) you end up with a microtubule-like mixed polarity tube. A second problem is that while microtubules mostly have 13 protofilaments, they can also sometimes have 12 or 14 or some other number. For best STA results you would have to separate out the particles from filaments with different protofilament numbers. We do this via per-filament STA and determining the polarity and protofilament number based on the resulting averages. This per-filament averaging is a bit awkward, so we used a script to automate it:
 
 ??? note "Per-filament averaging script"
@@ -54,8 +67,8 @@ A tricky thing about microtubules is that they have a distinct polarity, but whe
 
     ROOT = '/cephfs/mlast/em/HeLa_MPA_merged'
     MICRO = f'{ROOT}/MICROTUBULE'              # all per-filament work lives here
-    POLARITY = f'{MICRO}/polarity_maps'        # output maps (was never created)
-    REF = f'{MICRO}/emd_7973.mrc'              # reference (was referenced as ../emd_7973.mrc)
+    POLARITY = f'{MICRO}/polarity_maps'        # output maps
+    REF = f'{MICRO}/emd_7973.mrc'              # reference
 
     # create the shared output dirs once, up front
     os.makedirs(MICRO, exist_ok=True)
@@ -85,7 +98,7 @@ A tricky thing about microtubules is that they have a distinct polarity, but whe
             job = f'{work}/Refine3D/job001'
             os.makedirs(work, exist_ok=True)
 
-            if os.path.exists(f'{job}/run_data.star'):     # FIX: was {ROOT}/{name}/... (never matched)
+            if os.path.exists(f'{job}/run_data.star'):
                 print(f'skipping {name}')
             else:
                 particles = starfile.read(f)
@@ -161,11 +174,11 @@ A tricky thing about microtubules is that they have a distinct polarity, but whe
 
 This script saved the averages of each individual filament to `polarity_maps/`, which in this case we visually inspected to select a subset of 13-protofilament filaments with known polarity.
 
-## Step 6: global averaging
+### Step 6: global averaging
 
 We then pooled all particles found in filaments that clearly had 13 protofilaments and a consistent polarity (rotating the angles by 180 degrees for those particles that were inverted relative to the reference). This yielded ~3800 particles, which were roughly aligned. We exported these at 5 Å/px using WarpTools ts_export_particles and ran a Relion5 Refine3D job which quickly reached ~10 Å resolution.
 
-Finally, we used ChimeraX and the 10 Å average to position 13 cropped alpha beta tubulin monomers in the map, sampled the translation and orientation of each monomer relative to the center of the full map, applied the resulting transformation matrices to the .star file (generating 13 new particles for each original 1 particle), and ran refinement in M. This reached 4.6 Å. This ChimeraX-subboxer is not currently in a state ready for sharing, so for the time being we refer to Alister Burt's [Napari subboxer](https://github.com/alisterburt/napari-subboxer) instead.
+Finally, we used ChimeraX and the 10 Å average to position 13 cropped alpha beta tubulin monomers in the map, sampled the translation and orientation of each monomer relative to the center of the full map, applied the resulting transformation matrices to the .star file (generating 13 new particles for each original 1 particle), and ran refinement in M. This reached 4.6 Å. The subboxing was done with our [ChimeraX-subboxer](https://github.com/mgflast/ChimeraX-subbox) plugin.
 
 ![Microtubule average obtained using easymode-detected filaments](../../assets/microtubule_maps.png)
 
