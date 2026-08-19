@@ -166,22 +166,25 @@ def dispatch(input_directory, output_directory, method='n2n', tta=1, batch_size=
 
     patterns = input_directory if isinstance(input_directory, (list, tuple)) else [input_directory]
 
+    VOLUME_EXTENSIONS = ('.mrc', '.rec')
+
     tomograms = []
     for p in patterns:
         if p.endswith('.txt') and os.path.isfile(p):
             with open(p) as f:
                 for line in f:
                     entry = line.strip()
-                    if entry and not entry.endswith('.mrc'):
+                    if entry and not entry.endswith(VOLUME_EXTENSIONS):
                         entry += '.mrc'
                     if entry:
                         tomograms.append(entry)
         elif os.path.isdir(p):
-            tomograms.extend(glob.glob(os.path.join(p, '*.mrc')))
+            for ext in VOLUME_EXTENSIONS:
+                tomograms.extend(glob.glob(os.path.join(p, '*' + ext)))
         else:
             tomograms.extend(glob.glob(p))
 
-    tomograms = [f for f in sorted(set(tomograms)) if os.path.splitext(f)[-1] == '.mrc']
+    tomograms = [f for f in sorted(set(tomograms)) if os.path.splitext(f)[-1] in VOLUME_EXTENSIONS]
     print(f'Found {len(tomograms)} tomograms to denoise.')
 
     model_path = get_model(METHOD_TO_WEIGHTS[method])[0]
