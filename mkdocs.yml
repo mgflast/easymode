@@ -56,8 +56,8 @@ nav:
           - "🟢 MIPs": models/mip.md
           - "🔵 Prohibitin": models/prohibitin.md
           - "🔵 Intermediate filament": models/intermediate_filament.md
-          - "🔵 Chromatin": models/chromatin.md
-          - "🔵 ATP synthase": models/atp_synthase.md
+          - "🟢 Chromatin": models/chromatin.md
+          - "🟢 ATP synthase": models/atp_synthase.md
           - "🚧 Ferritin": models/ferritin.md
           - "🚧 Proteasome": models/proteasome.md
        - "🏞️ Biomes":
