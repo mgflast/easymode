@@ -21,7 +21,7 @@ RAW_FLAVOUR = 'x_raw'
 
 
 class TrainingDataset:
-    def __init__(self, path, negative=None):
+    def __init__(self, path):
         self.path = path
         self.name = os.path.basename(os.path.normpath(path)).split('.')[0]
         self._tmp = None
@@ -64,7 +64,6 @@ class TrainingDataset:
         self.annotated_flavour = annotated
         self.raw_flavour = RAW_FLAVOUR if RAW_FLAVOUR in self.flavours else None
         self.has_validity = os.path.isdir(os.path.join(self.root, VALIDITY_DIR))
-        self.negative = bool(self.meta.get('negative', False)) if negative is None else negative
         self.normalization = self.meta.get('normalization', NORM_GLOBAL_MAD)
 
         self._read_geometry()
@@ -131,7 +130,7 @@ class TrainingDataset:
         cov = ' '.join(f'{f}={sum(1 for i in self.ids if f in self._coverage[i])}' for f in self.flavours)
         apix = f'{self.apix:.2f} A/px' if self.apix else 'unknown A/px'
         return (f'{self.name}: {len(self.ids)} samples, {"x".join(str(s) for s in self.box_shape)}, {apix}'
-                f'{", negatives only" if self.negative else ""}\n  flavours: {cov} (annotated: {self.annotated_flavour})')
+                f'\n  flavours: {cov} (annotated: {self.annotated_flavour})')
 
     def close(self):
         if self._tmp is not None:
@@ -139,7 +138,7 @@ class TrainingDataset:
             self._tmp = None
 
 
-def open_datasets(patterns, negative=None):
+def open_datasets(patterns):
     """patterns: dirs, archives, or globs. A directory that holds several datasets expands to its children."""
     paths = []
     for p in ([patterns] if isinstance(patterns, str) else list(patterns)):
@@ -158,7 +157,7 @@ def open_datasets(patterns, negative=None):
     datasets = []
     try:
         for p in paths:
-            datasets.append(TrainingDataset(p, negative=negative))
+            datasets.append(TrainingDataset(p))
     except BaseException:
         close_datasets(datasets)
         raise

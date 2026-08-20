@@ -139,10 +139,16 @@ def get_preferred_mode(feature):
 
     # Check remote metadata if local doesn't have it
     if is_online():
+        remote = {}
         for _2d in (False, True):
             meta = get_remote_metadata(feature, _2d=_2d)
             if meta and 'preferred' in meta:
                 return meta['preferred']
+            remote[_2d] = meta
+        if remote[False] and not remote[True]:
+            return '3d'
+        if remote[True] and not remote[False]:
+            return '2d'
 
     # Fallback: 3d if .h5 exists or can be found, else 2d
     if os.path.exists(info_3d["weights_path"]):

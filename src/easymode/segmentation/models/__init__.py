@@ -16,10 +16,12 @@ import importlib
 import os
 
 LEGACY_ALIASES = {
-    None: 'unet-membrain',
-    'old': 'unet-membrain',
+    None: 'unet-membrain-groupnorm',
+    'old': 'unet-membrain-groupnorm',
     'current': 'unet-membrain-groupnorm',
-    'lite': 'unet-easymode',
+    'lite': 'unet-membrain-groupnorm',        # legacy tag of the removed unet-easymode, NOT unet-membrain-groupnorm-lite
+    'unet-membrain': 'unet-membrain-groupnorm',        # removed
+    'unet-easymode': 'unet-membrain-groupnorm',        # removed
     'unet-membrain-groupnorm-sgd': 'unet-membrain-groupnorm',  # removed; same forward arch, weights load as-is
 }
 

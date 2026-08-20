@@ -42,7 +42,7 @@ def main():
             return tuple(int(p) for p in parts)
         except ValueError:
             raise argparse.ArgumentTypeError(f"--size dimensions must be integers, got {s!r}")
-    train_parser.add_argument('--size', type=_parse_size, default=None, help="Training crop shape as ZxYxX (e.g. 96x96x96 or 64x128x128). Each dim must be divisible by the arch's stride product (8 for unet-easymode, 32 for unet-membrain*). Default: arch-specific cubic input size.")
+    train_parser.add_argument('--size', type=_parse_size, default=None, help="Training crop shape as ZxYxX (e.g. 96x96x96 or 64x128x128). Each dim must be divisible by the arch's stride product (32 for unet-membrain-groupnorm, 16 for unet-membrain-groupnorm-lite). Default: arch-specific cubic input size.")
     train_parser.add_argument('--apix', type=float, default=None, help="Pixel size of the training data in Angstrom. Default: read from metadata.json, else from the .mrc headers.")
     train_parser.add_argument('--cache', action='store_true', help="Keep every volume in RAM after its first read, instead of re-reading from disk every epoch. Prints the projected footprint at startup - roughly (n_samples x (n_flavours + 2)) x box size.")
     train_parser.add_argument('--aug_rot_xz_yz', type=float, default=0.2, help="Probability of a continuous rotation around the X or Y axis (default 0.2).")

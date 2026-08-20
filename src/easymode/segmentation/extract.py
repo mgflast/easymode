@@ -232,8 +232,7 @@ def extract_training_data(features, apix):
                        'n_samples': len(glob.glob(f'{feature_dir}/y/*.mrc')),
                        'input_flavours': [f'x_{flavour}' for flavour in flavours],
                        'annotated_flavour': 'x_n2n',   # n2n is the flavour Ais annotated on
-                       'normalization': NORM_GLOBAL_MAD,
-                       'negative': ('Junk' in f or 'Not' in f)}, jf, indent=4)
+                       'normalization': NORM_GLOBAL_MAD}, jf, indent=4)
 
     with open('/cephfs/mlast/compu_projects/easymode/training/3d/n_annotations.json', 'w') as jf:
         json.dump(feature_dataset_count_map, jf, indent=4)

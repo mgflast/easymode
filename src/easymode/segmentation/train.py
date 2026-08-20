@@ -60,7 +60,7 @@ class Sample:
         if label_volume.size == 0:
             print(f'Corrupt/empty label for sample {self.idx} in {self.dataset.name}')
             self.valid = False
-        elif not dataset.negative:
+        else:
             self.is_positive = np.sum(label_volume == 1) > 0
 
     def _slab(self, img, label, z_depth, validation):
@@ -109,9 +109,6 @@ class Sample:
         validity = read_volume(self.validity_path, self.cache) if self.validity_path else None
         if validity is not None and validity.shape != label.shape:
             validity = None
-
-        if self.dataset.negative:
-            label[label == 1] = 0
 
         if validity is not None:
             label[validity == 0] = 2
