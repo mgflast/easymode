@@ -10,18 +10,20 @@ is derived from the filename (underscores → hyphens). Each module must expose:
 Once an arch has been published with weights, its module is frozen — bug fixes
 only if they don't alter weight shapes or forward behaviour. New ideas go in
 a new file with a new name; add a legacy alias below if older metadata refers
-to it under a different name.
+to it under a different name. Archs that are no longer offered for training but
+have published weights that must keep loading live in legacy/ — they resolve by
+name like any other arch but are excluded from list_archs(). Never delete an
+arch module outright: published weights only load if the module that built them
+still exists (see e0d21a9, which broke every untagged model on the hub).
 """
 import importlib
 import os
 
 LEGACY_ALIASES = {
-    None: 'unet-membrain-groupnorm',
-    'old': 'unet-membrain-groupnorm',
+    None: 'unet-membrain',
+    'old': 'unet-membrain',
     'current': 'unet-membrain-groupnorm',
-    'lite': 'unet-membrain-groupnorm',        # legacy tag of the removed unet-easymode, NOT unet-membrain-groupnorm-lite
-    'unet-membrain': 'unet-membrain-groupnorm',        # removed
-    'unet-easymode': 'unet-membrain-groupnorm',        # removed
+    'lite': 'unet-easymode',
     'unet-membrain-groupnorm-sgd': 'unet-membrain-groupnorm',  # removed; same forward arch, weights load as-is
 }
 
@@ -29,20 +31,28 @@ LEGACY_ALIASES = {
 def _discover_module_paths():
     pkg_dir = os.path.dirname(__file__)
     out = {}
-    for entry in sorted(os.listdir(pkg_dir)):
-        if not entry.endswith('.py') or entry.startswith('_'):
+    legacy = set()
+    for subdir in ('', 'legacy'):
+        d = os.path.join(pkg_dir, subdir)
+        if not os.path.isdir(d):
             continue
-        stem = entry[:-3]
-        out[stem.replace('_', '-')] = f'easymode.segmentation.models.{stem}'
-    return out
+        pkg = 'easymode.segmentation.models' + (f'.{subdir}' if subdir else '')
+        for entry in sorted(os.listdir(d)):
+            if not entry.endswith('.py') or entry.startswith('_'):
+                continue
+            name = entry[:-3].replace('_', '-')
+            out[name] = f'{pkg}.{entry[:-3]}'
+            if subdir:
+                legacy.add(name)
+    return out, legacy
 
 
-_MODULE_PATHS = _discover_module_paths()
+_MODULE_PATHS, _LEGACY_ARCHS = _discover_module_paths()
 _LOADED = {}
 
 
 def list_archs():
-    return sorted(_MODULE_PATHS)
+    return sorted(n for n in _MODULE_PATHS if n not in _LEGACY_ARCHS)
 
 
 def resolve_arch(name):
