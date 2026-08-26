@@ -98,7 +98,7 @@ def main():
     segment.add_argument('--overlap', type=int, default=None, help="Overlap between neighbouring inference tiles, in voxels (default 48). Tiles stride by (tile - 2*overlap), so the overlap is reduced automatically if it is too large for the tile size. Only affects 3D models.")
     segment.add_argument('--format', type=str, choices=['float32', 'uint16', 'int8'], default='int8', help='Output format for the segmented volumes (default: int8).')
     segment.add_argument('--gpu', type=str, default=None, help="Comma-separated list of GPU ids to use (leave empty to use all available devices).")
-    segment.add_argument('--apix', type=float, default=None, help="Override the pixel size stored in the .mrc header (in Angstrom). Use this if the pixel size is missing or incorrect. Set to 0.0 to disallow any scaling.")
+    segment.add_argument('--override-header-apix', type=float, default=None, help="Override the pixel size stored in the .mrc header (in Angstrom). Only use this if the header value is missing or wrong - if the header is correct, do not use this flag. Set to 0.0 to disallow any scaling.")
     segment.add_argument('--model', type=str, default=None, help="Path to a local .h5 model, e.g. one you trained yourself with 'easymode train'. Its .json sidecar must sit next to it. Always 3D.")
     segment.add_argument('--2d', dest="force_2d", action='store_true', help='Force 2D segmentation for all features (overrides per-model preference).')
     segment.add_argument('--3d', dest="force_3d", action='store_true', help='Force 3D segmentation for all features (overrides per-model preference).')
@@ -312,7 +312,7 @@ def main():
                 overwrite=args.overwrite,
                 data_format=args.format,
                 gpus=args.gpu,
-                data_apix=args.apix,
+                data_apix=args.override_header_apix,
             )
             if mode != '2d':
                 kwargs['tile_size'] = args.tile
