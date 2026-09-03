@@ -198,7 +198,7 @@ def reconstruct(frames, mdocs, apix=None, axis=None, dose=None, extension=None, 
 
     if steps[5]:
         print(f'\n\033[96mEstimating tilt series CTF\033[0m')
-        _run(f'WarpTools ts_ctf --settings warp_tiltseries.settings --range_high {max(5.0, 2 * apix)} --defocus_max 8 --perdevice 1')
+        _run(f'WarpTools ts_ctf --settings warp_tiltseries.settings --range_high {max(5.0, 2.1 * apix)} --defocus_max 8 --perdevice 1')
 
     if steps[6]:
         print(f'\n\033[96mChecking handedness\033[0m')

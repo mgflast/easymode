@@ -17,10 +17,10 @@ easymode segment npc cytoplasm nucleus --data denoised --output segmented
 ### Step 2: picking
 
 ```
-easymode pick npc --data segmented --output coordinates/npc --spacing 900 --centroid
+easymode pick npc --data segmented --output coordinates/npc --spacing 900 --centroid --size 5000000
 ```
 
-The `--centroid` flag places each coordinate at the centroid of the detected blob rather than at its deepest point (i.e. the maximum of the distance transform). This matters for NPCs because the NPC segmentation is shaped like a flat slab rather than a compact sphere. Without `--centroid`, the coordinate is placed at the point farthest from the edge of the blob, which for a flat slab can end up at a position far from the actual center. In turn, this can defeat the minimum particle spacing: if one NPC's coordinate lands at its far end by chance, a second coordinate within the same NPC can be placed within the `--spacing` radius, resulting in a duplicate pick. Both will be quite far from the actual center of the pore. Using `--centroid` avoids this.
+The `--centroid` flag places each coordinate at the centroid of the detected blob rather than at its deepest point (i.e. the maximum of the distance transform). This matters for NPCs because the NPC segmentation is shaped like a flat slab rather than a compact sphere. Without `--centroid`, the default 'blob picking mode' is used. In this mode coordinates are placed at the deepest point within a connected component in the thresholded segmentation. For a slab the coordinate can end up at a position far from the actual center, if the slab happens to be just slightly thicker on one side than on the other. In turn, this can defeat the minimum particle spacing: if one NPC's coordinate lands far away from the real center o the connected component, a second coordinate could be placed within the chosen `--spacing`, resulting in a duplicate pick. Both will be quite far from the actual center of the pore. Using `--centroid` avoids this: instead of placing coordinates in the deepest point of a connected component, we simply calculate the centroid coordiante of the connected component and place the coordinate there.
 
 !!! warning
     `--centroid` should not be used when segmented blobs may be touching or overlapping, as is common for ribosomes. In those cases, the centroid of a merged blob would fall between the two particles.
@@ -32,7 +32,7 @@ This yielded 216 NPC coordinates across 130 tomograms, without priors on the ori
 We exported particles at 10 Å/px with a box size of 220 px:
 
 ```
-WarpTools ts_export_particles --input_directory coordinates/npc --input_pattern "*.star" --coords_angpix 10.0 --output_star relion/npc/particles.star --output_angpix 10.0 --box 220 --diameter 900 --3d --relative_output_paths
+WarpTools ts_export_particles --settings warp_tiltseries.settings --input_directory coordinates/npc --input_pattern "*.star" --coords_angpix 10.0 --output_star relion/npc/particles.star --output_angpix 10.0 --box 220 --diameter 1400 --3d --relative_output_paths
 ```
 
 We then ran a RELION5 Refine3D job with global angular search starting at 15°, using no prior on the orientation. This initial refinement reached 55 Å resolution using C8 symmetry.
