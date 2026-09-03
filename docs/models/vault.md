@@ -8,7 +8,7 @@ The vault model was trained on manually curated 3D subtomograms that were labell
 
 For validation we used dataset [EMPIAR-11845](https://www.ebi.ac.uk/empiar/EMPIAR-11845), consisting of 152 tomograms of FIB-milled D. discoideum cells. For the sake of the validation we re-trained the vault networks with data from this source excluded from the training collection.  
 
-Vaults remain rare even in this dataset; we found on average between 2 to 3 particles per tomogram, or 348 in total. With D39 symmetry, subtomogram averaging plateaued at a resolution of 13.8 Å. 
+Vaults remain rare even in this dataset; we found on average between 2 to 3 particles per tomogram, or 393 in total. With D39 symmetry, subtomogram averaging plateaued at a resolution of 13.8 Å. 
 
 <p style="text-align:center;">
   <video autoplay loop muted playsinline controls style="width:50%; max-width:600px; border-radius:8px; display:block; margin:auto;">
