@@ -2,8 +2,9 @@ import subprocess, glob, os, starfile
 from easymode.core.distribution import get_model, load_model
 from multiprocessing import cpu_count
 
-def _run(cmd, capture=False):
-    print(f'\033[42m{cmd}\033[0m\n')
+def _run(cmd, capture=False, echo=True):
+    if echo:
+        print(f'\033[42m{cmd}\033[0m\n')
     ret = subprocess.run(cmd, shell=True, capture_output=capture, text=True if capture else None)
     if ret.returncode != 0:
         print(f'\033[91merror running {cmd}\033[0m')
@@ -109,8 +110,7 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
           f'output_directory: {output_directory}\n'
           f'gpus: {gpus}\n'
           f'tta: {tta}\n'
-          f'overwrite: {overwrite}\n'
-          f'ais_2d_nets: True\n')
+          f'overwrite: {overwrite}\n')
 
     patterns = data_directory if isinstance(data_directory, (list, tuple)) else [data_directory]
 
@@ -147,5 +147,5 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
         command += f' -sigma {model_apix} {model_apix / 2.0} {model_apix / 2.0}'
 
 
-    _run(command)
+    _run(command, echo=False)
 
