@@ -203,6 +203,10 @@ def dispatch(input_directory, output_directory, method='n2n', tta=1, batch_size=
     for p in processes:
         p.join()
 
+    teacher = {'iso': 'IsoNet2', 'ddw': 'DeepDeWedge'}.get(method)
+    if teacher:
+        print(f"if this denoiser was useful in your work, remember to cite the original {teacher} paper, from which the easymode general denoiser was distilled.")
+
 
 
 
