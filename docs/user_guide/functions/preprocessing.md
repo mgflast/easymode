@@ -21,6 +21,7 @@ Optional arguments:
 !!! tip "Tip: skip the halfmaps"
     If you plan to use one the easymode general pretrained denoisers, you can save a lot of time and memory by skipping the generation of the halfmaps with `--no_halfmaps`. See the [general denoisers](general_denoisers.md) page for details.
 
+<!--
 ## Tilt selection
 Use `easymode select_tilts` to automatically identify bad tilt images and exclude them from tomogram reconstruction. To avoid repeating tomogram reconstruction, you could run the above `easymode reconstruct` with argument `--steps 11100000` first, then run tilt selection, and then reconstruct with `--steps 00011111`. Or just reconstruct and think about tilt selection later.
 ```
@@ -39,3 +40,4 @@ Optional arguments:
 --overwrite                If used, if output star files already exist in --output, they will be overwritten. 
 ```
 If you provide --tomostar only, a standard Warp file structure is assumed, with tilt stacks in warp_tiltseries/tiltstack/\*/\*.st and xml files in warp_tiltseries/*.xml. If you provide --tiltstack only, output tomostar files will be written in the location of each tilt stack file and no Warp-style file structure is used. 
+-->

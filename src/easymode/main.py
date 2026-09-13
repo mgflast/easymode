@@ -266,6 +266,7 @@ def main():
                      iter=args.iter,
                      gpus=args.gpu)
     elif args.command == 'select_tilts':
+            print("\033[38;5;208mthis network is experimental and probably not yet suited for general use.\033[0m")
             import easymode.tiltfilter.inference as tiltfilter
             tiltfilter.dispatch(input_tiltstack=args.tiltstack,
                                 input_tomostar=args.tomostar,
