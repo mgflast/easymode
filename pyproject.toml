@@ -19,7 +19,7 @@ artifacts = [
 
 [project]
 name = "easymode"
-version = "1.0.17"
+version = "1.2.0"
 description = "Easymode - a collection of pretrained general networks for segmenting common eukaryotic features in cryoET"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -49,6 +49,8 @@ classifiers = [
 
 dependencies = [
     "tensorflow>=2.11.0,<2.12",
+    "ais-cryoet>=1.2.36",
+    "pom-cryoet>=1.2.0",
     "mrcfile",
     "numpy>=1.20,<2",
     "scipy",

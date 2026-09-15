@@ -1,7 +1,7 @@
 # Installation
 
 ## Installing from scratch
-The following command will create a new environment called `easymode` and install easymode and all dependencies into it. 
+The following command will create a new environment called `easymode` and install easymode and all dependencies into it, including Ais and Pom.
 ```
 # Create environment with CUDA support
 conda create -n easymode python=3.10 cudatoolkit=11.2 cudnn=8.1 git -c conda-forge
@@ -9,8 +9,7 @@ conda activate easymode
 
 # Install packages
 pip install tensorflow==2.11.0 protobuf==3.19.0
-pip install git+https://github.com/mgflast/Ais.git
-pip install git+https://github.com/mgflast/easymode.git
+pip install easymode
 
 # Set up CUDA library paths (one-time setup)
 mkdir -p $CONDA_PREFIX/etc/conda/activate.d $CONDA_PREFIX/etc/conda/deactivate.d
