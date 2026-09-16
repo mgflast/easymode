@@ -130,7 +130,7 @@ def get_engine(feature, variant=None):
 
 def _download(entry, weights_path, metadata_path, silent=False):
     if not silent:
-        print(f"\nDownloading {entry['tag']} from {REPO_ID}...\n")
+        print(f"\nDownloading '{entry['feature']} ({entry['tag']})' from {REPO_ID}...\n")
     try:
         hf_hub_download(repo_id=REPO_ID, filename=entry["weights"], cache_dir=MODEL_CACHE_DIR, local_dir=MODEL_CACHE_DIR)
     except Exception as e:
@@ -161,13 +161,13 @@ def get_model(model_title, force_download=False, silent=False, variant=None, _2d
 
     if entry["tag"] == "local" or not is_online():
         if not cached:
-            print(f"\n{model_title} is not in the local cache {MODEL_CACHE_DIR} and there is no internet connection to download it - aborting.\n")
+            print(f"\n'{entry['feature']} ({entry['tag']})' is not in the local cache {MODEL_CACHE_DIR} and there is no internet connection to download it - aborting.\n")
             return None, None
         return weights_path, local_meta or entry_metadata(entry)
 
     if force_download or not cached or _newer(entry.get("timestamp"), (local_meta or {}).get("timestamp")):
         if not silent and cached and not force_download:
-            print(f"\nNew version available for {model_title}, updating...")
+            print(f"\nNew version available for '{entry['feature']} ({entry['tag']})', updating...")
         local_meta = _download(entry, weights_path, metadata_path, silent=silent)
     return weights_path, local_meta or entry_metadata(entry)
 
