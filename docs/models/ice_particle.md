@@ -4,7 +4,7 @@ title: " "
 
 `easymode segment ice_particle`
 
-This model segments ice particles, which are common contaminants on the top and bottom of cryoET samples. This 2D model works at 30 Å/px. It can be useful to segment ice particles when using template matching (TM) for particle detection: large dark blobs such as ice particles can often score high in TM, but are clearly false positives, so you can discard them by detecting what's ice and what isn't.
+This model segments ice particles, which are common contaminants on the top and bottom of cryoET samples. This model works at 30 Å/px. It can be useful to segment ice particles when using template matching (TM) for particle detection: large dark blobs such as ice particles can often score high in TM, but are clearly false positives, so you can discard them by detecting what's ice and what isn't.
 
 
 **Example output**

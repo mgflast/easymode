@@ -9,17 +9,19 @@ easymode list
 Example output:
 ```
 easymode can currently segment the following features:
-    > ribosome
-    > microtubule
-    > mitochondrion
-    > npc
-    > tric
-    > actin
-    > mitochondrial_granule
-    > cytoplasmic_granule
-    > nuclear_envelope
-    > vault
+
+                                    versions
+   > actin                          sv2-3d*, sv2-2.5d
+   > atp_synthase                   sv2-2d*
+   > chromatin                      sv2-2d*
+   ...
+   > ribosome                       sv3-3d*, sv2-3d
+   > void                           sv3-3d*, sv2-2d
+
+   *default model. use --version to select a specific model variant.
 ```
+
+Each feature can have more than one model. The version tag says how a model was trained and what it is: `sv2` or `sv3` is the supervision, i.e. whether the training labels were 2D or 3D; `2d`, `2.5d` or `3d` is the network. A 2.5D model has a 2D architecture but takes a slab of slices as input rather than a single slice. The default is marked with `*`; pick another with `easymode segment <feature> --version <tag>`.
 
 To segment any of these features in your tomograms, use the `easymode segment <feature>` command. For example:
 
@@ -29,6 +31,7 @@ easymode segment ribosome --data warp_tiltseries/reconstruction --output segment
 
 Optional arguments:
 ```
+--version <tag>         Which version of the model to use (see `easymode list`). Default: the feature's default model.
 --tta <int>             Test-time augmentation factor (default: 4). The model will segment multiple augmented versions of the input and average the results.
 --overwrite             If used, if output tomograms already exist in --output, they will be overwritten.
 --format                Output format for the segmented volumes. Choices are 'float32', 'uint16', or 'int8' (default).

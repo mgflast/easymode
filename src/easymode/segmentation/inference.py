@@ -271,7 +271,7 @@ def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, bat
                 os.remove(output_file)
             print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {feature} - {os.path.basename(tomogram_path)} - ERROR: {e}")
 
-def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_size=8, overwrite=False, data_format='int8', gpus=None, data_apix=None, use_depth=1.0, xy_margin=0, tile_size=None, overlap=None, model_path=None):
+def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_size=8, overwrite=False, data_format='int8', gpus=None, data_apix=None, use_depth=1.0, xy_margin=0, tile_size=None, overlap=None, model_path=None, variant=None):
     if tile_size is None:
         tile_size = DEFAULT_TILE_SIZE
     if overlap is None:
@@ -347,7 +347,7 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
         return
 
     if model_path is None:
-        model_path, metadata = get_model(feature)
+        model_path, metadata = get_model(feature, variant=variant)
         if model_path is None:
             print(f'Could not find model for {feature}! Exiting.')
             return

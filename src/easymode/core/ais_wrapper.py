@@ -89,7 +89,7 @@ def pick(data_directory, target, output_directory, threshold, spacing, size, bin
           f"\033[0m")
 
 
-def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_size=8, overwrite=False, data_format='int8', gpus=None, stride=1, use_depth=1.0, data_apix=None):
+def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_size=8, overwrite=False, data_format='int8', gpus=None, stride=1, use_depth=1.0, data_apix=None, variant=None):
     import tensorflow as tf
 
     if output_directory is None:
@@ -132,20 +132,15 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
     if len(tomograms) == 0:
         return
 
-    model_path, metadata = get_model(feature, _2d=True)
+    model_path, _ = get_model(feature, _2d=True, variant=variant)
     if model_path is None:
         print(f'Could not find model for {feature}! Exiting.')
         exit()
 
-    model_apix = metadata['apix']
-
     data_arg = " ".join(patterns)
-    command = f'ais segment -m {model_path} -apix {model_apix} -d {data_arg} -ou {output_directory} -tta {tta} -p 1 --overwrite {"1" if overwrite else "0"} -gpu {gpus} --stride {stride} --use-depth {use_depth}'
+    command = f'ais segment -m {model_path} -d {data_arg} -ou {output_directory} -tta {tta} -p 1 --overwrite {"1" if overwrite else "0"} -gpu {gpus} --stride {stride} --use-depth {use_depth}'
     if data_apix is not None:
         command += f' -data-apix {data_apix}'
-    if model_apix > 20.0:
-        command += f' -sigma {model_apix} {model_apix / 2.0} {model_apix / 2.0}'
-
 
     _run(command, echo=False)
 

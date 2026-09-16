@@ -44,9 +44,6 @@
 
     <b>4)</b> If your data is (somewhat) clear and the output is very poor, that's the most interesting case and we would love to help out — please consider [submitting a tomogram](../index.md#training-data-collection), [posting on GitHub](https://github.com/mgflast/easymode/issues), or reaching out directly (mlast@mrclmb.ac.uk).
 
-    !!! tip
-        You can always try the alternative model — run `easymode list` to see which models are available. In many cases there is both a 3D and a 2D model. For actin, for example, the 2D model can be useful, but the downside is that the filament shape is worse: elongated in Z, making adjacent filaments overlap often.
-
 ??? question "5. I want to segment X, but there is no model for X."
 
     We plan to expand the model library over time, but it does take quite a bit of work to train and validate a model. We try to focus on features that are of common interest to many users — for example, we plan to add networks to segment vesicles, Golgi, and virus-like particles, features that we expect are relevant to many different projects. If the feature you would like to segment is common to many species or cell types and you have some example data, we might be able to generate a (preliminary) network for it. Please reach out!

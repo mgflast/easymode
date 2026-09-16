@@ -293,7 +293,7 @@ easymode list
 Different features are segmented at different scales: ribosomes, for example, are segmented at 10 Å/px, but larger features like mitochondria can be picked out accurately at 50 Å/px. Segmentation at 50 Å/px is much faster, so to get started quickly we'll segment just the mitochondria:
 
 ```
-easymode segment mitochondrion --data denoised --2d
+easymode segment mitochondrion --data denoised
 ```
 
 Easymode automatically grabs the required network weights from [Hugging Face](https://huggingface.co/mgflast/easymode), so you don't have to worry about where to find them. Mitochondrion segmentation should take around 10-20 seconds per tomogram on a single GPU for the current dataset.

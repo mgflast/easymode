@@ -6,7 +6,7 @@ title: " "
 
 The microtubule model was trained to output a cylindrical tube with a diameter of 180 Å along microtubules, approximately **annotating the lumen of microtubules only**. As a result, closely adjacent microtubules are still segmented as individual filaments.
 
-In combination with the `--filament` flag in `easymode pick`, the model enables tracing individual microtubules and picking particles at regular intervals along individual filaments, with an **accurate prior on the particle orientation** and class labels linking particles to the parent filaments (_aisFilamentID). Use the `--per-filament` flag to write .star files for individual microtubules. This allows subtomogram averaging of individual filaments. 
+In combination with the `--filament` flag in `easymode pick`, the model enables tracing individual microtubules and picking particles at regular intervals along individual filaments, with an **accurate prior on the particle orientation** and class labels linking particles to the parent filaments (_aisFilamentID). Use the `--separate_filaments` flag to write .star files for individual microtubules. This allows subtomogram averaging of individual filaments. 
 
 For validation, we segmented, picked, and averaged microtubules in a large dataset of FIB-milled HeLa cell tomograms. After using per-filament averaging to determine polarity and protofilament count, then subboxing individual protofilaments, we achieved a 4.6 Å overall resolution (49k particles). 
 

@@ -20,7 +20,7 @@ IMPDH filaments may be a somewhat niche target compared to the other networks in
   <source src="../../assets/impdh.mp4" type="video/mp4">
   Video failed to load.
 </video>
-<p>Example of <code>easymode segment hfimpdh --2d</code> output overlaid on a tomogram of a human (HeLa) cell treated with IMPDH inhibitor <em>mycophenolic acid</em>, leading to filament and bundle formation.</p>
+<p>Example of <code>easymode segment hfimpdh</code> output overlaid on a tomogram of a human (HeLa) cell treated with IMPDH inhibitor <em>mycophenolic acid</em>, leading to filament and bundle formation.</p>
 </div>
 <div style="flex: 1; min-width: 300px;">
 <video autoplay loop muted playsinline controls style="width:100%; aspect-ratio:16/9; background:#fff; border-radius:8px;">

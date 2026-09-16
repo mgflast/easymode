@@ -1,171 +1,182 @@
-import os, json, logging, requests
-from pathlib import Path
-from huggingface_hub import hf_hub_download, HfApi
+import os, json, shutil, logging, requests
+from huggingface_hub import hf_hub_download
 import easymode.core.config as cfg
 
 logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
 
-HF_REPO_ID = "mgflast/easymode"
+REPO_ID = "mgflast/easymode-v2"
 MODEL_CACHE_DIR = cfg.settings["MODEL_DIRECTORY"]
-NON_SEGMENTATION_MODELS = {"n2n_direct", "ddw_direct", "iso_direct", "tilt"}
+METADATA_KEYS = ("apix", "apix_z", "arch", "normalization", "timestamp")
 
-
-def get_model_info(model_title, _2d=False):
-    if _2d:
-        weights_filename = f"{model_title}.scnm"
-        metadata_filename = f"{model_title}_2d.json"
-    else:
-        weights_filename = f"{model_title}.h5"
-        metadata_filename = f"{model_title}.json"
-    return {
-        "repo_id": HF_REPO_ID,
-        "model_title": model_title,
-        "weights_filename": weights_filename,
-        "metadata_filename": metadata_filename,
-        "weights_path": os.path.join(MODEL_CACHE_DIR, weights_filename),
-        "metadata_path": os.path.join(MODEL_CACHE_DIR, metadata_filename),
-    }
+_online = None
+_registry = None
 
 
 def is_online():
-    try:
-        r = requests.get("https://huggingface.co", timeout=5)
-        return r.status_code == 200
-    except Exception:
-        return False
+    global _online
+    if _online is None:
+        try:
+            _online = requests.get("https://huggingface.co", timeout=5).status_code == 200
+        except Exception:
+            _online = False
+    return _online
 
 
-def read_local_metadata(metadata_path):
-    if not os.path.exists(metadata_path): return None
+def fetch_json(filename):
     try:
-        with open(metadata_path, "r") as f: return json.load(f)
+        r = requests.get(f"https://huggingface.co/{REPO_ID}/resolve/main/{filename}", timeout=10)
+        return r.json() if r.status_code == 200 else None
     except Exception:
         return None
 
 
-def get_remote_metadata(model_title, _2d=False):
-    prev = os.environ.get("HF_HUB_DISABLE_PROGRESS_BARS")
-    os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
-    filename = f"{model_title}_2d.json" if _2d else f"{model_title}.json"
-    metadata = None
+def read_local_metadata(metadata_path):
+    if not metadata_path or not os.path.exists(metadata_path):
+        return None
     try:
-        path = hf_hub_download(repo_id=HF_REPO_ID, filename=filename, cache_dir=MODEL_CACHE_DIR)
-        with open(path, "r") as f: metadata = json.load(f)
+        with open(metadata_path, "r") as f:
+            return json.load(f)
     except Exception:
-        pass
-    finally:
-        if prev is None: os.environ.pop("HF_HUB_DISABLE_PROGRESS_BARS", None)
-        else: os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = prev
+        return None
+
+
+def _normalize_ts(ts):
+    ts = str(ts)
+    return "20" + ts if len(ts) == 12 else ts   # 2-digit-year stamps
+
+
+def _newer(remote_ts, local_ts):
+    return bool(remote_ts) and (not local_ts or _normalize_ts(remote_ts) > _normalize_ts(local_ts))
+
+
+# ---- registry: registry.json = {feature: {"default": tag, "models": {tag: {"weights": path, ["metadata": path], "timestamp": ..., ...}}}}
+
+REGISTRY_CACHE = os.path.join(MODEL_CACHE_DIR, "registry.json")
+
+
+def get_registry():
+    global _registry
+    if _registry is None:
+        _registry = fetch_json("registry.json") if is_online() else None
+        if _registry:
+            os.makedirs(MODEL_CACHE_DIR, exist_ok=True)
+            with open(REGISTRY_CACHE, "w") as f:
+                json.dump(_registry, f, indent=2)
+        else:
+            _registry = read_local_metadata(REGISTRY_CACHE) or {}
+    return _registry
+
+
+def list_variants(feature):
+    return sorted((get_registry().get(feature) or {}).get("models", {}))
+
+
+def registry_entry(feature, variant=None):
+    feat = get_registry().get(feature)
+    if not feat:
+        return None
+    tag = variant or feat.get("default")
+    entry = feat.get("models", {}).get(tag)
+    return dict(entry, feature=feature, tag=tag) if entry else None
+
+
+def root_entry(title):
+    # denoisers and the tilt filter live at the repo root, outside the registry
+    entry = {"feature": title, "tag": title, "weights": f"{title}.h5", "metadata": f"{title}.json"}
+    meta = fetch_json(entry["metadata"]) if is_online() else None
+    if meta is not None:
+        entry.update({k: meta[k] for k in METADATA_KEYS if k in meta})
+        return entry
+    return entry if os.path.exists(_cache_path(entry["weights"])) else None
+
+
+def local_entry(title):
+    # a user's own model, copied into the cache root: its sidecar was not written by us, so it has no "feature"
+    for ext in (".h5", ".scnm"):
+        weights = os.path.join(MODEL_CACHE_DIR, title + ext)
+        meta = read_local_metadata(os.path.join(MODEL_CACHE_DIR, title + ".json"))
+        if os.path.exists(weights) and meta is not None and "feature" not in meta:
+            return {"feature": title, "tag": "local", "weights": title + ext}
+    return None
+
+
+def list_local_models():
+    if not os.path.isdir(MODEL_CACHE_DIR):
+        return []
+    stems = {os.path.splitext(f)[0] for f in os.listdir(MODEL_CACHE_DIR) if f.endswith((".h5", ".scnm"))}
+    return sorted(s for s in stems if local_entry(s) is not None)
+
+
+def entry_metadata(entry):
+    return {k: entry[k] for k in METADATA_KEYS if k in entry}
+
+
+def _cache_path(repo_path):
+    return os.path.join(MODEL_CACHE_DIR, *repo_path.split("/"))
+
+
+def _cache_paths(entry):
+    weights_path = _cache_path(entry["weights"])
+    metadata_path = _cache_path(entry["metadata"]) if entry.get("metadata") else os.path.splitext(weights_path)[0] + ".json"
+    return weights_path, metadata_path   # sidecar always sits next to the weights: load_model_weights finds it by stem
+
+
+def get_engine(feature, variant=None):
+    entry = registry_entry(feature, variant) or local_entry(feature)
+    if entry is None:
+        return None
+    return "2d" if entry["weights"].endswith(".scnm") else "3d"
+
+
+def _download(entry, weights_path, metadata_path, silent=False):
+    if not silent:
+        print(f"\nDownloading {entry['tag']} from {REPO_ID}...\n")
+    try:
+        hf_hub_download(repo_id=REPO_ID, filename=entry["weights"], cache_dir=MODEL_CACHE_DIR, local_dir=MODEL_CACHE_DIR)
+    except Exception as e:
+        raise RuntimeError(f"Failed to download {entry['weights']} from {REPO_ID}: {e}")
+    metadata = (fetch_json(entry["metadata"]) if entry.get("metadata") else None) or entry_metadata(entry)
+    metadata.update(feature=entry["feature"], tag=entry["tag"])   # the cache describes itself
+    os.makedirs(os.path.dirname(metadata_path), exist_ok=True)
+    with open(metadata_path, "w") as f:
+        json.dump(metadata, f, indent=2)
+    if not silent:
+        print(f"\nNetwork weights saved to cache at {weights_path}\n")
     return metadata
 
 
-def is_remote_newer(local_meta, remote_meta):
-    if not local_meta or not remote_meta:
-        return False
-
-    local_ts = local_meta.get("timestamp")
-    remote_ts = remote_meta.get("timestamp")
-
-    if not local_ts or not remote_ts:
-        return False
-
-    return remote_ts > local_ts
-
-
-def download_model_files(info, remote_metadata=None, silent=False):
-    os.makedirs(MODEL_CACHE_DIR, exist_ok=True)
-    if not silent: print(f"\nDownloading {info['model_title']} from {info['repo_id']}...\n")
-    try:
-        hf_hub_download(repo_id=info["repo_id"], filename=info["weights_filename"], cache_dir=MODEL_CACHE_DIR, local_dir=MODEL_CACHE_DIR)
-        prev = os.environ.get("HF_HUB_DISABLE_PROGRESS_BARS")
-        os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
-        hf_hub_download(repo_id=info["repo_id"], filename=info["metadata_filename"], cache_dir=MODEL_CACHE_DIR, local_dir=MODEL_CACHE_DIR)
-        if prev is None: os.environ.pop("HF_HUB_DISABLE_PROGRESS_BARS", None)
-        else: os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = prev
-    except Exception as e:
-        raise RuntimeError(f"Failed to download {info['model_title']} from {info['repo_id']}: {e}")
-    metadata = remote_metadata or read_local_metadata(info["metadata_path"])
-    if not silent: print(f"\nNetwork weights saved to cache at {info['weights_path']}\n")
-    return info["weights_path"], metadata
-
-
-def get_model(model_title, force_download=False, silent=False, _2d=False):
-    info = get_model_info(model_title, _2d=_2d)
-    online = is_online()
-    weights_local = os.path.exists(info["weights_path"])
-    local_meta = read_local_metadata(info["metadata_path"])
-
-    if not online:
-        if not weights_local:
-            print(f"\nThe required network weights for {model_title} are not available in the local cache {MODEL_CACHE_DIR} and there is no internet connection available to download them - aborting...\n")
-            return None, None
-        if not silent:
-            print("\nLocal model found. There may be updates available, but we cannot check without an internet connection.\n")
-        return info["weights_path"], local_meta
-
-    remote_meta = get_remote_metadata(model_title, _2d=_2d)
-    if remote_meta is None:
-        if weights_local:
-            if not silent: print(f"Remote metadata for {model_title} not found; using existing local weights.")
-            return info["weights_path"], local_meta
-        print(f"\nModel '{model_title}' not found. For an up-to-date list of available models, run 'easymode list'\n")
+def get_model(model_title, force_download=False, silent=False, variant=None, _2d=None):
+    entry = registry_entry(model_title, variant) or local_entry(model_title) or root_entry(model_title)
+    if entry is None:
+        variants = list_variants(model_title)
+        if variant and variants:
+            print(f"\nNo '{variant}' model for {model_title}; available: {', '.join(variants)}\n")
+        else:
+            print(f"\nNo model available for '{model_title}'. Run 'easymode list' to see the available features.\n")
         return None, None
 
-    needs_update = is_remote_newer(local_meta, remote_meta)
-    if force_download or not weights_local or needs_update:
-        if not silent:
-            if not weights_local: print(f"\nThe required network weights for {model_title} are not available in the local cache.")
-            elif needs_update: print(f"\nNew version available for {model_title}, updating...")
-            else: print(f"\nForce downloading {model_title}...")
-        return download_model_files(info, remote_metadata=remote_meta, silent=silent)
+    weights_path, metadata_path = _cache_paths(entry)
+    local_meta = read_local_metadata(metadata_path)
+    cached = os.path.exists(weights_path)
 
-    return info["weights_path"], local_meta or remote_meta
+    if entry["tag"] == "local" or not is_online():
+        if not cached:
+            print(f"\n{model_title} is not in the local cache {MODEL_CACHE_DIR} and there is no internet connection to download it - aborting.\n")
+            return None, None
+        return weights_path, local_meta or entry_metadata(entry)
 
-
-def get_preferred_mode(feature):
-    """Determine whether to use 3d or 2d for a feature.
-
-    Checks the feature's JSON metadata for a 'preferred' field ('3d' or '2d').
-    Falls back to '3d' if a .h5 exists, '2d' if only .scnm exists.
-    """
-    info_3d = get_model_info(feature, _2d=False)
-    info_2d = get_model_info(feature, _2d=True)
-
-    # Try reading preference from the 3d metadata first, then 2d
-    for info in (info_3d, info_2d):
-        meta = read_local_metadata(info["metadata_path"])
-        if meta and 'preferred' in meta:
-            return meta['preferred']
-
-    # Check remote metadata if local doesn't have it
-    if is_online():
-        remote = {}
-        for _2d in (False, True):
-            meta = get_remote_metadata(feature, _2d=_2d)
-            if meta and 'preferred' in meta:
-                return meta['preferred']
-            remote[_2d] = meta
-        if remote[False] and not remote[True]:
-            return '3d'
-        if remote[True] and not remote[False]:
-            return '2d'
-
-    # Fallback: 3d if .h5 exists or can be found, else 2d
-    if os.path.exists(info_3d["weights_path"]):
-        return '3d'
-    if os.path.exists(info_2d["weights_path"]):
-        return '2d'
-    return '3d'
+    if force_download or not cached or _newer(entry.get("timestamp"), (local_meta or {}).get("timestamp")):
+        if not silent and cached and not force_download:
+            print(f"\nNew version available for {model_title}, updating...")
+        local_meta = _download(entry, weights_path, metadata_path, silent=silent)
+    return weights_path, local_meta or entry_metadata(entry)
 
 
 def load_model_weights(weights_path):
     import tensorflow as tf
     base = os.path.basename(weights_path)
-    # The sidecar wins over the filename: a user model titled e.g. 'my_iso_run' would otherwise
-    # be built as the n2n denoiser. Fall back to the filename for models packaged without an arch.
+    # sidecar wins over the filename: a user model titled e.g. 'my_iso_run' would otherwise be built as the n2n denoiser
     arch_name = (read_local_metadata(os.path.splitext(weights_path)[0] + '.json') or {}).get('arch')
-    # n2n, ddw and iso share the same UNet architecture -- they differ only in the
-    # (x, y) supervision used to train them (even/odd vs raw/teacher-corrected).
     if arch_name in ("n2n", "ddw", "iso") or (arch_name is None and ("n2n" in base or "ddw" in base or "iso" in base)):
         from easymode.n2n.model import create
         dummy_input = tf.zeros((1, 160, 160, 160, 1))
@@ -189,74 +200,47 @@ def load_model(local_path):
 
 
 def clear_model_cache(model_title=None):
-    if model_title:
-        for _2d in (False, True):
-            info = get_model_info(model_title, _2d=_2d)
-            for p in (info["weights_path"], info["metadata_path"]):
-                if os.path.exists(p):
-                    os.remove(p)
-                    print(f"Removed {p}")
-    else:
-        import shutil
+    if not model_title:
         if os.path.exists(MODEL_CACHE_DIR):
             shutil.rmtree(MODEL_CACHE_DIR)
             print(f"Cleared model cache: {MODEL_CACHE_DIR}")
+        return
+    for root, _, files in os.walk(MODEL_CACHE_DIR):
+        for name in files:
+            sidecar = os.path.join(root, name)
+            if not name.endswith(".json") or (read_local_metadata(sidecar) or {}).get("feature") != model_title:
+                continue
+            stem = os.path.splitext(sidecar)[0]
+            for p in [sidecar] + [stem + ext for ext in (".h5", ".scnm")]:
+                if os.path.exists(p):
+                    os.remove(p)
+                    print(f"Removed {p}")
+
+
+def print_notification():
+    message = ((fetch_json("notification.json") or {}).get("message") or "").strip()
+    if message:
+        print()
+        print(message)
 
 
 def list_remote_models():
-    """List features and whether they have 3d, 2d, or both models."""
-    if not is_online():
-        print("Cannot list remote models: No internet connection")
-        return []
+    if is_online():
+        print_notification()
+    registry = get_registry()
+    if not registry:
+        print(f"\nCould not read the model registry from {REPO_ID}" + ("." if is_online() else " (no internet connection)."))
 
-    try:
-        api = HfApi()
-        repo_files = api.list_repo_files(HF_REPO_ID)
-
-        # collect bases from h5 (3d)
-        h5_bases = {
-            os.path.splitext(os.path.basename(f))[0]
-            for f in repo_files
-            if f.endswith(".h5")
-        } - NON_SEGMENTATION_MODELS
-
-        # collect bases from scnm (2d)
-        scnm_bases = {
-            os.path.splitext(os.path.basename(f))[0]
-            for f in repo_files
-            if f.endswith(".scnm")
-        } - NON_SEGMENTATION_MODELS
-
-        # union of all bases
-        all_bases = sorted(h5_bases | scnm_bases)
-
+    models = []
+    if registry:
         print("\neasymode can currently segment the following features:\n")
-        models = []
-
-        for base in all_bases:
-            has_3d = base in h5_bases
-            has_2d = base in scnm_bases
-
-            if has_3d and has_2d:
-                pref = get_preferred_mode(base)
-                dim = f"3D/2D (default: {pref.upper()})"
-            elif has_3d:
-                dim = "3D"
-            else:
-                dim = "2D"
-
-            print(f"   > {base.ljust(30)} {dim}")
-
-            models.append({
-                "title": base,
-                "dim": dim,
-                "has_3d": has_3d,
-                "has_2d": has_2d,
-            })
-
-        print()
-        return models
-
-    except Exception as e:
-        print(f"Error listing remote models: {e}")
-        return []
+        print(f"     {''.ljust(30)} versions")
+        for feature in sorted(registry):
+            tags = list_variants(feature)
+            default = (registry[feature] or {}).get("default")
+            label = ", ".join(t + "*" if t == default else t for t in tags)
+            print(f"   > {feature.ljust(30)} {label}")
+            models.append({"title": feature, "variants": tags, "default": default})
+        print("\n   *default model. use --version to select a specific model variant.")
+    print()
+    return models

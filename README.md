@@ -39,7 +39,7 @@ easymode pick ribosome --data segmented/ --output coordinates/ribosome --size 20
 easymode reconstruct --frames frames/ --mdocs mdocs/ --apix 1.56 --dose 4.6
 
 # Denoise tomograms
-easymode denoise --method n2n --mode direct --data warp_tiltseries/reconstruction --output denoised
+easymode denoise --method n2n --data warp_tiltseries/reconstruction --output denoised
 ```
 
 Pretrained networks are hosted on [HuggingFace](https://huggingface.co/mgflast/easymode) and downloaded automatically on first use. See the [user guide](https://mgflast.github.io/easymode/user_guide/overview/) for detailed usage.

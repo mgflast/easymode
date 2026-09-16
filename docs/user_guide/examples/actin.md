@@ -25,7 +25,7 @@ We now have 143 reconstructed tomograms at 10.00 Å/px in `warp_tiltseries/reco
 
 ### Step 2: tomogram denoising
 ```
-easymode denoise --data warp_tiltseries/reconstruction --output denoised --mode direct --method n2n --gpu 0,1,2,3
+easymode denoise --data warp_tiltseries/reconstruction --output denoised --method n2n --gpu 0,1,2,3
 ```
 This produced 143 denoised tomograms in `denoised/`.
 

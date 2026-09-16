@@ -64,7 +64,7 @@ def main():
     subparsers.add_parser('list', help='List the features for which pretrained general segmentation networks are available.')
 
     if dev:
-        package = subparsers.add_parser('package', description='Package model and weights. Note that this is used for 3D models only; 2D models are packaged and distributed with Ais.')
+        package = subparsers.add_parser('package', description='Package model and weights. Note that this is used for easymode models only; Ais models are packaged in Ais.')
         package.add_argument('-c', "--checkpoint_directory", type=str, required=True, help="Path to the checkpoint directory to package from.")
         package.add_argument('-t', "--title", type=str, default=None, help="Title of the model to package. If not provided, the name of the checkpoint directory is used.")
         package.add_argument('--apix', type=float, default=10.0, help="Pixel size of the training data in Angstrom (default: 10.0). This is used to rescale the model to the correct physical pixel size during inference.")
@@ -94,14 +94,13 @@ def main():
     segment.add_argument('--tta', required=False, type=int, default=4, help="Integer between 1 and 16. For values > 1, test-time augmentation is performed by averaging the predictions of several transformed versions of the input. Higher values can yield better results but increase computation time. (default: 4)")
     segment.add_argument('--output', required=False, type=str, default="segmented", help="Directory to save the output (default: ./segmented/)")
     segment.add_argument('--overwrite', action='store_true', help='If set, overwrite existing segmentations in the output directory.')
-    segment.add_argument('--tile', type=_parse_zyx, default=None, help="Inference tile size as ZxYxX (default 160x160x160). Each dim is capped at the volume size. Decrease if you run out of GPU memory; only affects 3D models.")
-    segment.add_argument('--overlap', type=int, default=None, help="Overlap between neighbouring inference tiles, in voxels (default 48). Tiles stride by (tile - 2*overlap), so the overlap is reduced automatically if it is too large for the tile size. Only affects 3D models.")
+    segment.add_argument('--tile', type=_parse_zyx, default=None, help="Inference tile size as ZxYxX (default 160x160x160). Each dim is capped at the volume size. Decrease if you run out of GPU memory.")
+    segment.add_argument('--overlap', type=int, default=None, help="Overlap between neighbouring inference tiles, in voxels (default 48). Tiles stride by (tile - 2*overlap), so the overlap is reduced automatically if it is too large for the tile size.")
     segment.add_argument('--format', type=str, choices=['float32', 'uint16', 'int8'], default='int8', help='Output format for the segmented volumes (default: int8).')
     segment.add_argument('--gpu', type=str, default=None, help="Comma-separated list of GPU ids to use (leave empty to use all available devices).")
     segment.add_argument('--override-header-apix', type=float, default=None, help="Override the pixel size stored in the .mrc header (in Angstrom). Only use this if the header value is missing or wrong - if the header is correct, do not use this flag. Set to 0.0 to disallow any scaling.")
-    segment.add_argument('--model', type=str, default=None, help="Path to a local .h5 model, e.g. one you trained yourself with 'easymode train'. Its .json sidecar must sit next to it. Always 3D.")
-    segment.add_argument('--2d', dest="force_2d", action='store_true', help='Force 2D segmentation for all features (overrides per-model preference).')
-    segment.add_argument('--3d', dest="force_3d", action='store_true', help='Force 3D segmentation for all features (overrides per-model preference).')
+    segment.add_argument('--model', type=str, default=None, help="Path to a local .h5 model, e.g. one you trained yourself with 'easymode train'. Its .json sidecar must sit next to it.")
+    segment.add_argument('--version', dest='variant', type=str, default=None, help="Which version of the model to use, e.g. 'sv2-2.5d'. Default: the feature's default model. Run 'easymode list' to see the available versions.")
 
     report = subparsers.add_parser('report', help='Help improve easymode by reporting model failures and sharing the relevant volumes. All data will be kept confidential and is never released publicly.')
     report.add_argument("--tomogram", type=str, help="Path to the .mrc file to upload")
@@ -290,19 +289,17 @@ def main():
                 features = [os.path.splitext(os.path.basename(args.model))[0].lower()]
         elif not features:
             parser.error('name at least one feature to segment, or point at a local model with --model.')
-        from easymode.core.distribution import get_preferred_mode
+        from easymode.core.distribution import get_engine
         from easymode.core.ais_wrapper import dispatch_segment as dispatch_segment_2d
         from easymode.segmentation.inference import dispatch_segment as dispatch_segment_3d
         for feature in features:
             if args.model is not None:
                 mode = '3d'   # a local 2D model is a .scnm, owned by Ais
-            elif args.force_2d:
-                mode = '2d'
-            elif args.force_3d:
-                mode = '3d'
             else:
-                mode = get_preferred_mode(feature)
-            print(f'{feature}: using {mode.upper()} model')
+                mode = get_engine(feature, args.variant)
+            if mode is None:
+                print(f"No {args.variant + ' ' if args.variant else ''}model available for '{feature}' - run 'easymode list' to see what is available.")
+                continue
             dispatch = dispatch_segment_2d if mode == '2d' else dispatch_segment_3d
             kwargs = dict(
                 feature=feature,
@@ -314,6 +311,7 @@ def main():
                 data_format=args.format,
                 gpus=args.gpu,
                 data_apix=args.override_header_apix,
+                variant=args.variant,
             )
             if mode != '2d':
                 kwargs['tile_size'] = args.tile
