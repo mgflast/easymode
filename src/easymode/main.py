@@ -63,6 +63,11 @@ def main():
 
     subparsers.add_parser('list', help='List the features for which pretrained general segmentation networks are available.')
 
+    download = subparsers.add_parser('download', help='Download models to the local cache, e.g. for use on a machine without internet access.')
+    download.add_argument('features', metavar='FEATURE', nargs='*', type=str, help="Features to download, e.g. 'ribosome membrane' (see 'easymode list'). Also accepts the denoisers: n2n_direct, ddw_direct, iso_direct, tilt.")
+    download.add_argument('--version', dest='variant', type=str, default=None, help="Which version of the model(s) to download. Default: each feature's default model.")
+    download.add_argument('--all', action='store_true', help='Download every version of every model, plus the denoisers.')
+
     if dev:
         package = subparsers.add_parser('package', description='Package model and weights. Note that this is used for easymode models only; Ais models are packaged in Ais.')
         package.add_argument('-c', "--checkpoint_directory", type=str, required=True, help="Path to the checkpoint directory to package from.")
@@ -380,6 +385,11 @@ def main():
     elif args.command == 'list':
         from easymode.core.distribution import list_remote_models
         list_remote_models()
+    elif args.command == 'download':
+        from easymode.core.distribution import download_models
+        if not args.features and not args.all:
+            parser.error('name at least one feature to download, or use --all.')
+        download_models(args.features, version=args.variant, everything=args.all)
 
 if __name__ == "__main__":
     main()

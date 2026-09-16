@@ -217,6 +217,24 @@ def clear_model_cache(model_title=None):
                     print(f"Removed {p}")
 
 
+ROOT_MODELS = ("n2n_direct", "ddw_direct", "iso_direct", "tilt")
+
+
+def download_models(features=(), version=None, everything=False, silent=False):
+    """Fetch models into the cache for offline use: named features (one version each), or everything."""
+    if not is_online():
+        print("\nAn internet connection is required to download models.\n")
+        return
+    if everything:
+        jobs = [(f, tag) for f in sorted(get_registry()) for tag in list_variants(f)] + [(t, None) for t in ROOT_MODELS]
+    else:
+        jobs = [(f, version) for f in features]
+    for feature, tag in jobs:
+        get_model(feature, variant=tag, silent=silent)
+    if everything and not silent:
+        print(f"\nAll models are now in {MODEL_CACHE_DIR}.\n")
+
+
 def print_notification():
     message = ((fetch_json("notification.json") or {}).get("message") or "").strip()
     if message:
