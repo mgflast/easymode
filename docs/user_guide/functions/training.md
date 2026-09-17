@@ -40,12 +40,12 @@ training_data/
     {
       "apix": 10.0,
       "apix_z": 10.0,
-      "annotated_flavour": "x_n2n",
+      "validation_flavour": "x_n2n",
       "normalization": "global_mad"
     }
     ```
 
-    `apix` and `apix_z` are the pixel sizes the model is packaged with, and determine how tomograms are rescaled at inference. `annotated_flavour` names the input variant that the labels were drawn on; it is the only one used for validation, and defaults to `x_main` if present or else to the first variant alphabetically. `normalization` is passed on to the trained model, so that inference measures the input the same way training did; `--normalization` on the command line overrides it.
+    `apix` and `apix_z` are the pixel sizes the model is packaged with, and determine how tomograms are rescaled at inference. `validation_flavour` names the input variant that validation is scored on (training draws from all of them); it defaults to `x_main` if present or else to the first variant alphabetically. `normalization` is passed on to the trained model, so that inference measures the input the same way training did; `--normalization` on the command line overrides it.
 
 ??? note "Input normalization"
 
@@ -68,7 +68,7 @@ easymode train --data training_data/ --title my_feature
 Output:
 ```
 training_data: 1000 samples, 160x160x160, 10.00 A/px
-  flavours: x_ddw=1000 x_even=1000 x_iso=1000 x_n2n=1000 x_odd=1000 x_raw=1000 (annotated: x_n2n)
+  flavours: x_ddw=1000 x_even=1000 x_iso=1000 x_n2n=1000 x_odd=1000 x_raw=1000 (validation: x_n2n)
 Loaded 950 samples for training (830 positive, 120 negative)
 Loaded 50 samples for validation (44 positive, 6 negative)
 

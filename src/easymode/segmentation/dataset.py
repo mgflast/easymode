@@ -16,7 +16,7 @@ from easymode.segmentation.normalization import NORM_GLOBAL_MAD
 INPUT_PREFIX = 'x_'
 LABEL_DIR = 'y'
 VALIDITY_DIR = 'validity'
-DEFAULT_ANNOTATED_FLAVOUR = 'x_main'
+DEFAULT_VALIDATION_FLAVOUR = 'x_main'
 RAW_FLAVOUR = 'x_raw'
 
 
@@ -58,10 +58,10 @@ class TrainingDataset:
         if not self.ids:
             raise ValueError(f'{path}: no sample has an input volume in any {INPUT_PREFIX}* directory.')
 
-        annotated = self.meta.get('annotated_flavour')
-        if annotated not in self.flavours:
-            annotated = DEFAULT_ANNOTATED_FLAVOUR if DEFAULT_ANNOTATED_FLAVOUR in self.flavours else self.flavours[0]
-        self.annotated_flavour = annotated
+        validation = self.meta.get('validation_flavour', self.meta.get('annotated_flavour'))   # old key
+        if validation not in self.flavours:
+            validation = DEFAULT_VALIDATION_FLAVOUR if DEFAULT_VALIDATION_FLAVOUR in self.flavours else self.flavours[0]
+        self.validation_flavour = validation
         self.raw_flavour = RAW_FLAVOUR if RAW_FLAVOUR in self.flavours else None
         self.has_validity = os.path.isdir(os.path.join(self.root, VALIDITY_DIR))
         self.normalization = self.meta.get('normalization', NORM_GLOBAL_MAD)
@@ -130,7 +130,7 @@ class TrainingDataset:
         cov = ' '.join(f'{f}={sum(1 for i in self.ids if f in self._coverage[i])}' for f in self.flavours)
         apix = f'{self.apix:.2f} A/px' if self.apix else 'unknown A/px'
         return (f'{self.name}: {len(self.ids)} samples, {"x".join(str(s) for s in self.box_shape)}, {apix}'
-                f'\n  flavours: {cov} (annotated: {self.annotated_flavour})')
+                f'\n  flavours: {cov} (validation: {self.validation_flavour})')
 
     def close(self):
         if self._tmp is not None:

@@ -32,7 +32,7 @@ easymode segment ribosome --data warp_tiltseries/reconstruction --output segment
 Optional arguments:
 ```
 --version <tag>         Which version of the model to use (see `easymode list`). Default: the feature's default model.
---tta <int>             Test-time augmentation factor (default: 4). The model will segment multiple augmented versions of the input and average the results.
+--tta <int>             Test-time augmentation factor (default: 2). The model will segment multiple augmented versions of the input and average the results.
 --overwrite             If used, if output tomograms already exist in --output, they will be overwritten.
 --format                Output format for the segmented volumes. Choices are 'float32', 'uint16', or 'int8' (default).
 ```

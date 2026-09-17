@@ -13,7 +13,7 @@ tf.get_logger().setLevel('ERROR')
 tf.config.optimizer.set_experimental_options({'layout_optimizer': False})
 
 DEFAULT_TILE_SIZE = (160, 256, 256)  # (Z, Y, X); capped per-axis to the volume dims at tiling time
-DEFAULT_OVERLAP = 24
+DEFAULT_OVERLAP = 32
 
 
 _PLACEHOLDER_BYTES = 8192   # the 10x10x10 claim file is ~5 kB; a real segmentation is megabytes

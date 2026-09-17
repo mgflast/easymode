@@ -84,7 +84,7 @@ class Sample:
     def load(self, validation=False, flavourmix=AUGMENTATIONS_FLAVOURMIX, z_depth=None):
         available_flavours = sorted(self.flavours.keys())
         if validation:
-            flavour = self.dataset.annotated_flavour
+            flavour = self.dataset.validation_flavour
             img = read_volume(self.flavours[flavour if flavour in self.flavours else available_flavours[0]], self.cache)
         else:
             raw = self.dataset.raw_flavour
