@@ -176,18 +176,12 @@ def main():
         denoise_train.add_argument('-le', '--lr_end',   type=float, default=1e-5, help="Final LR. Default kept identical to the calibrated value.")
         denoise_train.add_argument('--gpus', type=str, default='0,1,2,3', help="Comma-separated GPU ids for the training stage (default '0,1,2,3').")
 
-    if dev:
-        score_train = subparsers.add_parser('score_train', description='Train the tomogram quality scorer: a pairwise (Bradley-Terry) ranker fed your labelled pairs (pairs.csv, from `easymode score_label`) plus free synthetic-corruption pairs.')
-        score_train.add_argument('-e', '--epochs', type=int, default=40)
-        score_train.add_argument('--pairs', type=str, default=None, help="Labelled pairs CSV from `easymode score_label` (default <ROOT>/score/pairs.csv).")
-
-        score = subparsers.add_parser('score', description='Score every tomogram with a trained scorer and write the global ranking to <ROOT>/score/ranking.csv.')
-        score.add_argument('--model', type=str, default=None, help="Trained scorer directory (default <ROOT>/score/runs/scorer_best).")
-        score.add_argument('--out', type=str, default=None, help="Output ranking.csv (default <ROOT>/score/ranking.csv).")
-
-    score_label = subparsers.add_parser('score_label', help='Launch the pairwise quality labeling applet (writes <ROOT>/score/pairs.csv).')
-    score_label.add_argument('--out', type=str, default=None, help="pairs.csv path (default <ROOT>/score/pairs.csv).")
-    score_label.add_argument('--seed', type=int, default=0)
+    score = subparsers.add_parser('score', help='Score the tilt-series alignment quality of tomograms (lower = better aligned).')
+    score.add_argument("--data", nargs="+", type=str, required=True, help="One or more directories, file paths, glob patterns, or .txt files containing one tomogram path per line. Score the raw 10 A/px reconstructions, not denoised volumes.")
+    score.add_argument('--model', type=str, default=None, help="Path to a local misalignment .h5 model. Its .json sidecar must sit next to it.")
+    score.add_argument('--out', type=str, default=None, help="Output .star file. Default: the Pom summary (./pom/summary.star) if it exists, else ./alignment_scores.star. Scores are added as columns alignment_score and alignment_spread.")
+    score.add_argument('--overwrite', action='store_true', help='If set, rescore tomograms that already have an alignment_score in the output.')
+    score.add_argument('--gpu', type=str, default=None, help="GPU id to use (default: first available).")
 
 
     args = parser.parse_args()
@@ -244,15 +238,9 @@ def main():
                           lr_start=args.lr_start,
                           lr_end=args.lr_end,
                           gpus=args.gpus)
-    elif args.command == 'score_train':
-        from easymode.score.train import train_model
-        train_model(pairs=args.pairs, epochs=args.epochs)
     elif args.command == 'score':
         from easymode.score.inference import dispatch as score_dispatch
-        score_dispatch(model=args.model, out=args.out)
-    elif args.command == 'score_label':
-        from easymode.score.label import label
-        label(out=args.out, seed=args.seed)
+        score_dispatch(data=args.data, model=args.model, out=args.out, overwrite=args.overwrite, gpu=args.gpu)
     elif args.command == 'tilt_train':
         from easymode.tiltfilter.train import train_model
         train_model(batch_size=args.batch_size,

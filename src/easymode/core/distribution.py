@@ -183,6 +183,9 @@ def load_model_weights(weights_path):
     elif arch_name == "tilt" or (arch_name is None and "tilt" in base):
         from easymode.tiltfilter.model import create
         dummy_input = [tf.zeros((1, 256, 256, 1)), tf.zeros((1, 256, 256, 1))]
+    elif arch_name == "misalignment":
+        from easymode.score.model import create
+        dummy_input = tf.zeros((1, 96, 96, 96, 1))
     else:
         from easymode.segmentation.models import get_arch
         arch = get_arch(arch_name)
@@ -217,7 +220,7 @@ def clear_model_cache(model_title=None):
                     print(f"Removed {p}")
 
 
-ROOT_MODELS = ("n2n_direct", "ddw_direct", "iso_direct", "tilt")
+ROOT_MODELS = ("n2n_direct", "ddw_direct", "iso_direct", "tilt", "misalignment")
 
 
 def download_models(features=(), version=None, everything=False, silent=False):

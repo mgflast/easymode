@@ -271,7 +271,26 @@ def segmentation_thread(tomogram_list, model_path, feature, output_dir, gpu, bat
                 os.remove(output_file)
             print(f"{j}/{len(tomogram_list)} (on GPU {gpu}) - {feature} - {os.path.basename(tomogram_path)} - ERROR: {e}")
 
-def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_size=8, overwrite=False, data_format='int8', gpus=None, data_apix=None, use_depth=1.0, xy_margin=0, tile_size=None, overlap=None, model_path=None, variant=None):
+def collect_tomograms(patterns):
+    tomograms = []
+    for p in patterns:
+        if p.endswith('.txt') and os.path.isfile(p):
+            # .txt file with one tomogram path per line (e.g. a pom subset) (260331)
+            with open(p) as f:
+                for line in f:
+                    entry = line.strip()
+                    if entry and not entry.endswith('.mrc'):
+                        entry += '.mrc'
+                    if entry:
+                        tomograms.append(entry)
+        elif os.path.isdir(p):
+            tomograms.extend(glob.glob(os.path.join(p, '*.mrc')))
+        else:
+            tomograms.extend(glob.glob(p))
+    return [f for f in sorted(set(tomograms)) if os.path.splitext(f)[-1] == '.mrc']
+
+
+def dispatch_segment(feature,data_directory, output_directory, tta=1, batch_size=8, overwrite=False, data_format='int8', gpus=None, data_apix=None, use_depth=1.0, xy_margin=0, tile_size=None, overlap=None, model_path=None, variant=None):
     if tile_size is None:
         tile_size = DEFAULT_TILE_SIZE
     if overlap is None:
@@ -320,26 +339,7 @@ def dispatch_segment(feature, data_directory, output_directory, tta=1, batch_siz
         f'overlap: {overlap}\n'
     )
 
-    # Collect tomograms from all patterns / paths
-    tomograms = []
-    for p in patterns:
-        if p.endswith('.txt') and os.path.isfile(p):
-            # .txt file with one tomogram path per line (e.g. a pom subset) (260331)
-            with open(p) as f:
-                for line in f:
-                    entry = line.strip()
-                    if entry and not entry.endswith('.mrc'):
-                        entry += '.mrc'
-                    if entry:
-                        tomograms.append(entry)
-        elif os.path.isdir(p):
-            matches = glob.glob(os.path.join(p, '*.mrc'))
-            tomograms.extend(matches)
-        else:
-            matches = glob.glob(p)
-            tomograms.extend(matches)
-
-    tomograms = [f for f in sorted(set(tomograms)) if os.path.splitext(f)[-1] == '.mrc']
+    tomograms = collect_tomograms(patterns)
 
     print(f'Found {len(tomograms)} tomograms to segment. \n')
 
