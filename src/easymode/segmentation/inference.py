@@ -60,7 +60,7 @@ class XLAModel:
 
     Called like the model (``m(x, training=False)``), so it drops in wherever a model is. XLA fuses
     the memory-bound work between the convolutions (GroupNorm, activations, residual adds), which
-    dominates a 3D UNet's time on large tiles: 2.5-3x faster per tomogram with near-identical output.
+    dominates a 3D UNet's time on large tiles: 2-6x faster per tomogram with near-identical output.
     It is the compilation ``train --xla`` already uses. The first call for each tile shape compiles
     (tens of seconds); tiles of one shape reuse it. If compiling raises, e.g. libdevice not found, it
     warns once and continues with the plain model. A missing or too old ptxas can abort the process

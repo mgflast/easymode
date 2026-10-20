@@ -106,7 +106,7 @@ def main():
     segment.add_argument('--override-header-apix', type=float, default=None, help="Override the pixel size stored in the .mrc header (in Angstrom). Only use this if the header value is missing or wrong - if the header is correct, do not use this flag. Set to 0.0 to disallow any scaling.")
     segment.add_argument('--model', type=str, default=None, help="Path to a local .h5 model, e.g. one you trained yourself with 'easymode train'. Its .json sidecar must sit next to it.")
     segment.add_argument('--version', dest='variant', type=str, default=None, help="Which version of the model to use, e.g. 'sv2-2.5d'. Default: the feature's default model. Run 'easymode list' to see the available versions.")
-    segment.add_argument('--xla', action='store_true', help="Compile 3D models into optimized GPU code (XLA), as 'easymode train --xla' does. Typically 2.5-3x faster after the first tomogram, which pays for the compilation. Like training with --xla it needs the CUDA compiler tools in your environment; if compiling fails, segmentation continues without it.")
+    segment.add_argument('--xla', action='store_true', help="Compile 3D models into optimized GPU code (XLA), as 'easymode train --xla' does. Typically 2-6x faster after the first tomogram, which pays for the compilation. Like training with --xla it needs the CUDA compiler tools in your environment; if compiling fails, segmentation continues without it.")
 
     report = subparsers.add_parser('report', help='Help improve easymode by reporting model failures and sharing the relevant volumes. All data will be kept confidential and is never released publicly.')
     report.add_argument("--tomogram", type=str, help="Path to the .mrc file to upload")
