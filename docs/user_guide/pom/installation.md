@@ -6,14 +6,19 @@ Pom is installed together with easymode (`pip install easymode`), so there is no
 
 ## Pom browser app
 
-The browser app (`pom browse`) needs streamlit, which is not installed by default because it conflicts with tensorflow's protobuf requirement. To use the app, install streamlit first and then protobuf:
+The browser app (`pom browse`) needs streamlit, which is not installed by default because it conflicts with the protobuf requirement of tensorflow 2.11. To use the app, install streamlit:
 
 ```
 pip install streamlit==1.56.0 streamlit-aggrid
+```
+
+With TensorFlow 2.15 or newer, that is all. With TensorFlow 2.11, then also install protobuf:
+
+```
 pip install protobuf==3.20.0
 ```
 
-pip will warn that tensorflow or streamlit is incompatible with this protobuf version. Ignore that; it works.
+pip will warn that tensorflow or streamlit is incompatible with this protobuf version. Ignore that; it works. Do not do this with TensorFlow 2.20 or newer, which needs protobuf 5.28 or newer and does not import with 3.20.
 
 ## 3D visualization
 

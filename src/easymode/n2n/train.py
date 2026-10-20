@@ -20,6 +20,7 @@ import numpy as np
 import tensorflow as tf
 from easymode.segmentation.augmentations import *  # noqa: F401,F403 -- np/random shim used below
 from easymode.training.sampler import ROOT, MODES
+from easymode.core.h5weights import BestWeightsCheckpoint
 
 
 class N2NDataloader:
@@ -119,6 +120,8 @@ def train_n2n(mode, batch_size=32, box_size=96, epochs=100, lr_start=1e-3, lr_en
 
     with tf.distribute.MirroredStrategy().scope():
         model = create()
+        # build eagerly: built inside fit's trace, the nested variables get duplicate names, which a .h5 cannot hold
+        model(tf.zeros((1, box_size, box_size, box_size, 1)))
     model.optimizer.learning_rate.assign(lr_start)
 
     train_ds, train_steps = N2NDataloader(mode=mode, batch_size=batch_size, box_size=box_size,
@@ -131,14 +134,8 @@ def train_n2n(mode, batch_size=32, box_size=96, epochs=100, lr_start=1e-3, lr_en
         ckpt_dir += "/"
     os.makedirs(ckpt_dir, exist_ok=True)
 
-    cb_ckpt_train = tf.keras.callbacks.ModelCheckpoint(
-        filepath=f"{ckpt_dir}training_loss",
-        monitor="loss", save_best_only=True, save_weights_only=True, mode="min", verbose=1,
-    )
-    cb_ckpt_val = tf.keras.callbacks.ModelCheckpoint(
-        filepath=f"{ckpt_dir}validation_loss",
-        monitor="val_loss", save_best_only=True, save_weights_only=True, mode="min", verbose=1,
-    )
+    cb_ckpt_train = BestWeightsCheckpoint(f"{ckpt_dir}training_loss.h5", monitor="loss", verbose=1)
+    cb_ckpt_val = BestWeightsCheckpoint(f"{ckpt_dir}validation_loss.h5", monitor="val_loss", verbose=1)
 
     def lr_decay(epoch, _):
         return float(lr_start + (lr_end - lr_start) * ((epoch - 2) / epochs))

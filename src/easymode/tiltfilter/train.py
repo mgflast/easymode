@@ -179,6 +179,7 @@ class DataLoader:
 
 def train_model(batch_size=32, epochs=100, lr_start=1e-3, lr_end=1e-5):
     from easymode.tiltfilter.model import create
+    from easymode.core.h5weights import BestWeightsCheckpoint
     tf.config.run_functions_eagerly(False)
 
     print(f'Training tilt selection network')
@@ -199,12 +200,7 @@ def train_model(batch_size=32, epochs=100, lr_start=1e-3, lr_end=1e-5):
     #                                                        save_weights_only=True,
     #                                                        mode='min',
     #                                                        verbose=1)
-    cb_checkpoint_train = tf.keras.callbacks.ModelCheckpoint(filepath=f'{checkpoint_dir}/' + "training_loss",
-                                                             monitor=f'loss',
-                                                             save_best_only=True,
-                                                             save_weights_only=True,
-                                                             mode='min',
-                                                             verbose=1)
+    cb_checkpoint_train = BestWeightsCheckpoint(f'{checkpoint_dir}/training_loss.h5', monitor='loss', verbose=1)
 
     def lr_decay(epoch, _):
         return float(lr_start + (lr_end - lr_start) * (epoch / epochs))

@@ -1,5 +1,5 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Input, Conv2D, ReLU, GlobalAveragePooling2D, Dense, Concatenate, BatchNormalization
+from tensorflow.keras.layers import Input, Conv2D, ReLU, GlobalAveragePooling2D, Dense, Concatenate, BatchNormalization, Lambda, Multiply, Subtract
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 
@@ -35,7 +35,8 @@ def create():
     e0 = encoder(x0)
     e1 = encoder(x1)
 
-    z = Concatenate()([e0, e1, tf.abs(e0 - e1), e0 * e1])
+    # layers rather than tf ops: Keras 3 cannot apply a tf op to a symbolic tensor. None has weights.
+    z = Concatenate()([e0, e1, Lambda(tf.abs)(Subtract()([e0, e1])), Multiply()([e0, e1])])
     z = Dense(256, activation='relu')(z)
     z = Dense(64, activation='relu')(z)
 
@@ -43,9 +44,12 @@ def create():
 
     model = Model(inputs=[x0, x1], outputs=out)
 
+    # jit_compile=False, as on Keras 2: Keras 3 would XLA-compile select_tilts' predict() for every new image size
+    # (2-4 s each) to save 2% per call.
     model.compile(optimizer=Adam(1e-3), loss='binary_crossentropy',
                   metrics=[tf.keras.metrics.Precision(name="prec"),
                            tf.keras.metrics.Recall(name="rec"),
-                           'accuracy'])
+                           'accuracy'],
+                  jit_compile=False)
 
     return model

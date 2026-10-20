@@ -27,10 +27,10 @@
 
 ??? question "3. When I install Pom, easymode breaks."
 
-    Sorry about that. There is an annoying compatibility problem between streamlit (used in Pom) and tensorflow (used in easymode). You can either:
+    Sorry about that. There is an annoying compatibility problem between streamlit (used in Pom) and tensorflow 2.11 (used in easymode): they require different versions of protobuf. With TensorFlow 2.15 or newer there is no conflict, see the [installation](functions/installation.md). On TensorFlow 2.11 you can either:
 
     1. Use separate easymode and Pom environments, or
-    2. After installing Pom, re-install easymode and then run `pip install protobuf==3.20.3`. There will be a warning telling you that this breaks tensorflow, but that is a lie. Ignore it.
+    2. After installing Pom, re-install easymode and then run `pip install protobuf==3.20.3`. There will be a warning telling you that this breaks tensorflow, but that is a lie. Ignore it. Only do this on TensorFlow 2.11: TensorFlow 2.20 and newer need protobuf 5.28 or newer, and do not import with 3.20.
 
 ??? question "4. Outputs for a particular network are very bad."
 
