@@ -40,6 +40,14 @@ conda activate easymode
 
 ```
 
+To use `--xla` (in `easymode segment` and `easymode train`) in this environment, also add the CUDA compiler tools once:
+```
+conda install -c nvidia cuda-nvcc=11.3.58
+mkdir -p $CONDA_PREFIX/lib/nvvm/libdevice
+ln -sf $CONDA_PREFIX/lib/libdevice.10.bc $CONDA_PREFIX/lib/nvvm/libdevice/libdevice.10.bc
+export XLA_FLAGS=--xla_gpu_cuda_data_dir=$CONDA_PREFIX/lib
+```
+
 
 ## Environment settings
 
