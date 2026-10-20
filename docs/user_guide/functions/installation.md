@@ -1,7 +1,17 @@
 # Installation
 
 ## Installing from scratch
-The following command will create a new environment called `easymode` and install easymode and all dependencies into it, including Ais and Pom.
+The following command will create a new environment called `easymode` and install easymode and all dependencies into it, including Ais and Pom. `tensorflow[and-cuda]` brings its own CUDA and cuDNN libraries, so no CUDA toolkit or library-path setup is needed.
+```
+conda create -n easymode python=3.10 git -c conda-forge
+conda activate easymode
+
+pip install "tensorflow[and-cuda]==2.15.1"
+pip install easymode
+```
+
+### Older setup: TensorFlow 2.11
+easymode also runs on TensorFlow 2.11, the version it was developed with. In that case the CUDA libraries come from conda:
 ```
 # Create environment with CUDA support
 conda create -n easymode python=3.10 cudatoolkit=11.2 cudnn=8.1 git -c conda-forge

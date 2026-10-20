@@ -35,7 +35,11 @@ Optional arguments:
 --tta <int>             Test-time augmentation factor (default: 2). The model will segment multiple augmented versions of the input and average the results.
 --overwrite             If used, if output tomograms already exist in --output, they will be overwritten.
 --format                Output format for the segmented volumes. Choices are 'float32', 'uint16', or 'int8' (default).
+--xla                   Compile 3D models into optimized GPU code (XLA), as 'easymode train --xla' does. Typically 2-6x faster after the first tomogram, which pays for the compilation.
 ```
+
+!!! tip
+    `--xla` gives the same segmentations as running without it, apart from rounding (a mask IoU above 0.9999 in our tests), and is worth it whenever you segment more than one tomogram. With the TensorFlow 2.15 installation it works without further setup and gives the largest gain, about 4-6x, so use it there. Like `easymode train --xla`, it needs the CUDA compiler tools, and in a TensorFlow 2.11 environment you add them once with `conda install -c nvidia cuda-nvcc=11.3.58`, make `$CONDA_PREFIX/lib/nvvm/libdevice/libdevice.10.bc` point at `$CONDA_PREFIX/lib/libdevice.10.bc`, and `export XLA_FLAGS=--xla_gpu_cuda_data_dir=$CONDA_PREFIX/lib`. If compilation fails with an error, easymode warns and continues without XLA. If the command does not work at all, run it without `--xla`. It applies to 3D models; 2.5D models are segmented by Ais and are unaffected.
 !!! note
     easymode uses almost exactly the same network architecture as [Membrain](https://github.com/CellArchLab/MemBrain-v2). If your hardware can handle Membrain, it should also work for easymode.
 

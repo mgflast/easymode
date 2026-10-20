@@ -48,7 +48,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "tensorflow>=2.11.0,<2.12",
+    "tensorflow>=2.11.0,<2.16",
     "ais-cryoet>=1.2.36",
     "pom-cryoet>=1.2.0",
     "mrcfile",
