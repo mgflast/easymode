@@ -39,7 +39,7 @@ Optional arguments:
 ```
 
 !!! tip
-    `--xla` gives the same segmentations as running without it, apart from rounding, and is worth it whenever you segment more than one tomogram. With the TensorFlow 2.15 [installation](installation.md) it works without further setup; in the older TensorFlow 2.11 setup it needs the CUDA compiler tools first (see the installation page). If compilation fails, easymode warns and continues without XLA.
+    `--xla` gives the same segmentations as running without it, apart from rounding, and is worth it whenever you segment more than one tomogram. With the TensorFlow 2.21 (or 2.15) [installation](installation.md) it works without further setup; in the older TensorFlow 2.11 setup it needs the CUDA compiler tools first (see the installation page). If compilation fails, easymode warns and continues without XLA.
 
 !!! note
     easymode uses almost exactly the same network architecture as [Membrain](https://github.com/CellArchLab/MemBrain-v2). If your hardware can handle Membrain, it should also work for easymode.

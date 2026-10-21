@@ -2,6 +2,7 @@ import os, mrcfile
 from dataclasses import dataclass
 from easymode.segmentation.augmentations import *
 from easymode.segmentation.dataset import open_datasets, close_datasets
+from easymode.core.h5weights import KERAS3, BestWeightsCheckpoint
 import tensorflow as tf
 import numpy as np
 
@@ -287,6 +288,10 @@ class DataLoader:
                 cycle_length=workers, num_parallel_calls=workers, deterministic=False)
         dataset = dataset.batch(batch_size=batch_size, drop_remainder=True).prefetch(tf.data.AUTOTUNE)
         if self.validation:
+            if len(self.samples) // batch_size:
+                # state the length: on a dataset of unknown length Keras 3 runs one empty step past its end and
+                # averages val_loss over it too, n/(n+1) of the true value (half, with one validation batch)
+                dataset = dataset.apply(tf.data.experimental.assert_cardinality(len(self.samples) // batch_size))
             return dataset, None  # finite dataset — Keras runs until exhausted
         n_steps = len(self.samples) // batch_size
         return dataset, n_steps
@@ -358,7 +363,7 @@ def train_model(title='', data=(), output=None, batch_size=8, epochs=100, lr_sta
             # counter, which restarts per trace and hands two sibling layers the same variable name --
             # fatal only later, when saving to HDF5 (one dataset per weight name): "name already exists".
             model(tf.zeros((1, cz, cy, cx, 1)))
-            names = [w.name for w in model.weights]
+            names = [getattr(w, 'path', w.name) for w in model.weights]   # Keras 3 names a variable 'kernel'; its path is the full name
             if len(names) != len(set(names)):
                 dupes = sorted({n for n in names if names.count(n) > 1})
                 raise RuntimeError(f'model has duplicate weight names (would fail at first save): {dupes[:4]} '
@@ -370,6 +375,10 @@ def train_model(title='', data=(), output=None, batch_size=8, epochs=100, lr_sta
                     checkpoint = os.path.join(weights_path, h5[0]) if h5 else tf.train.latest_checkpoint(weights_path)
                     if checkpoint is None:
                         raise ValueError(f'No weights (.h5) found in {weights_path}')
+                    if not h5 and KERAS3:
+                        raise ValueError(f'{weights_path} holds a TensorFlow checkpoint, which Keras 3 (TensorFlow 2.16 '
+                                         f'and newer) cannot read. Train from it with TensorFlow <= 2.15 instead; that '
+                                         f'run saves a .h5, which loads here.')
                     weights_path = checkpoint
                 model.load_weights(weights_path)
             if xla:
@@ -400,12 +409,7 @@ def train_model(title='', data=(), output=None, batch_size=8, epochs=100, lr_sta
                        'arch': arch,
                        'normalization': normalization,
                        'timestamp': datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}, _f, indent=2)
-        cb_checkpoint_train = tf.keras.callbacks.ModelCheckpoint(filepath=weights_out,
-                                                                 monitor=f'loss',
-                                                                 save_best_only=True,
-                                                                 save_weights_only=True,
-                                                                 mode='min',
-                                                                 verbose=0)
+        cb_checkpoint_train = BestWeightsCheckpoint(weights_out, monitor='loss')
 
         if hasattr(m, 'lr_schedule'):
             # Arch owns its LR schedule (e.g. nnU-Net PolyLR); CLI lr_start/lr_end ignored.

@@ -6,9 +6,11 @@ The following command will create a new environment called `easymode` and instal
 conda create -n easymode python=3.10 git -c conda-forge
 conda activate easymode
 
-pip install "tensorflow[and-cuda]==2.15.1"
+pip install "tensorflow[and-cuda]==2.21.0"
 pip install easymode
 ```
+
+easymode runs on TensorFlow 2.11 through 2.21. Up to 2.15, TensorFlow ships Keras 2, and from 2.16 on, Keras 3. easymode writes the same model files with both, so a model trained with `easymode train` on one version segments on any other.
 
 ### Older setup: TensorFlow 2.11
 easymode also runs on TensorFlow 2.11, the version it was developed with. In that case the CUDA libraries come from conda:

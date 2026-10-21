@@ -1,6 +1,7 @@
 import os
 import tensorflow as tf
 import easymode.core.config as cfg
+from easymode.core.h5weights import KERAS3, save_weights
 from datetime import datetime, timezone
 import json
 
@@ -10,11 +11,16 @@ def package_checkpoint(title='', checkpoint_directory='', apix=10.0, apix_z=None
     output_directory = output_directory or MODEL_CACHE_DIR
     os.makedirs(output_directory, exist_ok=True)
 
-    # Find checkpoint files
-    checkpoint_files = [f.replace('.index', '') for f in os.listdir(checkpoint_directory) if f.endswith('.index')]
+    # Find checkpoint files: the .h5 the trainers write, else an old-style TF checkpoint (*.index)
+    checkpoint_files = sorted(f for f in os.listdir(checkpoint_directory) if f.endswith('.h5'))
     if not checkpoint_files:
-        raise ValueError(f'No checkpoint (*.index) found in {checkpoint_directory}.')
+        checkpoint_files = [f.replace('.index', '') for f in os.listdir(checkpoint_directory) if f.endswith('.index')]
+    if not checkpoint_files:
+        raise ValueError(f'No checkpoint (*.h5 or *.index) found in {checkpoint_directory}.')
     checkpoint_path = os.path.join(checkpoint_directory, checkpoint_files[-1])
+    if not checkpoint_path.endswith('.h5') and KERAS3:
+        raise ValueError(f'{checkpoint_path} is a TensorFlow checkpoint, which Keras 3 (TensorFlow 2.16 and newer) '
+                         f'cannot read. Package it with TensorFlow <= 2.15.')
 
     # Without an explicit arch, determine it from the title.
     # n2n and ddw share the same UNet -- the difference is the (x, y) supervision,
@@ -50,9 +56,12 @@ def package_checkpoint(title='', checkpoint_directory='', apix=10.0, apix_z=None
     model = create()
     _ = model(dummy_input)
 
-    model.load_weights(checkpoint_path).expect_partial()
+    if checkpoint_path.endswith('.h5'):
+        model.load_weights(checkpoint_path)
+    else:
+        model.load_weights(checkpoint_path).expect_partial()
     weights_path = os.path.join(output_directory, f'{title}.h5')
-    model.save_weights(weights_path)
+    save_weights(model, weights_path)
 
     size_mb = os.path.getsize(weights_path) / (1024 * 1024)
     print(f'Saved {weights_path}. File size: {size_mb:.2f} MB')
