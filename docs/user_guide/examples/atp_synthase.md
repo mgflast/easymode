@@ -3,7 +3,7 @@
 In this example we use **easymode**, Warp/Relion/M, and subboxing to segment, pick, and average *Polytomella sp.* ATP synthase.
 
 ??? note "Dataset"
-    For this example we used a curated set of 100 high quality tilt series of FIB-milled *Polytomella sp.* lamellae from [Dietrich et al., Science (2024)](https://www.science.org/doi/10.1126/science.adp4640), generously shared with us by Lea Dietrich and Andre Schwartz (Max Planck Institute for Brain Research, Frankfurt) for us to use in validation of the network. The data is not yet available online, but will soon be deposited onto EMPIAR by the original authors.
+    For this example we used a curated set of 100 high quality tilt series of FIB-milled *Polytomella sp.* lamellae from [Dietrich et al., Science (2024)](https://www.science.org/doi/10.1126/science.adp4640), generously shared with us by Lea Dietrich and Andre Schwartz (Max Planck Institute for Brain Research, Frankfurt) for us to use in validation of the network. The data is available online as [EMPIAR-14085](https://www.ebi.ac.uk/empiar/EMPIAR-14085/).
 
 We reconstructed the tomograms at 10 Å/px as per usual with WarpTools (via `easymode reconstruct`) and denoised them with the IsoNet2-style general denoiser (`easymode denoise --method iso`).
 
